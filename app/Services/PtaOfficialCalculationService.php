@@ -213,19 +213,151 @@ class PtaOfficialCalculationService
     }
 
     /**
+     * Remontee hierarchique officielle : objectif operationnel, objectif
+     * strategique, axe strategique et PAS.
+     *
+     * Regle metier retenue (2026-08-04) : chaque enfant a le meme poids et sa
+     * cible de performance vaut 100 %. Le taux d'un niveau est donc la moyenne
+     * des taux de ses enfants :
+     *
+     *     taux = ( Σ taux des enfants ) ÷ ( 100 × nombre d'enfants ) × 100
+     *          = moyenne des taux des enfants
+     *
+     * Les enfants non parametres (cible absente) sont exclus du calcul.
+     * `target` et `realized` restent les cumuls en unites : ils ne servent plus
+     * au calcul du taux mais restent affiches a titre informatif.
+     *
      * @param  Collection<int, array<string, mixed>>  $rows
      * @return array{target:float,realized:float,rate:?float,display_rate:float,is_configured:bool,excluded:bool,status:string,status_label:string,source:string}
      */
     public function targetWeightedRows(Collection $rows, string $source = 'row_rollup'): array
     {
-        return $this->targetWeighted(
-            $rows->map(fn (array $row): array => [
-                'target' => (float) ($row['calcul_cible'] ?? $row['cible_cumulee'] ?? $row['target'] ?? 0),
-                'realized' => (float) ($row['calcul_realise'] ?? $row['realisation_cumulee'] ?? $row['realized'] ?? 0),
-                'is_configured' => (bool) ($row['calcul_configured'] ?? $row['is_configured'] ?? false),
-            ])->values(),
-            $source
+        $items = $rows->map(fn (array $row): array => [
+            'target' => (float) ($row['calcul_cible'] ?? $row['cible_cumulee'] ?? $row['target'] ?? 0),
+            'realized' => (float) ($row['calcul_realise'] ?? $row['realisation_cumulee'] ?? $row['realized'] ?? 0),
+            'is_configured' => (bool) ($row['calcul_configured'] ?? $row['is_configured'] ?? false),
+            'rate' => $this->rowRate($row),
+        ])->values();
+
+        $configured = $items->filter(
+            fn (array $item): bool => $item['is_configured'] && $item['rate'] !== null
         );
+
+        $cumulatedTarget = round((float) $items->sum(fn (array $item): float => max(0.0, $item['target'])), 4);
+        $cumulatedRealized = round((float) $items->sum(fn (array $item): float => max(0.0, $item['realized'])), 4);
+
+        if ($configured->isEmpty()) {
+            $statutRealisation = StatutRealisation::AParametrer;
+
+            return [
+                'target' => $cumulatedTarget,
+                'realized' => $cumulatedRealized,
+                'rate' => null,
+                'display_rate' => 0.0,
+                'is_configured' => false,
+                'excluded' => true,
+                'status' => $statutRealisation->legacyStatus(),
+                'status_label' => $this->statusLabel($statutRealisation->legacyStatus()),
+                'statut_realisation' => $statutRealisation->value,
+                'statut_realisation_label' => $statutRealisation->label(),
+                'source' => $source,
+            ];
+        }
+
+        $rate = round((float) $configured->avg(fn (array $item): float => (float) $item['rate']), 2);
+        $statutRealisation = StatutRealisation::fromRate($rate, false);
+
+        return [
+            'target' => $cumulatedTarget,
+            'realized' => $cumulatedRealized,
+            'rate' => $rate,
+            'display_rate' => $this->displayRate($rate),
+            'is_configured' => true,
+            'excluded' => false,
+            'status' => $statutRealisation->legacyStatus(),
+            'status_label' => $this->statusLabel($statutRealisation->legacyStatus()),
+            'statut_realisation' => $statutRealisation->value,
+            'statut_realisation_label' => $statutRealisation->label(),
+            'source' => $source,
+        ];
+    }
+
+    /**
+     * Taux deja calcule d'une ligne (action ou niveau agrege), quel que soit le
+     * nom de la cle utilisee par l'appelant.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function rowRate(array $row): ?float
+    {
+        foreach (['taux_realisation', 'performance', 'rate'] as $key) {
+            if (array_key_exists($key, $row) && $row[$key] !== null) {
+                return round(max(0.0, (float) $row[$key]), 2);
+            }
+        }
+
+        $target = (float) ($row['calcul_cible'] ?? $row['cible_cumulee'] ?? $row['target'] ?? 0);
+        $realized = (float) ($row['calcul_realise'] ?? $row['realisation_cumulee'] ?? $row['realized'] ?? 0);
+
+        return $target > 0.0 ? round(($realized / $target) * 100, 2) : null;
+    }
+
+    /**
+     * Taux d'execution du PAS : part des actions echues qui sont realisees.
+     *
+     *     taux = ( actions echues realisees ) ÷ ( actions echues ) × 100
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows  lignes d'action
+     * @return array{rate:?float,display_rate:float,due:int,done:int,is_configured:bool}
+     */
+    public function executionRate(Collection $rows): array
+    {
+        $due = $rows->filter(fn (array $row): bool => (bool) ($row['est_echue'] ?? false));
+        $done = $due->filter(fn (array $row): bool => (bool) ($row['est_realisee'] ?? false));
+
+        return $this->countRatio($done->count(), $due->count());
+    }
+
+    /**
+     * Taux d'avancement global du PAS : part des actions programmees realisees,
+     * independamment de leur echeance.
+     *
+     *     taux = ( actions realisees ) ÷ ( actions programmees ) × 100
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows  lignes d'action
+     * @return array{rate:?float,display_rate:float,due:int,done:int,is_configured:bool}
+     */
+    public function globalCompletionRate(Collection $rows): array
+    {
+        $done = $rows->filter(fn (array $row): bool => (bool) ($row['est_realisee'] ?? false));
+
+        return $this->countRatio($done->count(), $rows->count());
+    }
+
+    /**
+     * @return array{rate:?float,display_rate:float,due:int,done:int,is_configured:bool}
+     */
+    private function countRatio(int $done, int $total): array
+    {
+        if ($total <= 0) {
+            return [
+                'rate' => null,
+                'display_rate' => 0.0,
+                'due' => 0,
+                'done' => 0,
+                'is_configured' => false,
+            ];
+        }
+
+        $rate = round(($done / $total) * 100, 2);
+
+        return [
+            'rate' => $rate,
+            'display_rate' => $this->displayRate($rate),
+            'due' => $total,
+            'done' => $done,
+            'is_configured' => true,
+        ];
     }
 
     public function statusForRate(?float $rate, bool $isLate = false, float $completionThreshold = 100.0): string
@@ -242,7 +374,7 @@ class PtaOfficialCalculationService
     public function statusLabel(string $status): string
     {
         return match ($status) {
-            self::STATUS_TO_CONFIGURE => 'A parametrer',
+            self::STATUS_TO_CONFIGURE => 'À paramétrer',
             self::STATUS_PENDING => 'Non demarree',
             self::STATUS_IN_PROGRESS => 'En cours',
             self::STATUS_DONE => 'Realisee',

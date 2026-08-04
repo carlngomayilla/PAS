@@ -235,6 +235,11 @@ final class UiLabel
             'warning' => 'Vigilance',
             'critical', 'critique' => 'Critique',
             'urgence' => 'Urgence',
+            // Niveaux de risque saisis sur les actions.
+            'faible' => 'Faible',
+            'modere', 'modéré' => 'Modéré',
+            'eleve', 'élevé' => 'Élevé',
+            'majeur' => 'Majeur',
             default => ucfirst(str_replace('_', ' ', (string) $level)),
         };
     }

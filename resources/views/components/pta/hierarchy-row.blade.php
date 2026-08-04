@@ -28,7 +28,7 @@
     $title = match ($level) {
         'axis' => 'Axe strategique',
         'strategic-objective' => 'Objectif strategique',
-        'operational-objective' => 'Objectif operationnel',
+        'operational-objective' => 'Objectif opérationnel',
         'sub-action' => 'Sous-action',
         default => 'Element',
     };

@@ -928,7 +928,7 @@
                 <dl class="action-fiche-dl mt-2">
                     <dt>Mode évaluation</dt><dd>{{ $modeEvaluationLabel }}</dd>
                     @if ($usesQuantitativeProgress)
-                        <dt>Quantite a realiser</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 0, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Quantité à réaliser</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 0, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Unité</dt><dd>{{ $action->unite_cible ?: '-' }}</dd>
                         <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 0, ',', ' ') : '0' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 0, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>

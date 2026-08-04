@@ -125,7 +125,7 @@
                     ['label' => 'Axe strategique', 'node' => $path['axis'] ?? [], 'href' => null, 'tone' => 'text-[#7656a8]'],
                     ['label' => 'Objectif strategique', 'node' => $path['strategic_objective'] ?? [], 'href' => null, 'tone' => 'text-[#7656a8]'],
                     ['label' => 'PAO', 'node' => $path['pao'] ?? [], 'href' => ($path['pao']['id'] ?? null) ? route('workspace.pao.show', $path['pao']['id']) : null, 'tone' => 'text-[#17324a]'],
-                    ['label' => 'Objectif operationnel', 'node' => $path['operational_objective'] ?? [], 'href' => null, 'tone' => 'text-[#168c4c]'],
+                    ['label' => 'Objectif opérationnel', 'node' => $path['operational_objective'] ?? [], 'href' => null, 'tone' => 'text-[#168c4c]'],
                 ] as $step)
                     <div class="min-w-0 border-b border-slate-200 px-4 py-4 last:border-b-0 dark:border-slate-700 md:border-b-0 md:border-r md:last:border-r-0">
                         <p class="text-xs font-black uppercase {{ $step['tone'] }}">{{ $step['label'] }}</p>
@@ -205,7 +205,7 @@
                                         <p class="mt-2 text-xs text-slate-500">Financement : {{ $action['financing'] }}</p>
                                     </td>
                                     <td class="whitespace-nowrap align-top text-sm">
-                                        <p><span class="text-xs font-bold text-slate-500">Debut</span> {{ $action['start_date'] ?? '-' }}</p>
+                                        <p><span class="text-xs font-bold text-slate-500">Début</span> {{ $action['start_date'] ?? '-' }}</p>
                                         <p class="mt-2"><span class="text-xs font-bold text-slate-500">Fin</span> {{ $action['deadline'] ?? '-' }}</p>
                                     </td>
                                     <td class="min-w-[180px] align-top">

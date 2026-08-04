@@ -37,7 +37,7 @@ enum StatutRealisation: string
     public function label(): string
     {
         return match ($this) {
-            self::AParametrer => 'A parametrer',
+            self::AParametrer => 'À paramétrer',
             self::NonDemarree => 'Non demarree',
             self::EnCours => 'En cours',
             self::PartiellementRealisee => 'Partiellement realisee',

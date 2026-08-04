@@ -320,16 +320,16 @@
                                                             <span class="pta-param-kicker">Indicateur de mesure</span>
                                                             <span class="pta-param-edit-affordance">{{ $indicatorDisplay === '' ? 'Parametrer' : 'Modifier' }}</span>
                                                         </span>
-                                                        <strong>{{ $indicatorDisplay !== '' ? $indicatorDisplay : 'A renseigner' }}</strong>
+                                                        <strong>{{ $indicatorDisplay !== '' ? $indicatorDisplay : 'À renseigner' }}</strong>
                                                         <span class="pta-param-trigger-meta">
                                                             <span class="pta-param-chip" data-pta-current-type-label>{{ $indicatorTypeLabel }}</span>
                                                         </span>
                                                         <span class="pta-param-trigger-details">
                                                             @if ($showQuantity)
-                                                                <span>Quantite a realiser : {{ $quantityLabel !== '' ? $quantityLabel : 'A renseigner' }}</span>
+                                                                <span>Quantité à réaliser : {{ $quantityLabel !== '' ? $quantityLabel : 'À renseigner' }}</span>
                                                             @endif
                                                             @if ($showDeliverable)
-                                                                <span>Livrable attendu : {{ $deliverableValue !== '' ? $deliverableValue : 'A renseigner' }}</span>
+                                                                <span>Livrable attendu : {{ $deliverableValue !== '' ? $deliverableValue : 'À renseigner' }}</span>
                                                             @endif
                                                         </span>
                                                     </button>
@@ -349,8 +349,8 @@
                                                         </label>
                                                         <div class="pta-param-grid" data-pta-type-field="quantitatif mixte">
                                                             <label class="pta-param-field">
-                                                                <span>Quantite a realiser</span>
-                                                                <input form="{{ $formId }}" name="quantite_a_realiser" type="number" min="0" step="0.0001" value="{{ $inlineValue($metricRow, 'quantite_a_realiser') }}" class="pta-inline-field" aria-label="Quantite a realiser" placeholder="Ex. 10" data-pta-cell-input>
+                                                                <span>Quantité à réaliser</span>
+                                                                <input form="{{ $formId }}" name="quantite_a_realiser" type="number" min="0" step="0.0001" value="{{ $inlineValue($metricRow, 'quantite_a_realiser') }}" class="pta-inline-field" aria-label="Quantité à réaliser" placeholder="Ex. 10" data-pta-cell-input>
                                                             </label>
                                                             <label class="pta-param-field">
                                                                 <span>Unite</span>
@@ -366,16 +366,16 @@
                                             @else
                                                 <x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$cellPreviewMode">
                                                     <span class="pta-param-readonly">
-                                                        <span class="pta-param-readonly-title">{{ $indicatorDisplay !== '' ? $indicatorDisplay : 'A renseigner' }}</span>
+                                                        <span class="pta-param-readonly-title">{{ $indicatorDisplay !== '' ? $indicatorDisplay : 'À renseigner' }}</span>
                                                         <span class="pta-param-trigger-meta">
                                                             <span class="pta-param-chip">{{ $indicatorTypeLabel }}</span>
                                                         </span>
                                                         <span class="pta-param-trigger-details">
                                                             @if ($showQuantity)
-                                                                <span>Quantite a realiser : {{ $quantityLabel !== '' ? $quantityLabel : 'A renseigner' }}</span>
+                                                                <span>Quantité à réaliser : {{ $quantityLabel !== '' ? $quantityLabel : 'À renseigner' }}</span>
                                                             @endif
                                                             @if ($showDeliverable)
-                                                                <span>Livrable attendu : {{ $deliverableValue !== '' ? $deliverableValue : 'A renseigner' }}</span>
+                                                                <span>Livrable attendu : {{ $deliverableValue !== '' ? $deliverableValue : 'À renseigner' }}</span>
                                                             @endif
                                                         </span>
                                                     </span>

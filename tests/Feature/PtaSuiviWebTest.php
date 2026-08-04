@@ -16,6 +16,7 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
+use App\Services\Exports\PtaEvolutionWorkbookExporter;
 use App\Services\Exports\PtaSuiviWorkbookExporter;
 use App\Services\PtaSuiviService;
 use App\Services\RolePermissionSettings;
@@ -50,7 +51,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('S1', false)
             ->assertSee('Janvier', false)
             ->assertSee('Aucune action PTA', false)
-            ->assertSee('>Synthese</a>', false)
+            ->assertSee('>Synthèse</a>', false)
             ->assertSee('onclick="window.print()"', false)
             ->assertDontSee('id="admin-sidebar-open"', false);
     }
@@ -625,10 +626,10 @@ class PtaSuiviWebTest extends TestCase
             ->assertDontSee('data-pta-type-input', false)
             ->assertDontSee('data-pta-param-fields', false)
             ->assertDontSee('data-pta-type-continue', false)
-            ->assertSee('Quantite a realiser', false)
+            ->assertSee('Quantité à réaliser', false)
             ->assertDontSee('Livrable / resultat attendu', false)
-            ->assertSee('Quantite a realiser : 10 dossiers', false)
-            ->assertSee('Quantite a realiser : 5 dossiers', false)
+            ->assertSee('Quantité à réaliser : 10 dossiers', false)
+            ->assertSee('Quantité à réaliser : 5 dossiers', false)
             ->assertSee('Livrable attendu : Dossiers valides signes', false)
             ->assertDontSee('Seuil (%)', false)
             ->assertDontSee('name="rmo_id"', false)
@@ -639,7 +640,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertDontSee('Seuil : 80%', false)
             ->assertDontSee('value="10"', false)
             ->assertDontSee('value="5"', false)
-            ->assertSee('100.00%')
+            ->assertSee('100%')
             ->assertSeeInOrder([
                 'Action avec sous-actions detaillees',
                 '1.</span>',
@@ -670,12 +671,12 @@ class PtaSuiviWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
-            ->assertSee('A renseigner', false)
+            ->assertSee('À renseigner', false)
             ->assertDontSee('data-pta-indicator-cell', false)
             ->assertDontSee('data-pta-param-fields', false)
             ->assertDontSee('aria-controls="pta-indicator-panel-', false)
             ->assertDontSee('pta-param-edit-affordance', false)
-            ->assertSee('Quantite a realiser : 10 dossiers', false)
+            ->assertSee('Quantité à réaliser : 10 dossiers', false)
             ->assertDontSee('name="type_indicateur"', false)
             ->assertDontSee('name="indicateur"', false)
             ->assertDontSee('type="hidden" name="libelle" value="Action indicateur vide"', false)
@@ -766,7 +767,7 @@ class PtaSuiviWebTest extends TestCase
             $this->assertStringContainsString('Sous-actions', $sheet);
             $this->assertStringContainsString('Verifier les pieces', $sheet);
             $this->assertStringContainsString('Type : Mixte', $sheet);
-            $this->assertStringContainsString('Quantite a realiser : 3 dossiers', $sheet);
+            $this->assertStringContainsString('Quantité à réaliser : 3 dossiers', $sheet);
             $this->assertStringContainsString('Livrable attendu : PV signe', $sheet);
             $this->assertStringNotContainsString('Progression</t>', $sheet);
         } finally {
@@ -1034,7 +1035,7 @@ class PtaSuiviWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('pta.suivi.details', $action))
             ->assertOk()
-            ->assertSee("Detail de l'action PTA", false)
+            ->assertSee("Détail de l'action PTA", false)
             ->assertSee('Action detail modal', false)
             ->assertSee('Retard', false)
             ->assertSee('RMO', false)
@@ -1097,7 +1098,14 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('Action visible malgre filtre invalide', false);
     }
 
-    public function test_pta_suivi_uses_target_weighted_rollups_instead_of_simple_average(): void
+    /**
+     * Regle metier du 2026-08-04 : chaque action pese autant que les autres
+     * dans son objectif operationnel, quelle que soit sa cible.
+     *
+     * 80/100 = 80 % et 10/20 = 50 % donnent (80 + 50) / 2 = 65 %.
+     * L'ancienne ponderation par la cible aurait donne 90/120 = 75 %.
+     */
+    public function test_pta_suivi_rollup_gives_every_action_the_same_weight(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-06-27 10:00:00'));
 
@@ -1118,8 +1126,8 @@ class PtaSuiviWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
-            ->assertSee('75.00%', false)
-            ->assertDontSee('65.00%', false);
+            ->assertSee('65%', false)
+            ->assertDontSee('75%', false);
     }
 
     public function test_pta_suivi_marks_zero_target_as_to_configure_and_excludes_it_from_rollup(): void
@@ -1144,7 +1152,7 @@ class PtaSuiviWebTest extends TestCase
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
             ->assertSee('Action sans quantite', false)
-            ->assertSee('A parametrer', false)
+            ->assertSee('À paramétrer', false)
             ->assertSee('Performance consolidee : 50.00%', false);
     }
 
@@ -1274,6 +1282,83 @@ class PtaSuiviWebTest extends TestCase
             ->get(route('pta.suivi.export.pdf', ['annee' => 'all']))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_planning_control_profile_can_export_pta_evolution_report_pdf(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pta.suivi.export.evolution-pdf', ['annee' => 'all']))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_planning_control_profile_can_export_pta_evolution_report_excel(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pta.suivi.export.evolution-excel', ['annee' => 'all']))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+
+    /**
+     * Le rapport d'evolution suit le modele institutionnel : un bloc par
+     * objectif operationnel (axe, objectif strategique, objectif operationnel)
+     * puis les neuf colonnes du tableau des actions detaillees.
+     */
+    public function test_pta_evolution_workbook_follows_the_institutional_template(): void
+    {
+        if (! class_exists(ZipArchive::class)) {
+            $this->markTestSkipped('ZipArchive extension is required to inspect XLSX contents.');
+        }
+
+        $user = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+        ]);
+        $this->makePtaAction('Actualiser le tableau de conservation', '2026-04-15', [
+            'ressources_necessaires' => ['ressources_humaines'],
+            'ressources_details' => 'Juriste ANBG, personnel archives',
+            'risque_potentiel' => 'Indisponibilite des agents',
+            'indicateurs_attendus' => 'Tableau de conservation actualise',
+        ]);
+
+        $request = Request::create(route('pta.suivi.index'), 'GET', ['annee' => 'all']);
+        $payload = app(PtaSuiviService::class)->buildPagePayload($request, $user);
+        $path = app(PtaEvolutionWorkbookExporter::class)->create($payload);
+
+        try {
+            $zip = new ZipArchive;
+            $this->assertTrue($zip->open($path) === true);
+            $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+            $zip->close();
+
+            foreach (PtaEvolutionWorkbookExporter::COLUMNS as $column) {
+                $this->assertStringContainsString(
+                    htmlspecialchars($column, ENT_XML1 | ENT_COMPAT, 'UTF-8'),
+                    $sheet,
+                    "La colonne « {$column} » du modele institutionnel est absente du classeur."
+                );
+            }
+
+            $this->assertStringContainsString('AXE STRAT', $sheet);
+            $this->assertStringContainsString('OBJECTIF STRAT', $sheet);
+            $this->assertStringContainsString('OBJECTIF OP', $sheet);
+            $this->assertStringContainsString('Actualiser le tableau de conservation', $sheet);
+            $this->assertStringContainsString('Ressources humaines, Juriste ANBG, personnel archives', $sheet);
+            $this->assertStringContainsString('Indisponibilite des agents', $sheet);
+        } finally {
+            @unlink($path);
+        }
     }
 
     public function test_reporting_pta_view_uses_official_suivi_component(): void

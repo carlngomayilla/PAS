@@ -256,14 +256,14 @@
                     </select>
                     <p class="mt-1 text-xs text-slate-500" data-type-action-hint>
                         @switch($typeAction)
-                            @case('quantitative') Quantite a realiser + unite + seuils numeriques. @break
+                            @case('quantitative') Quantité à réaliser + unite + seuils numériques. @break
                             @case('composee') Performance calculée depuis les sous-actions (poids Σ=100%). @break
                             @default Pièce justificative attendue (réalisé = 0 % ou 100 %).
                         @endswitch
                     </p>
                 </div>
                 <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
-                    <label>Quantite a realiser</label>
+                    <label>Quantité à réaliser</label>
                     <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="1" min="0" value="{{ isset($rowData['quantite_cible']) && $rowData['quantite_cible'] !== '' && $rowData['quantite_cible'] !== null ? (int) $rowData['quantite_cible'] : '' }}" @disabled(! $showTargetFields)>
                     @error("actions.$index.quantite_cible") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
@@ -368,7 +368,7 @@
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][date_fin]" type="date" value="{{ $subAction['date_fin'] ?? ($rowData['date_fin'] ?? '') }}" @readonly($subActionDatesLocked)>
                             </div>
                             <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">
-                                <label>Quantite a realiser</label>
+                                <label>Quantité à réaliser</label>
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][cible_prevue]" type="number" step="1" min="0" value="{{ isset($subAction['cible_prevue']) && $subAction['cible_prevue'] !== '' && $subAction['cible_prevue'] !== null ? (int) $subAction['cible_prevue'] : '' }}">
                             </div>
                             <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">

@@ -28,9 +28,11 @@ use App\Services\DeadlineExtensionQueueService;
 use App\Services\ExerciceContext;
 use App\Services\FinancialMonitoringService;
 use App\Services\PersonalTaskService;
+use App\Services\PtaOfficialCalculationService;
 use App\Services\PtaSuiviService;
 use App\Services\WorkflowSettings;
 use App\Support\SafeSql;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
@@ -70,6 +72,7 @@ class DashboardController extends Controller
         private readonly ActionStatusService $actionStatusService,
         private readonly PersonalTaskService $personalTaskService,
         private readonly PtaSuiviService $ptaSuiviService,
+        private readonly PtaOfficialCalculationService $officialCalculation,
         private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService,
         private readonly FinancialMonitoringService $financialMonitoringService
     ) {}
@@ -808,6 +811,48 @@ class DashboardController extends Controller
             ->last();
 
         return $date instanceof Carbon ? $date->copy()->endOfMonth() : now()->endOfQuarter();
+    }
+
+    /**
+     * Indicateurs PAS bases sur le comptage d'actions terminees.
+     *
+     *   taux d'execution        = actions echues realisees ÷ actions echues × 100
+     *   taux d'avancement global = actions realisees ÷ actions programmees × 100
+     *   performance moyenne     = moyenne des taux des axes strategiques
+     *
+     * Une action n'est comptee comme realisee que si elle est entierement
+     * executee (100 %) : une action a 80 % ne compte pas.
+     *
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, float|int>
+     */
+    private function pasCompletionIndicators(Collection $actions): array
+    {
+        $rows = $actions->map(function (Action $action): array {
+            $result = $this->officialCalculation->actionResult($action);
+            $deadline = $this->actionDeadline($action);
+
+            return [
+                'est_realisee' => (float) ($result['display_rate'] ?? 0) >= 100.0,
+                'est_echue' => $deadline instanceof Carbon && $deadline->copy()->startOfDay()->lte(Carbon::today()),
+                'taux_realisation' => $result['rate'],
+                'calcul_configured' => (bool) ($result['is_configured'] ?? false),
+            ];
+        })->values();
+
+        $execution = $this->officialCalculation->executionRate($rows);
+        $completion = $this->officialCalculation->globalCompletionRate($rows);
+        $performance = $this->officialCalculation->targetWeightedRows($rows, 'pas_global');
+
+        return [
+            'execution_rate' => (float) $execution['display_rate'],
+            'actions_echues' => (int) $execution['due'],
+            'actions_echues_realisees' => (int) $execution['done'],
+            'completion_actions_rate' => (float) $completion['display_rate'],
+            'actions_realisees' => (int) $completion['done'],
+            'actions_programmees' => (int) $completion['due'],
+            'pas_performance' => (float) $performance['display_rate'],
+        ];
     }
 
     private function dashboardPtaProgressRate(Action $action): float
@@ -2501,6 +2546,7 @@ class DashboardController extends Controller
             'completion_rate' => $this->completionRate($statusCounts['acheve'], $actions->count()),
             'delay_rate' => $this->completionRate(max(0, $actions->count() - $statusCounts['en_retard']), $actions->count()),
             'global_progress' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
+            ...$this->pasCompletionIndicators($actions),
             'global_score' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
             'directions_total' => collect($directionRows)->count(),
             'services_total' => $actions->pluck('pta.service_id')->filter()->unique()->count(),
@@ -3086,8 +3132,45 @@ class DashboardController extends Controller
             ->count();
         $summaryCards = [
             [
-                ...$this->makeRoleCard('Avancement global', number_format((float) $portfolio['global_progress'], 1, ',', ' ').'%', 'Progression moyenne des actions visibles', route('workspace.reporting'), '#2563EB', '#EFF6FF', null, 'info'),
+                ...$this->makeRoleCard(
+                    "Taux d'exécution",
+                    UiLabel::percent((float) $portfolio['execution_rate']),
+                    $portfolio['actions_echues_realisees'].' action(s) échue(s) réalisée(s) sur '.$portfolio['actions_echues'],
+                    route('workspace.reporting'),
+                    '#B45309',
+                    '#FFFBEB',
+                    null,
+                    'warning'
+                ),
+                'icon' => '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>',
+                'used' => true,
+            ],
+            [
+                ...$this->makeRoleCard(
+                    'Avancement global',
+                    UiLabel::percent((float) $portfolio['completion_actions_rate']),
+                    $portfolio['actions_realisees'].' action(s) réalisée(s) sur '.$portfolio['actions_programmees'].' programmée(s)',
+                    route('workspace.reporting'),
+                    '#2563EB',
+                    '#EFF6FF',
+                    null,
+                    'info'
+                ),
                 'icon' => '<path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/>',
+                'used' => true,
+            ],
+            [
+                ...$this->makeRoleCard(
+                    'Performance moyenne des axes',
+                    UiLabel::percent((float) $portfolio['pas_performance']),
+                    "Niveau moyen d'atteinte des résultats programmés",
+                    route('workspace.reporting'),
+                    '#0F766E',
+                    '#F0FDFA',
+                    null,
+                    'info'
+                ),
+                'icon' => '<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>',
                 'used' => true,
             ],
             [
@@ -5562,13 +5645,31 @@ class DashboardController extends Controller
     /**
      * @param  Collection<int, Action>  $actions
      */
+    /**
+     * Taux d'un niveau de la vue synthetique : moyenne des taux des actions
+     * qu'il regroupe, calcules par le service officiel afin que la Synthese et
+     * le Suivi PTA affichent la meme valeur.
+     *
+     * @param  Collection<int, Action>  $actions
+     */
     private function synthesisActionsProgress(Collection $actions): float
     {
         if ($actions->isEmpty()) {
             return 0.0;
         }
 
-        return round((float) $actions->avg(fn (Action $action): float => $this->dashboardPtaProgressRate($action)), 2);
+        $rows = $actions->map(function (Action $action): array {
+            $result = $this->officialCalculation->actionResult($action);
+
+            return [
+                'taux_realisation' => $result['rate'],
+                'calcul_configured' => (bool) ($result['is_configured'] ?? false),
+                'calcul_cible' => (float) ($result['target'] ?? 0),
+                'calcul_realise' => (float) ($result['realized'] ?? 0),
+            ];
+        })->values();
+
+        return (float) $this->officialCalculation->targetWeightedRows($rows, 'synthesis')['display_rate'];
     }
 
     private function synthesisAlertLabel(string $status): string

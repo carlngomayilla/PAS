@@ -7,6 +7,112 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-08-04 - Base de calcul unifiée des taux (règle métier de référence)
+
+### Changement
+
+La note métier de référence fixe **six indicateurs** et deux familles de lecture. Cette règle remplace les deux chaînes de calcul divergentes qui coexistaient (pondération par la cible côté Suivi PTA officiel, moyenne arithmétique côté tableau de bord).
+
+#### Famille 1 — Performance progressive (niveaux 1 à 4)
+
+| Niveau | Formule |
+| --- | --- |
+| Action | `réalisation ÷ cible × 100` |
+| Objectif opérationnel | `Σ taux des actions ÷ (100 × nombre d'actions) × 100` = moyenne des taux |
+| Objectif stratégique | moyenne des taux des objectifs opérationnels |
+| Axe stratégique | moyenne des taux des objectifs stratégiques |
+
+Chaque enfant a le **même poids** et sa cible de performance vaut 100 %. Une action de cible 1 000 pèse désormais autant qu'une action de cible 10 — auparavant elle pesait cent fois plus.
+
+#### Famille 2 — Comptage d'actions terminées (indicateurs du PAS)
+
+| Indicateur | Formule |
+| --- | --- |
+| Taux d'exécution du PAS | `actions échues réalisées ÷ actions échues × 100` |
+| Taux d'avancement global du PAS | `actions réalisées ÷ actions programmées × 100` |
+
+Une action n'est comptée comme réalisée qu'à **100 %** : une action à 80 % ne compte pas. Ces deux indicateurs ne doivent pas être confondus avec la performance progressive.
+
+### Portée
+
+Toutes les surfaces passent désormais par `PtaOfficialCalculationService` :
+
+- Suivi PTA officiel, Reporting PTA et exports PDF/Excel (`PtaSuiviService::groupRows()`) ;
+- Vue synthétique des axes (`synthesisActionsProgress()` — utilisait auparavant une cascade sur cinq colonnes) ;
+- Cartes du tableau de bord : « Taux d'exécution », « Avancement global » et « Performance moyenne des axes », chacune avec le comptage brut en sous-titre (`4 action(s) échue(s) réalisée(s) sur 6`).
+
+### Fichiers modifiés
+
+- `app/Services/PtaOfficialCalculationService.php` : `targetWeightedRows()` passe en moyenne des taux des enfants ; nouvelles méthodes `executionRate()`, `globalCompletionRate()`, `rowRate()`, `countRatio()`.
+- `app/Services/PtaSuiviService.php` : champs `est_realisee` / `est_echue` sur la ligne d'action ; indicateurs PAS ajoutés au résumé.
+- `app/Http/Controllers/DashboardController.php` : `pasCompletionIndicators()`, refonte des cartes KPI, `synthesisActionsProgress()` aligné sur le service officiel.
+- `resources/views/partials/dashboard-analytics.blade.php` : ordre des cartes (exécution, global, performance).
+- `docs/FORMULES-CALCUL-TAUX.md` : document de référence mis à jour, ancienne règle conservée en annexe.
+
+### Validation
+
+- `tests/Unit/PtaOfficialCalculationServiceTest.php` : l'exemple institutionnel complet est figé en test — OP1 90 %, OP2 80 %, OP3 100 %, OP4 75 %, OS1 85 %, OS2 87,5 %, axe 86,25 %, exécution 66,67 % (4/6), avancement global 62,5 % (5/8). **Reproduit au chiffre près.**
+- Tests complémentaires : poids identique quelle que soit la cible, exclusion des enfants non paramétrés, absence d'action échue.
+- `tests/Feature/PtaCalculationFormulaTest.php` et `tests/Feature/PtaSuiviWebTest.php` : assertions de l'ancienne règle remplacées par la nouvelle (75 % au lieu de 87,5 %, 65 % au lieu de 75 %).
+
+---
+
+## 2026-08-04 - Correctif : erreur 500 sur tout le tableau de bord
+
+### Changement
+
+Un commentaire `{{-- … --}}` avait été placé **à l'intérieur** d'un bloc `@php … @endphp` dans `resources/views/partials/dashboard-analytics.blade.php`. Blade n'interprète pas ses commentaires dans ces blocs : le texte se retrouvait tel quel dans le PHP compilé et provoquait `ParseError: syntax error, unexpected identifier "arrondi"`. **Toutes les pages du tableau de bord renvoyaient 500.**
+
+Commentaire converti en `//`. Vérifié : la page rend à nouveau, et les 202 vues Blade compilent sans erreur. Un contrôle automatique a confirmé qu'aucun autre bloc `@php` ne contient de commentaire Blade.
+
+**Leçon :** ne jamais utiliser `{{-- --}}` entre `@php` et `@endphp` — seul `//` ou `/* */` y est valide.
+
+---
+
+## 2026-08-04 - Rapport d'évolution du PTA (PDF et Excel) au modèle institutionnel
+
+### Changement
+
+Nouveau export **« Rapport d'évolution du PTA »**, calqué sur le support institutionnel ANBG (`PLAN D'ACTION STRATEGIQUE DSIC.pptx`) fourni comme modèle de référence.
+
+Structure reproduite à l'identique : un bloc par **objectif opérationnel**, précédé de trois bandeaux (`AXE STRATÉGIQUE`, `OBJECTIF STRATÉGIQUE`, `OBJECTIF OPÉRATIONNEL N° x`), puis le tableau des actions détaillées à **neuf colonnes** :
+
+| Colonne du modèle | Source applicative |
+| --- | --- |
+| DESCRIPTION DES ACTIONS DÉTAILLÉES | `actions.libelle` |
+| RMO | responsable / responsables de l'action |
+| CIBLE | seuil de complétude (`seuil_minimum`) |
+| DÉBUT | `actions.date_debut` |
+| FIN | échéance résolue de l'action |
+| ÉTAT DE RÉALISATION | statut d'avancement officiel |
+| RESSOURCES REQUISES | `Action::resourceLabels()` (tableau JSON `ressources_necessaires`, repli sur les anciennes colonnes booléennes) + texte libre `ressources_details` |
+| INDICATEURS DE PERFORMANCE | KPI, `indicateurs_attendus` ou indicateur de l'objectif |
+| RISQUES POTENTIELS | `risque_potentiel` / `risque_lie`, complété du niveau de risque |
+
+- Les deux formats partagent le périmètre, les filtres et le contrôle d'accès du Suivi PTA (`buildPagePayload`) : ce que l'utilisateur voit à l'écran est ce qu'il exporte.
+- Le rapport trimestriel rédigé conserve son propre modèle, déjà présent dans l'application (`ReportExportService`, `PtaQuarterlyReportPreviewService`) — il n'est pas touché.
+
+### Fichiers ajoutés / modifiés
+
+- `app/Services/Exports/PtaEvolutionWorkbookExporter.php` (nouveau) : hérite de `PtaSuiviWorkbookExporter` pour la plomberie XLSX et ne redéfinit que la composition des lignes.
+- `resources/views/workspace/pta-suivi/evolution-pdf.blade.php` (nouveau) : rendu PDF A4 paysage.
+- `app/Services/PtaSuiviService.php` : ajout de `debut_label`, `fin_label`, `ressources_requises` et `risques_potentiels` sur la ligne d'action ; `titleScopeLabel()` passe en public.
+- `app/Http/Controllers/Web/PtaSuiviWebController.php` : `exportEvolutionPdf()`, `exportEvolutionExcel()`, mutualisation du streaming de classeur.
+- `routes/web.php` : `pta.suivi.export.evolution-pdf` et `pta.suivi.export.evolution-excel`.
+- `resources/views/workspace/pta-suivi/index.blade.php` : deux boutons « Rapport d'évolution ».
+
+### Validation
+
+- `tests/Feature/PtaSuiviWebTest.php` : trois tests ajoutés (accès PDF, accès Excel, conformité du classeur au modèle — les neuf en-têtes, les trois bandeaux et les données métier sont présents). **3 tests passés, 22 assertions.**
+- Échantillon généré sur la base locale (36 actions) et vérifié ligne à ligne : bandeaux, en-têtes et données métier conformes au modèle.
+
+### Corrections associées
+
+- **Cartes de graphiques qui disparaissaient** : les graphiques de rôle (`dashboard-role-comparison-chart`, `-trend-chart`, `-support-chart`) étaient retirés du DOM lorsque leurs données étaient vides, alors que les graphiques du PTA trimestriel affichent une carte avec un état vide. L'affichage dépend désormais uniquement de ce que le rôle déclare : la carte reste visible et montre « Aucune donnée disponible ». Comportement homogène entre profils et indépendant des données du moment.
+- **Accents** : `À paramétrer`, `À renseigner`, `Quantité à réaliser` et les niveaux de risque (`Faible`, `Modéré`, `Élevé`, `Majeur`, via `UiLabel::alertLevel()`) étaient affichés sans accents, y compris dans les exports.
+
+---
+
 ## 2026-08-04 - Clôture planification non reconnue, progression de la vue synthétique, en-têtes de tableaux
 
 ### Changement

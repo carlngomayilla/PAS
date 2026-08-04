@@ -30,10 +30,19 @@ class DashboardShellPolishTest extends TestCase
         $this->assertCount(6, $primaryCards[0]);
 
         $renderedCards = implode("\n", $primaryCards[0]);
-        $this->assertStringContainsString('Avancement global', $primaryCards[0][0]);
+
+        // Ordre fixe par la regle metier du 2026-08-04 : les deux indicateurs
+        // du PAS d'abord, puis la performance moyenne des axes.
+        // Le contenu est du HTML brut : l'apostrophe y est echappee.
+        $this->assertStringContainsString(e("Taux d'exécution"), $primaryCards[0][0]);
+        $this->assertStringContainsString('Avancement global', $primaryCards[0][1]);
+        $this->assertStringContainsString('Performance moyenne des axes', $primaryCards[0][2]);
+
+        // Les sous-titres exposent le comptage brut, verifiable d'un coup d'oeil.
+        $this->assertStringContainsString('action(s) échue(s) réalisée(s) sur', $primaryCards[0][0]);
+        $this->assertStringContainsString('action(s) réalisée(s) sur', $primaryCards[0][1]);
+
         $this->assertStringContainsString('Actions en retard', $renderedCards);
-        $this->assertStringContainsString('Actions clôturées', $renderedCards);
-        $this->assertStringContainsString('En attente validation contrôleur', $renderedCards);
         $this->assertStringNotContainsString('Alertes critiques', $renderedCards);
     }
 

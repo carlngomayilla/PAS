@@ -120,9 +120,9 @@
     $showDirectionSynthesisSelector = ($directionSelector['enabled'] ?? false)
         && in_array($dashboardRole, $pilotDashboardRoles, true);
     $availableDashboardTabs = [
-        'overview' => 'Synthese',
+        'overview' => 'Synthèse',
         'charts' => 'Graphiques',
-        'advanced' => 'Vue detaillee',
+        'advanced' => 'Vue détaillée',
     ];
     $dashboardTabAliases = [
         'overview' => 'overview',
@@ -194,7 +194,9 @@
         ->sortBy(function (array $card): int {
             $label = \Illuminate\Support\Str::ascii(mb_strtolower((string) ($card['label'] ?? '')));
 
-            foreach (['execution', 'global', 'validation', 'retard', 'alerte', 'critique', 'action', 'pta'] as $index => $needle) {
+            // Ordre des cartes du PAS : taux d'execution, avancement global,
+            // performance moyenne des axes, puis les indicateurs de flux.
+            foreach (['execution', 'global', 'performance', 'validation', 'retard', 'alerte', 'critique', 'action', 'pta'] as $index => $needle) {
                 if (str_contains($label, $needle)) {
                     return $index;
                 }

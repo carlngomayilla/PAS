@@ -1,6 +1,6 @@
 @extends('layouts.workspace')
 
-@section('title', 'Detail action PTA')
+@section('title', 'Détail action PTA')
 
 @section('content')
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">

@@ -868,7 +868,7 @@ class ReportingAnalyticsService
         ) {
             $addRow(
                 'Indicateur de mesure',
-                'A renseigner',
+                'À renseigner',
                 'Completer le type d indicateur et les champs attendus dans le PTA.'
             );
         }
@@ -1369,7 +1369,7 @@ class ReportingAnalyticsService
                 return [
                     'action' => (string) ($action->libelle ?? '-'),
                     'indicateur' => $this->indicatorLabel((string) ($kpi->libelle ?? '-')),
-                    'type' => (string) ($kpi->periodicite ?? ($kpi->est_a_renseigner ? 'A renseigner' : 'Suivi')),
+                    'type' => (string) ($kpi->periodicite ?? ($kpi->est_a_renseigner ? 'À renseigner' : 'Suivi')),
                     'periode' => (string) ($measure?->periode ?? '-'),
                     'valeur' => $value,
                     'seuil' => $threshold,
@@ -1767,7 +1767,7 @@ class ReportingAnalyticsService
         // (cf. ActionStatusService) : inclut 'a_parametrer' (via statut_parametrage,
         // prioritaire) et fond les 11 valeurs de statut_dynamique dans le meme
         // vocabulaire que le dashboard. Corrige les statuts manquants/illisibles
-        // signales sur les graphiques (notamment l'absence de "A parametrer").
+        // signales sur les graphiques (notamment l'absence de "À paramétrer").
         $bucketExpr = 'CASE '
             ."WHEN actions.statut_parametrage = 'a_parametrer' THEN 'a_parametrer' "
             ."WHEN actions.statut_dynamique IN ('acheve_dans_delai','acheve_hors_delai','cloturee') THEN 'acheve' "

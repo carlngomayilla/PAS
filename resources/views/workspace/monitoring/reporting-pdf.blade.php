@@ -193,7 +193,7 @@
             <span class="section-kicker">PTA</span>
             <h2>Actions du PTA</h2>
             <table class="compact">
-                <thead><tr><th>Direction</th><th>Service</th><th>Objectif operationnel</th><th>Action</th><th>RMO</th><th>Debut</th><th>Fin</th><th>Quantite a realiser / livrable</th><th>Ressources</th><th>Risque</th><th>Statut</th><th>Avancement (%)</th></tr></thead>
+                <thead><tr><th>Direction</th><th>Service</th><th>Objectif opérationnel</th><th>Action</th><th>RMO</th><th>Début</th><th>Fin</th><th>Quantité à réaliser / livrable</th><th>Ressources</th><th>Risque</th><th>Statut</th><th>Avancement (%)</th></tr></thead>
                 <tbody>
                     @forelse ($actionRows as $row)
                         <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['objectif_operationnel'] ?? '-' }}</td><td>{{ $row['description_action'] ?? $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td>{{ $row['debut'] ?? '-' }}</td><td>{{ $row['fin'] ?? '-' }}</td><td>{{ $row['cible'] ?? '-' }}</td><td>{{ $row['ressources_requises'] ?? '-' }}</td><td>{{ $row['risque_resume'] ?? '-' }}</td><td>{{ $row['statut'] ?? '-' }}</td><td>{{ $row['progression'] ?? $row['progression_value'] ?? 0 }}</td></tr>
@@ -210,7 +210,7 @@
             <span class="section-kicker">Actions</span>
             <h2>Actions detaillees</h2>
             <table class="compact">
-                <thead><tr><th>Direction</th><th>Service</th><th>Objectif operationnel</th><th>Description action</th><th>RMO</th><th>Debut</th><th>Fin</th><th>Mode execution</th><th>Quantite a realiser / livrable</th><th>Avancement reel (%)</th><th>Financement</th><th>Risque</th><th>Ressources</th><th>KPI global (%)</th></tr></thead>
+                <thead><tr><th>Direction</th><th>Service</th><th>Objectif opérationnel</th><th>Description action</th><th>RMO</th><th>Début</th><th>Fin</th><th>Mode exécution</th><th>Quantité à réaliser / livrable</th><th>Avancement réel (%)</th><th>Financement</th><th>Risque</th><th>Ressources</th><th>KPI global (%)</th></tr></thead>
                 <tbody>
                     @forelse ($actionRows as $row)
                         <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['objectif_operationnel'] ?? '-' }}</td><td>{{ $row['description_action'] ?? $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td>{{ $row['debut'] ?? '-' }}</td><td>{{ $row['fin'] ?? '-' }}</td><td>{{ $row['mode_execution'] ?? '-' }}</td><td>{{ $row['cible'] ?? '-' }}</td><td>{{ $row['progression'] ?? $row['progression_value'] ?? 0 }}</td><td>{{ $row['financement_resume'] ?? '-' }}</td><td>{{ $row['risque_resume'] ?? '-' }}</td><td>{{ $row['ressources_requises'] ?? '-' }}</td><td>{{ $row['kpi_global'] ?? $row['kpi_global_value'] ?? 0 }}</td></tr>
@@ -228,7 +228,7 @@
             <h2>Indicateurs par action</h2>
             <table class="compact">
                 {{-- Colonne Conformite retiree (2026-05-28) du reporting PDF KPI. --}}
-                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>RMO</th><th>Performance (%)</th><th>Delai (%)</th><th>Avancement reel (%)</th><th>KPI global (%)</th></tr></thead>
+                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>RMO</th><th>Performance (%)</th><th>Delai (%)</th><th>Avancement réel (%)</th><th>KPI global (%)</th></tr></thead>
                 <tbody>
                     @forelse ($actionRows as $row)
                         <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td>{{ $row['kpi_performance'] ?? $row['kpi_performance_value'] ?? 0 }}</td><td>{{ $row['kpi_delai'] ?? $row['kpi_delai_value'] ?? 0 }}</td><td>{{ $row['progression'] ?? $row['progression_value'] ?? 0 }}</td><td>{{ $row['kpi_global'] ?? $row['kpi_global_value'] ?? 0 }}</td></tr>

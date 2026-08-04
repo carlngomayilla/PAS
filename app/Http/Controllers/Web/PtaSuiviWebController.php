@@ -14,6 +14,7 @@ use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\DeletionRequestService;
+use App\Services\Exports\PtaEvolutionWorkbookExporter;
 use App\Services\Exports\PtaSuiviWorkbookExporter;
 use App\Services\PlanningModificationLockService;
 use App\Services\PtaSuiviService;
@@ -32,7 +33,8 @@ class PtaSuiviWebController extends Controller
 
     public function __construct(
         private readonly PtaSuiviService $ptaSuiviService,
-        private readonly PtaSuiviWorkbookExporter $workbookExporter
+        private readonly PtaSuiviWorkbookExporter $workbookExporter,
+        private readonly PtaEvolutionWorkbookExporter $evolutionWorkbookExporter
     ) {}
 
     public function index(Request $request)
@@ -200,6 +202,76 @@ class PtaSuiviWebController extends Controller
         $filename = $this->filename($payload, 'xlsx');
         $tempPath = $this->workbookExporter->create($payload);
 
+        return response()->streamDownload(function () use ($tempPath): void {
+            $stream = fopen($tempPath, 'rb');
+            if (! is_resource($stream)) {
+                @unlink($tempPath);
+
+                return;
+            }
+
+            try {
+                while (! feof($stream)) {
+                    $chunk = fread($stream, 8192);
+                    if ($chunk === false) {
+                        break;
+                    }
+
+                    echo $chunk;
+                }
+            } finally {
+                fclose($stream);
+                @unlink($tempPath);
+            }
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    /**
+     * Rapport d'evolution du PTA au format PDF, suivant le modele
+     * institutionnel : un bloc par objectif operationnel (axe strategique,
+     * objectif strategique, objectif operationnel) puis le tableau des actions
+     * detaillees a neuf colonnes.
+     */
+    public function exportEvolutionPdf(Request $request)
+    {
+        $user = $this->user($request);
+        $this->ptaSuiviService->denyUnlessAuthorized($user);
+
+        $payload = $this->evolutionPayload($request, $user);
+
+        return Pdf::loadView('workspace.pta-suivi.evolution-pdf', $payload)
+            ->setPaper('a4', 'landscape')
+            ->download($this->filename($payload, 'pdf'));
+    }
+
+    public function exportEvolutionExcel(Request $request): StreamedResponse
+    {
+        $user = $this->user($request);
+        $this->ptaSuiviService->denyUnlessAuthorized($user);
+
+        $payload = $this->evolutionPayload($request, $user);
+
+        return $this->streamWorkbook(
+            $this->evolutionWorkbookExporter->create($payload),
+            $this->filename($payload, 'xlsx')
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function evolutionPayload(Request $request, User $user): array
+    {
+        $payload = $this->ptaSuiviService->buildPagePayload($request, $user);
+        $payload['title'] = "RAPPORT D'EVOLUTION DU PTA ".$this->ptaSuiviService->titleScopeLabel($payload['filters']);
+
+        return $payload;
+    }
+
+    private function streamWorkbook(string $tempPath, string $filename): StreamedResponse
+    {
         return response()->streamDownload(function () use ($tempPath): void {
             $stream = fopen($tempPath, 'rb');
             if (! is_resource($stream)) {

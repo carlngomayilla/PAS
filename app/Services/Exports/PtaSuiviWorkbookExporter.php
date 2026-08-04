@@ -17,7 +17,7 @@ class PtaSuiviWorkbookExporter
      */
     public function create(array $payload): string
     {
-        $tempPath = tempnam(sys_get_temp_dir(), 'pta_suivi_xlsx_');
+        $tempPath = tempnam(sys_get_temp_dir(), $this->tempFilePrefix());
         if ($tempPath === false) {
             throw new RuntimeException('Unable to allocate temporary file for PTA XLSX export.');
         }
@@ -45,11 +45,16 @@ class PtaSuiviWorkbookExporter
         return $tempPath;
     }
 
+    protected function tempFilePrefix(): string
+    {
+        return 'pta_suivi_xlsx_';
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      * @return list<array{cells:list<string>,style:int}>
      */
-    private function rows(array $payload): array
+    protected function rows(array $payload): array
     {
         $rows = [];
         $rows[] = ['cells' => [(string) ($payload['title'] ?? 'SUIVI PTA')], 'style' => 1];
@@ -64,15 +69,15 @@ class PtaSuiviWorkbookExporter
             'RMO',
             'Ratio',
             'Seuil',
-            'Realise',
+            'Réalisé',
             'Taux (%)',
             'Performance',
-            'Ecart',
-            'Echeance',
+            'Écart',
+            'Échéance',
             'Retard',
             'Statut action',
             'Statut de suivi',
-            'Statut delai',
+            'Statut délai',
             'Preuve',
             'Observations',
         ];
@@ -94,17 +99,17 @@ class PtaSuiviWorkbookExporter
 
             foreach (collect($pasGroup['axes'] ?? []) as $axisGroup) {
                 $axisGroup = (array) $axisGroup;
-                $rows[] = ['cells' => ['', 'Axe strategique', (string) ($axisGroup['label'] ?? '-'), '', '', '', '', '', number_format((float) ($axisGroup['performance'] ?? 0), 2).'%'], 'style' => 4];
+                $rows[] = ['cells' => ['', 'Axe stratégique', (string) ($axisGroup['label'] ?? '-'), '', '', '', '', '', number_format((float) ($axisGroup['performance'] ?? 0), 2).'%'], 'style' => 4];
 
                 foreach (collect($axisGroup['objectifs'] ?? []) as $strategicGroup) {
                     $strategicGroup = (array) $strategicGroup;
-                    $rows[] = ['cells' => ['', 'Objectif strategique', (string) ($strategicGroup['label'] ?? '-'), '', '', '', '', '', number_format((float) ($strategicGroup['performance'] ?? 0), 2).'%'], 'style' => 5];
+                    $rows[] = ['cells' => ['', 'Objectif stratégique', (string) ($strategicGroup['label'] ?? '-'), '', '', '', '', '', number_format((float) ($strategicGroup['performance'] ?? 0), 2).'%'], 'style' => 5];
 
                     foreach (collect($strategicGroup['objectifs_operationnels'] ?? []) as $operationalGroup) {
                         $operationalGroup = (array) $operationalGroup;
                         $rows[] = ['cells' => [
                             '',
-                            'Objectif operationnel',
+                            'Objectif opérationnel',
                             (string) ($operationalGroup['label'] ?? '-'),
                             '',
                             '',
@@ -188,7 +193,7 @@ class PtaSuiviWorkbookExporter
     /**
      * @param  list<array{cells:list<string>,style:int}>  $rows
      */
-    private function sheetXml(array $rows): string
+    protected function sheetXml(array $rows): string
     {
         $xmlRows = [];
         foreach ($rows as $index => $row) {
@@ -218,7 +223,7 @@ class PtaSuiviWorkbookExporter
             .'</worksheet>';
     }
 
-    private function contentTypesXml(): string
+    protected function contentTypesXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
@@ -232,7 +237,7 @@ class PtaSuiviWorkbookExporter
             .'</Types>';
     }
 
-    private function rootRelationshipsXml(): string
+    protected function rootRelationshipsXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -242,7 +247,7 @@ class PtaSuiviWorkbookExporter
             .'</Relationships>';
     }
 
-    private function workbookRelationshipsXml(): string
+    protected function workbookRelationshipsXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -251,7 +256,7 @@ class PtaSuiviWorkbookExporter
             .'</Relationships>';
     }
 
-    private function workbookXml(): string
+    protected function workbookXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
@@ -259,7 +264,7 @@ class PtaSuiviWorkbookExporter
             .'</workbook>';
     }
 
-    private function appPropertiesXml(): string
+    protected function appPropertiesXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
@@ -267,7 +272,7 @@ class PtaSuiviWorkbookExporter
             .'</Properties>';
     }
 
-    private function corePropertiesXml(mixed $generatedAt, string $title): string
+    protected function corePropertiesXml(mixed $generatedAt, string $title): string
     {
         $date = $generatedAt instanceof CarbonInterface ? $generatedAt->toIso8601String() : now()->toIso8601String();
 
@@ -278,7 +283,7 @@ class PtaSuiviWorkbookExporter
             .'</cp:coreProperties>';
     }
 
-    private function stylesXml(): string
+    protected function stylesXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
@@ -291,7 +296,7 @@ class PtaSuiviWorkbookExporter
             .'</styleSheet>';
     }
 
-    private function columnName(int $index): string
+    protected function columnName(int $index): string
     {
         $name = '';
         while ($index > 0) {
@@ -303,7 +308,7 @@ class PtaSuiviWorkbookExporter
         return $name;
     }
 
-    private function xml(string $value): string
+    protected function xml(string $value): string
     {
         return htmlspecialchars($value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
     }

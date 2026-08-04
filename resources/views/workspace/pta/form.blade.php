@@ -542,7 +542,7 @@
                 var hint = block.querySelector('[data-type-action-hint]');
                 if (hint) {
                     hint.textContent = isQuantitative
-                        ? 'Quantite a realiser + unite + quantites numeriques.'
+                        ? 'Quantité à réaliser + unite + quantités numériques.'
                         : (showSubActions
                             ? 'Performance calculée depuis les sous-actions (poids Σ=100%).'
                             : 'Pièce justificative attendue (réalisé = 0 % ou 100 %).');

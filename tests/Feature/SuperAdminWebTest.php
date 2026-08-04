@@ -302,7 +302,7 @@ class SuperAdminWebTest extends TestCase
         $this->assertStringContainsString('Tableau 2 : Objectifs operationnels &amp; Actions', (string) $sheetThreeXml);
         $this->assertStringContainsString('Direction', (string) $sheetThreeXml);
         $this->assertStringContainsString('Service', (string) $sheetThreeXml);
-        $this->assertStringContainsString('Objectif operationnel', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Objectif opérationnel', (string) $sheetThreeXml);
         // sheet4 = ACTIONS (Tableau 3)
         $this->assertStringContainsString('Tableau 3 : Actions detaillees', (string) $sheetFourXml);
         $this->assertStringContainsString('Description action', (string) $sheetFourXml);

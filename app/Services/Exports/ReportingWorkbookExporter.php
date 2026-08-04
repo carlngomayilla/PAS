@@ -526,7 +526,7 @@ class ReportingWorkbookExporter
             [1 => 36, 2 => 36, 3 => 34, 4 => 38, 5 => 42, 6 => 42, 7 => 28, 8 => 18],
             [
                 'Tableau 2 : Objectifs operationnels & Actions',
-                'Objectif operationnel',
+                'Objectif opérationnel',
             ]
         );
     }
@@ -537,7 +537,7 @@ class ReportingWorkbookExporter
             'ACTIONS',
             'ACTIONS',
             $this->standardReportMetaRows($payload, 'Tableau 3 : Actions détaillées'),
-            ['Direction', 'Service', 'Objectif operationnel', 'Description action', 'RMO', 'Debut', 'Fin', 'Mode execution', 'Quantite a realiser / livrable', 'Avancement reel (%)', 'Financement', 'Risque', 'Ressources', 'KPI global (%)'],
+            ['Direction', 'Service', 'Objectif opérationnel', 'Description action', 'RMO', 'Début', 'Fin', 'Mode exécution', 'Quantité à réaliser / livrable', 'Avancement réel (%)', 'Financement', 'Risque', 'Ressources', 'KPI global (%)'],
             ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string', 'string', 'string', 'percent'],
             $this->actionFinalSheetRows($payload),
             [1 => 30, 2 => 30, 3 => 36, 4 => 46, 5 => 28, 6 => 14, 7 => 14, 8 => 22, 9 => 28, 10 => 18, 11 => 42, 12 => 44, 13 => 34, 14 => 16],
@@ -553,7 +553,7 @@ class ReportingWorkbookExporter
             'Indicateurs',
             'Indicateurs',
             $this->standardReportMetaRows($payload, 'Tableau 4 : Indicateurs par action'),
-            ['Direction', 'Service', 'Action', 'RMO', 'Performance d execution (%)', 'Conformite (%)', 'Delai (%)', 'Avancement reel (%)'],
+            ['Direction', 'Service', 'Action', 'RMO', 'Performance d execution (%)', 'Conformite (%)', 'Delai (%)', 'Avancement réel (%)'],
             ['string', 'string', 'string', 'string', 'percent', 'percent', 'percent', 'percent'],
             $this->kpiFinalSheetRows($payload),
             [1 => 36, 2 => 36, 3 => 42, 4 => 26, 5 => 24, 6 => 22, 7 => 18, 8 => 20]
@@ -1529,9 +1529,9 @@ class ReportingWorkbookExporter
             $this->serviceCell(4, $rowIndex, 'Responsable', 25),
             $this->serviceCell(5, $rowIndex, 'Ratio', 25),
             $this->serviceCell(6, $rowIndex, 'Taux de réalisation (%)', 25),
-            $this->serviceCell(7, $rowIndex, 'Quantite a realiser / livrable', 25),
+            $this->serviceCell(7, $rowIndex, 'Quantité à réaliser / livrable', 25),
             $this->serviceCell(8, $rowIndex, 'Performance en fonction du seuil', 25),
-            $this->serviceCell(9, $rowIndex, 'Ecart', 25),
+            $this->serviceCell(9, $rowIndex, 'Écart', 25),
             $this->serviceCell(10, $rowIndex, 'Echéance', 25),
             $this->serviceCell(11, $rowIndex, 'Statut', 25),
             $this->serviceCell(12, $rowIndex, 'Observations', 25),
@@ -1730,7 +1730,7 @@ class ReportingWorkbookExporter
         ];
         $sections[] = [
             'title' => 'Details - Actions en retard',
-            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'Performance d execution', 'Conformite'],
+            'headers' => ['ID', 'Libelle', 'Échéance', 'Statut', 'PTA', 'Responsable', 'Performance d execution', 'Conformite'],
             'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal'],
             'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_performance ?? 0), 0.0])->all(),
         ];

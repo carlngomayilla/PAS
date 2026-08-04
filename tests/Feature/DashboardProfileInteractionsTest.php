@@ -52,7 +52,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
         $tables->assertSee('Agents');
-        $tables->assertSee('Synthese');
+        $tables->assertSee('Synthèse');
     }
 
     public function test_seeded_agent_user_sees_agent_dashboard_sections(): void
@@ -127,6 +127,8 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertSee('dashboard-pta-service-rate-chart-charts', false);
         $charts->assertDontSee('Evolution du suivi');
         $charts->assertDontSee('Directions sous vigilance');
+        // Le profil suivi-evaluation ne declare aucun graphique de role : ses
+        // graphiques macro sont ceux du PTA trimestriel, plus haut dans l'onglet.
         $charts->assertDontSee('dashboard-role-trend-chart', false);
         $charts->assertDontSee('dashboard-role-support-chart', false);
     }
@@ -158,6 +160,8 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertSee('dashboard-pta-service-rate-chart-charts', false);
         $charts->assertDontSee('Evolution du suivi');
         $charts->assertDontSee('Directions sous vigilance');
+        // Le profil suivi-evaluation ne declare aucun graphique de role : ses
+        // graphiques macro sont ceux du PTA trimestriel, plus haut dans l'onglet.
         $charts->assertDontSee('dashboard-role-trend-chart', false);
         $charts->assertDontSee('dashboard-role-support-chart', false);
     }

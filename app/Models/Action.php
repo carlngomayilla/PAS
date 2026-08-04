@@ -651,7 +651,7 @@ class Action extends Model
     public static function evaluationModeOptions(): array
     {
         return [
-            self::MODE_QUANTITATIF => 'Quantite a realiser',
+            self::MODE_QUANTITATIF => 'Quantité à réaliser',
             self::MODE_MIXTE => 'Quantite a realiser et livrable',
             self::MODE_SANS_QUANTITE => 'Sans quantité',
             self::MODE_SOUS_ACTIONS => 'Par sous-action',

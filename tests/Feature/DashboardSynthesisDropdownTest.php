@@ -49,7 +49,7 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringNotContainsString("Vue synthétique d'avancement PAS", $hierarchy);
         $this->assertStringContainsString('$showSynthesisTablesInOverview ?? false', $overview);
         $this->assertStringContainsString('_panel-synthesis-tables', $tables);
-        $this->assertStringContainsString('Tableaux de synthese', $detailTables);
+        $this->assertStringContainsString('Tableaux de synthèse', $detailTables);
         $this->assertStringContainsString('dashboard-synthesis-table', $detailTables);
         $this->assertStringContainsString('$agentActionCellLevels', $view);
         $this->assertStringContainsString("\$agentActionCellLevels = [1 => 'action', 2 => 'operational-objective', 3 => 'pta', 10 => 'sub-action'];", $view);

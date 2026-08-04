@@ -17,7 +17,7 @@
             <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
                 <div class="flex items-center gap-2">
                     <span class="inline-block w-3 text-[#3996d3]">▸</span>
-                    <h2 class="showcase-panel-title">Synthese {{ strtolower($unitModeLabel) }}</h2>
+                    <h2 class="showcase-panel-title">Synthèse {{ strtolower($unitModeLabel) }}</h2>
                 </div>
                 <span class="showcase-chip">{{ count($unitRows) }} lignes</span>
             </summary>

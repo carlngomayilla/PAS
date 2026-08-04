@@ -88,7 +88,7 @@ class PtaHierarchyService
             ->count();
         $withoutResponsible = $actions->filter(fn (Action $action): bool => $this->responsibleNames($action)->isEmpty())->count();
         $withoutDeadline = $actions->filter(fn (Action $action): bool => $this->actionDeadline($action) === null)->count();
-        $withoutTarget = $actions->filter(fn (Action $action): bool => $this->targetLabel($action) === 'A renseigner')->count();
+        $withoutTarget = $actions->filter(fn (Action $action): bool => $this->targetLabel($action) === 'À renseigner')->count();
         $pendingValidations = $actions
             ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                 'soumise',
@@ -191,12 +191,12 @@ class PtaHierarchyService
                 $action->indicateurs_attendus,
                 $action->intitule_cible,
                 $action->cible,
-            ]) ?? 'A renseigner',
+            ]) ?? 'À renseigner',
             'target' => $this->targetLabel($action),
             'expected_result' => $this->firstFilledText([
                 $action->resultat_attendu,
                 $action->livrable_attendu,
-            ]) ?? 'A renseigner',
+            ]) ?? 'À renseigner',
             'responsible' => $responsibleNames->isEmpty() ? 'Non affecte' : $responsibleNames->implode(', '),
             'start_date' => $action->date_debut?->format('d/m/Y'),
             'deadline' => $this->actionDeadline($action)?->format('d/m/Y'),
@@ -294,7 +294,7 @@ class PtaHierarchyService
             ->map(fn (string $part): string => trim($part))
             ->filter()
             ->unique()
-            ->implode(' / ') ?: 'A renseigner';
+            ->implode(' / ') ?: 'À renseigner';
     }
 
     private function isCompletedSubAction(SousAction $subAction): bool

@@ -74,7 +74,15 @@ class PtaCalculationFormulaTest extends TestCase
         $this->assertSame(0.0, $summary['taux_global_avancement']);
     }
 
-    public function test_hierarchy_uses_sum_of_realizations_over_sum_of_targets_at_every_level(): void
+    /**
+     * Regle metier du 2026-08-04 : chaque enfant pese autant que les autres et
+     * sa cible de performance vaut 100 %. Le taux d'un niveau est donc la
+     * moyenne des taux de ses enfants.
+     *
+     * OP1 = 50/100 = 50 %, OP2 = 300/300 = 100 % -> OS = (50 + 100) / 2 = 75 %.
+     * L'ancienne ponderation par la cible aurait donne 350/400 = 87,5 %.
+     */
+    public function test_hierarchy_averages_child_rates_at_every_level(): void
     {
         $rows = collect([
             $this->hierarchyRow('op-1', 100, 50, 1),
@@ -88,9 +96,11 @@ class PtaCalculationFormulaTest extends TestCase
 
         $this->assertSame(50.0, $operationalObjectives[0]['performance']);
         $this->assertSame(100.0, $operationalObjectives[1]['performance']);
-        $this->assertSame(87.5, $strategicObjective['performance']);
-        $this->assertSame(87.5, $axis['performance']);
-        $this->assertSame(87.5, $pas['performance']);
+        $this->assertSame(75.0, $strategicObjective['performance']);
+        $this->assertSame(75.0, $axis['performance']);
+        $this->assertSame(75.0, $pas['performance']);
+
+        // Les cumuls en unites restent disponibles a titre informatif.
         $this->assertSame(400.0, $axis['cible_cumulee']);
         $this->assertSame(350.0, $axis['realisation_cumulee']);
     }

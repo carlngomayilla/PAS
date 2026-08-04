@@ -112,7 +112,7 @@ class DynamicReferentialSettings
     {
         return [
             'action_target_type_labels' => [
-                'quantitative' => 'Quantite a realiser',
+                'quantitative' => 'Quantité à réaliser',
                 'qualitative' => 'Livrable attendu',
             ],
             'action_unit_suggestions' => [

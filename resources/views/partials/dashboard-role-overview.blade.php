@@ -10,14 +10,18 @@
     $supportChart = $roleDashboard['support_chart'] ?? [];
     $hideRepeatedSupportChart = (bool) ($hideRepeatedSupportChart ?? false);
     $showOverview = (bool) ($roleDashboard['overview_enabled'] ?? true);
+    // Un graphique s'affiche des lors que le role le declare, meme sans donnee :
+    // la carte montre alors son etat vide. Auparavant elle disparaissait
+    // entierement du DOM, ce qui donnait l'impression que des graphiques
+    // manquaient selon le profil.
     $showComparisonChart = (bool) ($roleDashboard['comparison_chart_enabled'] ?? true)
-        && count($comparisonChart['labels'] ?? []) > 0;
+        && $comparisonChart !== [];
     $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true)
-        && count($trendChart['labels'] ?? []) > 0;
+        && $trendChart !== [];
     $supportChartRepeatsMacroChart = $hideRepeatedSupportChart
         && in_array((string) $dashboardRole, ['direction', 'dg', 'planification'], true);
     $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true)
-        && count($supportChart['labels'] ?? []) > 0
+        && $supportChart !== []
         && ! $supportChartRepeatsMacroChart;
     $roleComparisonChartHeight = max(15, (count($comparisonChart['labels'] ?? []) * 2.1) + 4);
     $roleSupportChartHeight = max(15, (count($supportChart['labels'] ?? []) * 2.1) + 4);

@@ -408,7 +408,7 @@
                 ],
                 [
                     'group' => 'ACTION',
-                    'label' => 'Avancement reel',
+                    'label' => 'Avancement réel',
                     'progress' => (float) ($globalScores['progression'] ?? 0),
                     'status' => $statusCount('non_demarre') > 0 ? $fmtCount($statusCount('non_demarre')).' non démarrée(s)' : 'Suivi opérationnel',
                     'href' => route('workspace.actions.index'),

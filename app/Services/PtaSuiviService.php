@@ -343,7 +343,7 @@ class PtaSuiviService
             $objective?->indicateurs ?? null,
             $strategicObjective?->indicateur_global ?? null,
         ]);
-        $indicator = $indicatorText ?? 'A renseigner';
+        $indicator = $indicatorText ?? 'À renseigner';
 
         $detailsUrl = route('pta.suivi.details', $action);
         $proofPreview = $this->proofPreviewData($action);
@@ -420,6 +420,16 @@ class PtaSuiviService
             'ecart_label' => $this->percentLabel($ecart),
             'echeance' => $deadline?->toDateString(),
             'echeance_label' => $deadline?->format('Y-m-d') ?? '-',
+            // Comptages du PAS : une action est « realisee » lorsqu'elle est
+            // entierement executee (100 %), « echue » lorsque son echeance est
+            // passee. Une action a 80 % n'est pas comptee comme terminee.
+            'est_realisee' => $displayProgress >= 100.0,
+            'est_echue' => $deadline instanceof Carbon && $deadline->startOfDay()->lte(Carbon::today()),
+            // Colonnes du rapport d'evolution du PTA (modele institutionnel).
+            'debut_label' => $action->date_debut !== null ? Carbon::parse($action->date_debut)->format('d/m/Y') : '-',
+            'fin_label' => $deadline?->format('d/m/Y') ?? '-',
+            'ressources_requises' => $this->resourcesLabel($action),
+            'risques_potentiels' => $this->risksLabel($action),
             'retard_jours' => $delayDays,
             'retard_label' => $this->delayLabel($delayDays),
             'statut_suivi' => $workflowStatus,
@@ -533,10 +543,10 @@ class PtaSuiviService
                     'libelle' => (string) ($sousAction->libelle ?: '-'),
                     'type_indicateur' => $typeIndicateur->value,
                     'type_indicateur_label' => $typeIndicateur->label(),
-                    'indicateur' => $indicatorText ?? 'A renseigner',
+                    'indicateur' => $indicatorText ?? 'À renseigner',
                     'indicateur_affichage' => $this->indicatorDisplayLabel($typeIndicateur, $indicatorText, $quantityToRealize, $unit, $deliverable),
                     'responsable' => (string) ($sousAction->agent?->name ?? $fallbackResponsable),
-                    'ratio' => $target > 0 ? $this->numberLabel($realized).' / '.$this->numberLabel($target) : 'A parametrer',
+                    'ratio' => $target > 0 ? $this->numberLabel($realized).' / '.$this->numberLabel($target) : 'À paramétrer',
                     'taux_realisation' => $rate ?? 0.0,
                     'taux_realisation_display' => $displayRate,
                     'taux_realisation_label' => $this->percentLabel($rate),
@@ -858,7 +868,7 @@ class PtaSuiviService
             'realisation_cumulee' => 0.0,
             'calcul_configured' => false,
             'calcul_status' => PtaOfficialCalculationService::STATUS_TO_CONFIGURE,
-            'calcul_status_label' => 'A parametrer',
+            'calcul_status_label' => 'À paramétrer',
         ];
     }
 
@@ -1165,6 +1175,8 @@ class PtaSuiviService
     private function summary(Collection $rows): array
     {
         $result = $this->officialCalculation->targetWeightedRows($rows, 'summary');
+        $execution = $this->officialCalculation->executionRate($rows);
+        $completion = $this->officialCalculation->globalCompletionRate($rows);
 
         return [
             'actions' => $rows->count(),
@@ -1172,6 +1184,15 @@ class PtaSuiviService
             'performance_display' => (float) $result['display_rate'],
             'cible_cumulee' => (float) $result['target'],
             'realisation_cumulee' => (float) $result['realized'],
+            // Indicateurs PAS bases sur le comptage d'actions terminees.
+            'taux_execution' => (float) $execution['display_rate'],
+            'taux_execution_label' => $this->percentLabel($execution['rate']),
+            'actions_echues' => (int) $execution['due'],
+            'actions_echues_realisees' => (int) $execution['done'],
+            'taux_avancement_global' => (float) $completion['display_rate'],
+            'taux_avancement_global_label' => $this->percentLabel($completion['rate']),
+            'actions_realisees' => (int) $completion['done'],
+            'actions_programmees' => (int) $completion['due'],
             'a_parametrer' => $rows->where('calcul_configured', false)->count(),
             'en_retard' => $rows->where('alerte_echeance', 'en_retard')->count(),
             'critiques' => $rows->where('alerte_echeance', 'critique')->count(),
@@ -1193,7 +1214,7 @@ class PtaSuiviService
                 ['label' => 'Sous-action', 'color' => '#f1f5f9', 'text' => '#334155'],
             ],
             'Statut action' => [
-                ['label' => 'A parametrer', 'color' => '#6b7280'],
+                ['label' => 'À paramétrer', 'color' => '#6b7280'],
                 ['label' => 'En attente', 'color' => '#e5e7eb', 'text' => '#111827'],
                 ['label' => 'En cours', 'color' => '#3996d3'],
                 ['label' => 'Realise', 'color' => '#00b050'],
@@ -1204,7 +1225,7 @@ class PtaSuiviService
                 ['label' => 'Hors delai', 'color' => '#f97316'],
             ],
             'Statut de suivi' => [
-                ['label' => 'A parametrer', 'color' => '#6b7280'],
+                ['label' => 'À paramétrer', 'color' => '#6b7280'],
                 ['label' => 'Non demarre', 'color' => '#cbd5e1', 'text' => '#111827'],
                 ['label' => 'En cours', 'color' => '#3996d3'],
                 ['label' => 'En validation chef', 'color' => '#9333ea'],
@@ -1472,7 +1493,7 @@ class PtaSuiviService
     private function workflowStatusOptions(): array
     {
         return [
-            'a_parametrer' => 'A parametrer',
+            'a_parametrer' => 'À paramétrer',
             'non_demarre' => 'Non demarre',
             'en_cours' => 'En cours',
             'validation_chef' => 'En validation chef',
@@ -1506,7 +1527,7 @@ class PtaSuiviService
             'critique' => 'Critique',
             'en_retard' => 'En retard',
             'cloturee' => 'Clôturée',
-            'a_parametrer' => 'A parametrer',
+            'a_parametrer' => 'À paramétrer',
         ];
     }
 
@@ -1721,15 +1742,15 @@ class PtaSuiviService
         $deliverable = trim($deliverable);
         $parts = [
             'Type : '.$type->label(),
-            'Indicateur : '.($indicator !== '' ? $indicator : 'A renseigner'),
+            'Indicateur : '.($indicator !== '' ? $indicator : 'À renseigner'),
         ];
 
         if ($type->tracksQuantity()) {
-            $parts[] = 'Quantite a realiser : '.($quantity !== '' ? $quantity : 'A renseigner');
+            $parts[] = 'Quantité à réaliser : '.($quantity !== '' ? $quantity : 'À renseigner');
         }
 
         if ($type->tracksDeliverable()) {
-            $parts[] = 'Livrable attendu : '.($deliverable !== '' ? $deliverable : 'A renseigner');
+            $parts[] = 'Livrable attendu : '.($deliverable !== '' ? $deliverable : 'À renseigner');
         }
 
         return implode(' | ', $parts);
@@ -1913,7 +1934,7 @@ class PtaSuiviService
             ->implode(' | ') ?: '-';
     }
 
-    private function titleScopeLabel(array $filters): string
+    public function titleScopeLabel(array $filters): string
     {
         if (($filters['service_id'] ?? null) !== null) {
             $service = Service::query()->find((int) $filters['service_id']);
@@ -2089,6 +2110,47 @@ class PtaSuiviService
     /**
      * @param  list<mixed>  $values
      */
+    /**
+     * Ressources requises telles qu'attendues par le modele institutionnel du
+     * rapport d'evolution : un champ de synthese s'il est renseigne, sinon la
+     * concatenation des ressources humaines / materielles / techniques /
+     * financieres saisies.
+     */
+    private function resourcesLabel(Action $action): string
+    {
+        // `resourceLabels()` est la lecture canonique : elle gere le tableau JSON
+        // `ressources_necessaires` et retombe sur les anciennes colonnes booleennes.
+        $parts = collect($action->resourceLabels())
+            ->map(fn (mixed $value): string => trim((string) $value))
+            ->filter();
+
+        $details = $this->firstFilledText([$action->ressources_details ?? null]);
+        if ($details !== null) {
+            $parts->push($details);
+        }
+
+        return $parts->unique()->isNotEmpty() ? $parts->unique()->implode(', ') : '-';
+    }
+
+    /**
+     * Risques potentiels, complementes du niveau de risque quand il est saisi.
+     */
+    private function risksLabel(Action $action): string
+    {
+        $risk = $this->firstFilledText([
+            $action->risque_potentiel ?? null,
+            $action->risque_lie ?? null,
+        ]);
+
+        if ($risk === null) {
+            return '-';
+        }
+
+        $level = trim((string) ($action->niveau_risque ?? ''));
+
+        return $level !== '' ? $risk.' ('.UiLabel::alertLevel($level).')' : $risk;
+    }
+
     private function firstFilledText(array $values): ?string
     {
         foreach ($values as $value) {
@@ -2116,7 +2178,7 @@ class PtaSuiviService
     private function percentLabel(?float $value): string
     {
         if ($value === null) {
-            return 'A parametrer';
+            return 'À paramétrer';
         }
 
         return $this->formatPercent($value);

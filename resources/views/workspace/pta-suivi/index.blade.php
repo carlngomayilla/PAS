@@ -132,6 +132,8 @@
             <button class="btn btn-secondary rounded-xl px-4 py-2 text-sm" type="button" onclick="window.print()">Imprimer</button>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.excel', $query) }}">Export Excel</a>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.pdf', $query) }}">Export PDF</a>
+            <a class="btn btn-secondary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.evolution-excel', $query) }}">Rapport d'évolution (Excel)</a>
+            <a class="btn btn-secondary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.evolution-pdf', $query) }}">Rapport d'évolution (PDF)</a>
         </div>
     </div>
 

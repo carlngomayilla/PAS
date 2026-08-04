@@ -102,6 +102,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('pta.suivi.export.excel');
         Route::get('/pta/suivi/export/pdf', [PtaSuiviWebController::class, 'exportPdf'])
             ->name('pta.suivi.export.pdf');
+        Route::get('/pta/suivi/export/evolution/pdf', [PtaSuiviWebController::class, 'exportEvolutionPdf'])
+            ->name('pta.suivi.export.evolution-pdf');
+        Route::get('/pta/suivi/export/evolution/excel', [PtaSuiviWebController::class, 'exportEvolutionExcel'])
+            ->name('pta.suivi.export.evolution-excel');
         Route::patch('/pta/suivi/{action}', [PtaSuiviWebController::class, 'update'])
             ->whereNumber('action')
             ->name('pta.suivi.actions.update');
