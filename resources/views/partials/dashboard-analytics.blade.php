@@ -116,7 +116,10 @@
     $selectedSynthesisRmoLabel = ($selectedSynthesisRmo !== '' && $selectedSynthesisRmo !== 'all' && ctype_digit($selectedSynthesisRmo))
         ? \App\Models\User::query()->whereKey((int) $selectedSynthesisRmo)->value('name')
         : null;
-    $pilotDashboardRoles = ['global', 'admin', 'super_admin', 'dg', 'cabinet', 'planification'];
+    // Profils qui pilotent au-dela de leur propre perimetre et ont donc besoin
+    // des filtres Direction / Service / RMO. `suivi_evaluation` couvre le SCIQ,
+    // la planification et le chef de planification.
+    $pilotDashboardRoles = ['global', 'admin', 'super_admin', 'dg', 'cabinet', 'planification', 'suivi_evaluation'];
     $showDirectionSynthesisSelector = ($directionSelector['enabled'] ?? false)
         && in_array($dashboardRole, $pilotDashboardRoles, true);
     $availableDashboardTabs = [
@@ -195,8 +198,8 @@
             $label = \Illuminate\Support\Str::ascii(mb_strtolower((string) ($card['label'] ?? '')));
 
             // Ordre des cartes du PAS : taux d'execution, avancement global,
-            // performance moyenne des axes, puis les indicateurs de flux.
-            foreach (['execution', 'global', 'performance', 'validation', 'retard', 'alerte', 'critique', 'action', 'pta'] as $index => $needle) {
+            // actions cloturees, puis les indicateurs de flux.
+            foreach (['execution', 'global', 'clotur', 'validation', 'retard', 'alerte', 'critique', 'action', 'pta'] as $index => $needle) {
                 if (str_contains($label, $needle)) {
                     return $index;
                 }

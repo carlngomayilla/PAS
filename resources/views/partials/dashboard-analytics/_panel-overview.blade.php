@@ -276,11 +276,51 @@
     @if (is_array($financialSummary ?? null))
         @php
             $currency = static fn (float $value): string => number_format($value, 0, ',', ' ').' FCFA';
+            $engagementRate = min(100, max(0, (float) ($financialSummary['engagement_rate'] ?? 0)));
+            $disbursementRate = min(100, max(0, (float) ($financialSummary['disbursement_rate'] ?? 0)));
+            $budgetTotal = (float) ($financialSummary['budget'] ?? 0);
+            $remaining = (float) ($financialSummary['remaining'] ?? 0);
+            $remainingRate = $budgetTotal > 0 ? min(100, max(0, ($remaining / $budgetTotal) * 100)) : 0.0;
+
+            // Meme langage visuel que les cartes KPI principales : accent colore,
+            // icone dans une pastille, halo au survol et jauge de progression.
             $financialKpis = [
-                ['Budget des actions', $currency((float) ($financialSummary['budget'] ?? 0)), 'Montants inscrits dans les actions visibles', 'text-[#17324a]'],
-                ['Engagements enregistrés', $currency((float) ($financialSummary['engaged'] ?? 0)), number_format((float) ($financialSummary['engagement_rate'] ?? 0), 1, ',', ' ').'% du budget', 'text-[#176a9d]'],
-                ['Décaissements réalisés', $currency((float) ($financialSummary['disbursed'] ?? 0)), number_format((float) ($financialSummary['disbursement_rate'] ?? 0), 1, ',', ' ').'% du budget', 'text-emerald-700'],
-                ['Solde budgétaire à décaisser', $currency((float) ($financialSummary['remaining'] ?? 0)), (int) ($financialSummary['actions_total'] ?? 0).' action(s) dans le périmètre', 'text-amber-700'],
+                [
+                    'label' => 'Budget des actions',
+                    'value' => $currency($budgetTotal),
+                    'meta' => (int) ($financialSummary['actions_total'] ?? 0).' action(s) dans le périmètre',
+                    'accent' => '#1C203D',
+                    'bg' => '#F4F6FB',
+                    'rate' => null,
+                    'icon' => '<path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M7 15h4"/>',
+                ],
+                [
+                    'label' => 'Engagements enregistrés',
+                    'value' => $currency((float) ($financialSummary['engaged'] ?? 0)),
+                    'meta' => \App\Support\UiLabel::percent($engagementRate).' du budget',
+                    'accent' => '#176A9D',
+                    'bg' => '#EEF7FC',
+                    'rate' => $engagementRate,
+                    'icon' => '<path d="M9 12l2 2 4-4"/><path d="M21 12a9 9 0 1 1-9-9"/>',
+                ],
+                [
+                    'label' => 'Décaissements réalisés',
+                    'value' => $currency((float) ($financialSummary['disbursed'] ?? 0)),
+                    'meta' => \App\Support\UiLabel::percent($disbursementRate).' du budget',
+                    'accent' => '#0F766E',
+                    'bg' => '#F0FDFA',
+                    'rate' => $disbursementRate,
+                    'icon' => '<path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/>',
+                ],
+                [
+                    'label' => 'Solde à décaisser',
+                    'value' => $currency($remaining),
+                    'meta' => \App\Support\UiLabel::percent($remainingRate).' du budget restant',
+                    'accent' => '#B45309',
+                    'bg' => '#FFFBEB',
+                    'rate' => $remainingRate,
+                    'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+                ],
             ];
         @endphp
         <section class="mb-4 border border-[#cfe3ef] bg-white dark:border-slate-700 dark:bg-slate-900" aria-label="Suivi budgétaire">
@@ -292,11 +332,32 @@
                 <a class="btn btn-secondary btn-sm rounded-lg" href="{{ route('workspace.daf.financements.index') }}">Voir le suivi financier</a>
             </div>
             <div class="grid gap-px bg-[#dcecf5] sm:grid-cols-2 xl:grid-cols-4 dark:bg-slate-700">
-                @foreach ($financialKpis as [$label, $value, $meta, $tone])
-                    <a href="{{ route('workspace.daf.financements.index') }}" class="min-h-32 bg-white px-4 py-4 transition hover:bg-[#f7fbfd] dark:bg-slate-900 dark:hover:bg-slate-800">
-                        <p class="text-xs font-bold uppercase tracking-wide text-[#667085] dark:text-slate-400">{{ $label }}</p>
-                        <p class="mt-3 text-2xl font-black {{ $tone }} dark:text-sky-200">{{ $value }}</p>
-                        <p class="mt-2 text-xs leading-5 text-[#667085] dark:text-slate-400">{{ $meta }}</p>
+                @foreach ($financialKpis as $kpi)
+                    <a
+                        href="{{ route('workspace.daf.financements.index') }}"
+                        class="dashboard-primary-kpi-card group relative min-h-32 overflow-hidden bg-white px-4 py-4 transition"
+                        style="--dashboard-card-accent: {{ $kpi['accent'] }}; --dashboard-card-bg: {{ $kpi['bg'] }};"
+                    >
+                        <span class="dashboard-primary-kpi-glow" aria-hidden="true"></span>
+                        <div class="relative z-10 flex h-full flex-col justify-between gap-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="max-w-[12rem] text-xs font-bold leading-5 text-[#526174] dark:text-slate-400">{{ $kpi['label'] }}</p>
+                                <span class="dashboard-primary-kpi-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        {!! $kpi['icon'] !!}
+                                    </svg>
+                                </span>
+                            </div>
+                            <div>
+                                <p class="text-xl font-black leading-tight text-[#17324a] dark:text-sky-200">{{ $kpi['value'] }}</p>
+                                @if ($kpi['rate'] !== null)
+                                    <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-700">
+                                        <div class="h-full rounded-full" style="width: {{ $kpi['rate'] }}%; background: {{ $kpi['accent'] }};"></div>
+                                    </div>
+                                @endif
+                                <p class="mt-2 text-xs leading-5 text-[#667085] dark:text-slate-400">{{ $kpi['meta'] }}</p>
+                            </div>
+                        </div>
                     </a>
                 @endforeach
             </div>

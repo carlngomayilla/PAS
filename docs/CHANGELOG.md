@@ -7,6 +7,33 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-08-05 - Rapport d'évolution par direction/service, filtres du pilotage et cartes KPI
+
+### Rapport d'évolution du PTA
+
+- **Détail par direction puis par service**, chaque bloc précédé de son responsable (`Directeur : …`, `Chef de service : …`) avant les tableaux correspondants. Le chef du service Planification est résolu via le rôle `chef_planification`, les autres via le rôle `service`.
+- **`INDICATEURS DE PERFORMANCE`** affiche désormais le livrable attendu exprimé en quantité et unité (« 100 dossiers »), avec repli sur le libellé du livrable puis l'indicateur.
+- **Nouvelle colonne `TAUX D'EXÉCUTION`**, placée juste après, renseignée automatiquement depuis le taux officiel de l'action. Le tableau passe de 9 à 10 colonnes.
+- **Couleurs du modèle** : bleu `#00B0F0` extrait du support institutionnel pour les bandeaux et l'en-tête des colonnes (au lieu de `#1f4e79`), lignes de libellé sans remplissage comme dans le PPTX.
+
+### Emplacement des téléchargements
+
+Les rapports ne se téléchargent plus que depuis **Reporting**. Les deux boutons « Rapport d'évolution » quittent la page Suivi PTA, qui ne conserve que l'export de son propre tableau de suivi.
+
+### Tableau de bord
+
+- **Écart 3 % / 2,78 %** : `DashboardController::formatPercent()` arrondissait encore à l'entier et alimentait le « Réalisé » de la ligne d'axe. Il délègue maintenant à `UiLabel::percent()`, comme le reste de l'application.
+- **Filtres Direction / Service / RMO invisibles pour le pilotage** : deux verrous cumulés. Le profil `suivi_evaluation` (SCIQ, planification, chef planification) manquait dans la liste des profils pilotes ; surtout, `dashboardDirectionContext()` désactivait le sélecteur pour tout utilisateur portant le rôle `service` — or `chef_planification` en est un alias, ce qui privait le chef de planification de ses propres filtres. Le critère devient l'accès en lecture globale, qui distingue correctement les profils scopés (`service`, `direction`, `agent`) des profils institutionnels.
+- **Cartes KPI** : « Performance moyenne des axes » remplacée par « Actions clôturées » en troisième position.
+- **Cartes budgétaires** alignées sur le langage visuel des cartes KPI principales : accent coloré, icône en pastille, halo au survol et jauge de progression sur les taux d'engagement, de décaissement et de solde.
+
+### Validation
+
+- `tests/Feature/PtaSuiviWebTest.php` : le test de conformité au modèle vérifie les 10 colonnes, le détail direction/service avec responsables, le livrable « 100 dossiers » et le bleu `FF00B0F0` ; un test dédié couvre la résolution du chef de service planification.
+- `tests/Feature/DashboardShellPolishTest.php` : ordre des cartes mis à jour.
+
+---
+
 ## 2026-08-04 - Base de calcul unifiée des taux (règle métier de référence)
 
 ### Changement

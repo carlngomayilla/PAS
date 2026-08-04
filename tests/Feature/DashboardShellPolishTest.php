@@ -31,12 +31,12 @@ class DashboardShellPolishTest extends TestCase
 
         $renderedCards = implode("\n", $primaryCards[0]);
 
-        // Ordre fixe par la regle metier du 2026-08-04 : les deux indicateurs
-        // du PAS d'abord, puis la performance moyenne des axes.
+        // Ordre fixe : les deux indicateurs du PAS d'abord, puis les actions
+        // cloturees.
         // Le contenu est du HTML brut : l'apostrophe y est echappee.
         $this->assertStringContainsString(e("Taux d'exécution"), $primaryCards[0][0]);
         $this->assertStringContainsString('Avancement global', $primaryCards[0][1]);
-        $this->assertStringContainsString('Performance moyenne des axes', $primaryCards[0][2]);
+        $this->assertStringContainsString('Actions clôturées', $primaryCards[0][2]);
 
         // Les sous-titres exposent le comptage brut, verifiable d'un coup d'oeil.
         $this->assertStringContainsString('action(s) échue(s) réalisée(s) sur', $primaryCards[0][0]);

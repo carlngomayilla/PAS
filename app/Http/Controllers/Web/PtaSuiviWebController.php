@@ -266,6 +266,7 @@ class PtaSuiviWebController extends Controller
     {
         $payload = $this->ptaSuiviService->buildPagePayload($request, $user);
         $payload['title'] = "RAPPORT D'EVOLUTION DU PTA ".$this->ptaSuiviService->titleScopeLabel($payload['filters']);
+        $payload['directions'] = $this->ptaSuiviService->buildEvolutionReportGroups($payload['rows']);
 
         return $payload;
     }

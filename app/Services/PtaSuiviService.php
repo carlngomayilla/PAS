@@ -79,6 +79,119 @@ class PtaSuiviService
     }
 
     /**
+     * Rapport d'evolution du PTA : les actions sont regroupees par direction
+     * puis par service, chaque bloc etant precede du responsable concerne
+     * (directeur ou chef de service). A l'interieur, l'arborescence du modele
+     * institutionnel est conservee : axe, objectif strategique, objectif
+     * operationnel, puis le tableau des actions detaillees.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    public function buildEvolutionReportGroups(Collection $rows): array
+    {
+        $responsables = $this->organizationResponsables($rows);
+
+        return $rows
+            ->groupBy(fn (array $row): string => (string) ($row['direction_id'] ?? 'sans-direction'))
+            ->map(function (Collection $directionRows, string $directionKey) use ($responsables): array {
+                $services = $directionRows
+                    ->groupBy(fn (array $row): string => (string) ($row['service_id'] ?? 'sans-service'))
+                    ->map(fn (Collection $serviceRows, string $serviceKey): array => [
+                        'service' => (string) ($serviceRows->first()['service_label'] ?? 'Service non renseigné'),
+                        'chef' => $responsables['services'][$serviceKey] ?? 'Non renseigné',
+                        'actions_total' => $serviceRows->count(),
+                        'blocks' => $this->evolutionBlocks($serviceRows),
+                    ])
+                    ->sortBy('service')
+                    ->values()
+                    ->all();
+
+                return [
+                    'direction' => (string) ($directionRows->first()['direction_label'] ?? 'Direction non renseignée'),
+                    'directeur' => $responsables['directions'][$directionKey] ?? 'Non renseigné',
+                    'actions_total' => $directionRows->count(),
+                    'services' => $services,
+                ];
+            })
+            ->sortBy('direction')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Blocs axe / objectif strategique / objectif operationnel d'un service.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function evolutionBlocks(Collection $rows): array
+    {
+        $blocks = [];
+        $numero = 0;
+
+        foreach ($rows->groupBy('axe_key') as $axisRows) {
+            foreach ($axisRows->groupBy('objectif_strategique_key') as $strategicRows) {
+                foreach ($strategicRows->groupBy('objectif_operationnel_key') as $operationalRows) {
+                    $first = $operationalRows->first();
+                    $numero++;
+
+                    $blocks[] = [
+                        'numero' => $numero,
+                        'axe' => (string) ($first['axe_label'] ?? '-'),
+                        'objectif_strategique' => (string) ($first['objectif_strategique_label'] ?? '-'),
+                        'objectif_operationnel' => (string) ($first['objectif_operationnel_label'] ?? '-'),
+                        'actions' => $operationalRows->sortBy('ordre')->values()->all(),
+                    ];
+                }
+            }
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Noms des directeurs et des chefs de service concernes par le rapport.
+     *
+     * Le chef du service Planification porte le role `chef_planification` et non
+     * le role `service` : les deux sont donc acceptes.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array{directions: array<string, string>, services: array<string, string>}
+     */
+    private function organizationResponsables(Collection $rows): array
+    {
+        $directionIds = $rows->pluck('direction_id')->filter()->unique()->values();
+        $serviceIds = $rows->pluck('service_id')->filter()->unique()->values();
+
+        $directions = $directionIds->isEmpty()
+            ? collect()
+            : User::query()
+                ->where('role', User::ROLE_DIRECTION)
+                ->whereIn('direction_id', $directionIds)
+                ->orderBy('id')
+                ->get(['id', 'name', 'direction_id'])
+                ->groupBy(fn (User $user): string => (string) $user->direction_id)
+                ->map(fn (Collection $users): string => (string) $users->first()->name);
+
+        $services = $serviceIds->isEmpty()
+            ? collect()
+            : User::query()
+                ->whereIn('role', [User::ROLE_SERVICE, User::ROLE_CHEF_PLANIFICATION])
+                ->whereIn('service_id', $serviceIds)
+                ->orderByRaw('CASE WHEN role = ? THEN 0 ELSE 1 END', [User::ROLE_SERVICE])
+                ->orderBy('id')
+                ->get(['id', 'name', 'service_id', 'role'])
+                ->groupBy(fn (User $user): string => (string) $user->service_id)
+                ->map(fn (Collection $users): string => (string) $users->first()->name);
+
+        return [
+            'directions' => $directions->all(),
+            'services' => $services->all(),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function buildActionDetails(Action $action, User $user): array
@@ -399,8 +512,13 @@ class PtaSuiviService
             'objectif_strategique_label' => $this->entityLabel($strategicObjective?->code ?? null, $strategicObjective?->libelle ?? null, 'Objectif strategique non renseigne'),
             'objectif_operationnel_key' => (string) ($objective?->id ?? $pta?->id ?? 'oo-none'),
             'objectif_operationnel_label' => $this->entityLabel($objective?->code ?? null, $objective?->libelle ?? $pao?->objectif_operationnel ?? $pta?->titre ?? null, 'Objectif operationnel non renseigne'),
-            'direction_label' => $this->entityLabel($pta?->direction?->code ?? null, $pta?->direction?->libelle ?? null, 'Direction non renseignee'),
-            'service_label' => $this->entityLabel($pta?->service?->code ?? null, $pta?->service?->libelle ?? null, 'Service non renseigne'),
+            'direction_id' => $pta?->direction?->id !== null ? (int) $pta->direction->id : null,
+            'service_id' => $pta?->service?->id !== null ? (int) $pta->service->id : null,
+            'direction_label' => $this->entityLabel($pta?->direction?->code ?? null, $pta?->direction?->libelle ?? null, 'Direction non renseignée'),
+            'service_label' => $this->entityLabel($pta?->service?->code ?? null, $pta?->service?->libelle ?? null, 'Service non renseigné'),
+            // Livrable attendu affiche dans la colonne « Indicateurs de performance »
+            // du rapport d'evolution : « 100 dossiers », « Rapport signe »...
+            'livrable_attendu_label' => $this->expectedDeliverableLabel($quantityToRealize, $unit, $deliverable, $indicatorText),
             'responsable' => $responsable,
             'type_indicateur' => $typeIndicateur->value,
             'type_indicateur_label' => $typeIndicateur->label(),
@@ -2149,6 +2267,26 @@ class PtaSuiviService
         $level = trim((string) ($action->niveau_risque ?? ''));
 
         return $level !== '' ? $risk.' ('.UiLabel::alertLevel($level).')' : $risk;
+    }
+
+    /**
+     * Livrable attendu, exprime tel qu'il figure sur le modele institutionnel :
+     * la quantite suivie de son unite (« 100 dossiers ») lorsque l'action est
+     * quantifiee, sinon le libelle du livrable, sinon l'indicateur.
+     */
+    private function expectedDeliverableLabel(
+        mixed $quantity,
+        string $unit,
+        string $deliverable,
+        ?string $indicator
+    ): string {
+        $quantity = $quantity !== null ? (float) $quantity : 0.0;
+
+        if ($quantity > 0.0) {
+            return trim($this->numberLabel($quantity).' '.$unit);
+        }
+
+        return $this->firstFilledText([$deliverable, $indicator]) ?? '-';
     }
 
     private function firstFilledText(array $values): ?string

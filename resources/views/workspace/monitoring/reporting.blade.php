@@ -114,6 +114,18 @@
                 </svg>
                 Export PDF
             </a>
+            <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('pta.suivi.export.evolution-excel', $reportQuery) }}">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
+                </svg>
+                Rapport d'évolution (Excel)
+            </a>
+            <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('pta.suivi.export.evolution-pdf', $reportQuery) }}">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M8 13h2a2 2 0 010 4H8v-4zm6 0h2m-2 4h2" />
+                </svg>
+                Rapport d'évolution (PDF)
+            </a>
         </x-slot:actions>
     </x-ui.page-title>
 

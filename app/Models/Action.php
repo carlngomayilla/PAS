@@ -974,10 +974,10 @@ class Action extends Model
     public static function resourceOptions(): array
     {
         return [
-            'main_oeuvre' => 'Main-d oeuvre',
+            'main_oeuvre' => "Main-d'œuvre",
             'ressources_humaines' => 'Ressources humaines',
             'ressources_informatiques' => 'Ressources informatiques',
-            'ressources_materielles' => 'Ressources materielles',
+            'ressources_materielles' => 'Ressources matérielles',
             'ressources_documentaires' => 'Ressources documentaires',
             'partenariat' => 'Partenariat',
             'autres_ressources' => 'Autres ressources',

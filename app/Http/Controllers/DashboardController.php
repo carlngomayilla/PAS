@@ -1318,8 +1318,11 @@ class DashboardController extends Controller
 
     private function dashboardDirectionContext(User $user): array
     {
-        $enabled = $user->hasGlobalReadAccess()
-            && ! $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE, User::ROLE_AGENT);
+        // L'acces en lecture globale est le bon discriminant : il est faux pour
+        // un chef de service, un directeur ou un agent, et vrai pour les profils
+        // qui pilotent tout le PTA. L'ancienne exclusion par role privait le
+        // chef de planification des filtres, son role etant alias de `service`.
+        $enabled = $user->hasGlobalReadAccess();
 
         $selectedId = $this->selectedDashboardDirectionId($user);
         $selectedServiceId = $this->selectedDashboardServiceId($user);
@@ -3160,20 +3163,6 @@ class DashboardController extends Controller
                 'used' => true,
             ],
             [
-                ...$this->makeRoleCard(
-                    'Performance moyenne des axes',
-                    UiLabel::percent((float) $portfolio['pas_performance']),
-                    "Niveau moyen d'atteinte des résultats programmés",
-                    route('workspace.reporting'),
-                    '#0F766E',
-                    '#F0FDFA',
-                    null,
-                    'info'
-                ),
-                'icon' => '<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>',
-                'used' => true,
-            ],
-            [
                 ...$this->makeRoleCard('Actions suivies', $portfolio['actions_total'], 'Portefeuille visible', route('workspace.actions.index'), '#0F766E', '#F0FDFA', null, 'info'),
                 'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
                 'used' => true,
@@ -4717,9 +4706,14 @@ class DashboardController extends Controller
             ->all();
     }
 
+    /**
+     * Meme arrondi que partout ailleurs : les decimales n'apparaissent qu'a
+     * partir de 0,01 %. Sans cela la ligne d'axe affichait « 3 % » quand la
+     * valeur reelle etait 2,78 %.
+     */
     private function formatPercent(float $value): string
     {
-        return number_format($value, 0, ',', ' ').'%';
+        return UiLabel::percent($value);
     }
 
     /**

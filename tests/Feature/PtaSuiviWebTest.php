@@ -1315,6 +1315,11 @@ class PtaSuiviWebTest extends TestCase
      * objectif operationnel (axe, objectif strategique, objectif operationnel)
      * puis les neuf colonnes du tableau des actions detaillees.
      */
+    /**
+     * Le rapport d'evolution suit le modele institutionnel : detail par
+     * direction et par service avec leurs responsables, puis un bloc par
+     * objectif operationnel et les dix colonnes du tableau des actions.
+     */
     public function test_pta_evolution_workbook_follows_the_institutional_template(): void
     {
         if (! class_exists(ZipArchive::class)) {
@@ -1325,21 +1330,40 @@ class PtaSuiviWebTest extends TestCase
             'role' => User::ROLE_CHEF_PLANIFICATION,
             'is_active' => true,
         ]);
-        $this->makePtaAction('Actualiser le tableau de conservation', '2026-04-15', [
+        $action = $this->makePtaAction('Actualiser le tableau de conservation', '2026-04-15', [
             'ressources_necessaires' => ['ressources_humaines'],
             'ressources_details' => 'Juriste ANBG, personnel archives',
             'risque_potentiel' => 'Indisponibilite des agents',
             'indicateurs_attendus' => 'Tableau de conservation actualise',
+            'quantite_a_realiser' => 100,
+            'unite_cible' => 'dossiers',
+        ]);
+
+        $pta = $action->pta;
+        User::factory()->create([
+            'role' => User::ROLE_DIRECTION,
+            'is_active' => true,
+            'name' => 'Directrice de test',
+            'direction_id' => $pta->direction_id,
+        ]);
+        User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+            'is_active' => true,
+            'name' => 'Chef de service de test',
+            'direction_id' => $pta->direction_id,
+            'service_id' => $pta->service_id,
         ]);
 
         $request = Request::create(route('pta.suivi.index'), 'GET', ['annee' => 'all']);
         $payload = app(PtaSuiviService::class)->buildPagePayload($request, $user);
+        $payload['directions'] = app(PtaSuiviService::class)->buildEvolutionReportGroups($payload['rows']);
         $path = app(PtaEvolutionWorkbookExporter::class)->create($payload);
 
         try {
             $zip = new ZipArchive;
             $this->assertTrue($zip->open($path) === true);
             $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+            $styles = (string) $zip->getFromName('xl/styles.xml');
             $zip->close();
 
             foreach (PtaEvolutionWorkbookExporter::COLUMNS as $column) {
@@ -1350,15 +1374,58 @@ class PtaSuiviWebTest extends TestCase
                 );
             }
 
+            // Detail par direction et par service, avec les responsables.
+            $this->assertStringContainsString('DIRECTION : ', $sheet);
+            $this->assertStringContainsString('Directrice de test', $sheet);
+            $this->assertStringContainsString('SERVICE : ', $sheet);
+            $this->assertStringContainsString('Chef de service de test', $sheet);
+
             $this->assertStringContainsString('AXE STRAT', $sheet);
             $this->assertStringContainsString('OBJECTIF STRAT', $sheet);
             $this->assertStringContainsString('OBJECTIF OP', $sheet);
             $this->assertStringContainsString('Actualiser le tableau de conservation', $sheet);
             $this->assertStringContainsString('Ressources humaines, Juriste ANBG, personnel archives', $sheet);
             $this->assertStringContainsString('Indisponibilite des agents', $sheet);
+
+            // Le livrable attendu est exprime en quantite + unite.
+            $this->assertStringContainsString('100 dossiers', $sheet);
+
+            // Le bleu du modele institutionnel est utilise pour les bandeaux.
+            $this->assertStringContainsString('FF00B0F0', $styles);
         } finally {
             @unlink($path);
         }
+    }
+
+    public function test_pta_evolution_report_names_the_planning_service_chief(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+        ]);
+        $action = $this->makePtaAction('Action du service planification', '2026-06-30');
+        $pta = $action->pta;
+
+        // Le chef du service Planification porte le role chef_planification.
+        User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+            'name' => 'Chef planification de test',
+            'direction_id' => $pta->direction_id,
+            'service_id' => $pta->service_id,
+        ]);
+
+        $request = Request::create(route('pta.suivi.index'), 'GET', ['annee' => 'all']);
+        $service = app(PtaSuiviService::class);
+        $payload = $service->buildPagePayload($request, $user);
+        $directions = $service->buildEvolutionReportGroups($payload['rows']);
+
+        $chiefs = collect($directions)
+            ->flatMap(fn (array $direction): array => $direction['services'])
+            ->pluck('chef')
+            ->all();
+
+        $this->assertContains('Chef planification de test', $chiefs);
     }
 
     public function test_reporting_pta_view_uses_official_suivi_component(): void
