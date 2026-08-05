@@ -29,7 +29,7 @@
 
         {{-- Meme composant que les cartes KPI du tableau de bord : un seul style
              dans toute l'application. --}}
-        <x-ui.kpi-grid min="200px" class="app-screen-block" aria-label="Indicateurs des réunions et rapports">
+        <section class="showcase-summary-grid app-screen-kpis app-screen-block" aria-label="Indicateurs des réunions et rapports">
             @foreach ([
                 ['Réunions programmées', $summary['meetings_scheduled'] ?? 0, 'blue'],
                 ['Tenues dans les délais', $summary['meetings_on_time'] ?? 0, 'green'],
@@ -43,7 +43,7 @@
             ] as [$label, $value, $tone])
                 <x-ui.stat-card :label="$label" :value="$value" :tone="$tone" />
             @endforeach
-        </x-ui.kpi-grid>
+        </section>
 
         @if ($followUpDecisions->isNotEmpty())
             <section class="app-screen-block mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
