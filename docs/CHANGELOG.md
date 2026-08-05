@@ -7,6 +7,21 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-08-05 - Page Rapports institutionnels : encodage, cartes KPI et barre de filtres
+
+### Changement
+
+- **Encodage cassé** : le libellé « Décisions à suivre » s'affichait `DÃ©cisions Ã  suivre` sur la page Rapports institutionnels. Corrigé. Un contrôle automatique sur les 202 vues n'en trouve plus aucun.
+- **Mêmes défauts dans les graphiques** : `dashboard-render.js` contenait 15 séquences doublement encodées, visibles dans les légendes et infobulles des graphiques (`Prévu`, `Réalisé`, `Période`, `Écart`, `PTA exécuté`). Le fichier mélangeait accents corrects et cassés — seules les séquences fautives ont été remplacées.
+- **Cartes KPI unifiées** : la page Rapports institutionnels était la dernière à utiliser un bloc de cartes ad hoc (`min-h-28 bg-white`). Elle utilise désormais `x-ui.kpi-grid` + `x-ui.stat-card`, le composant déjà employé par toutes les autres pages, qui porte le langage visuel des cartes du tableau de bord (accent coloré, icône en pastille, halo au survol).
+- **Barre de filtres** alignée sur le motif standard des pages PAS / PAO / PTA (`showcase-toolbar` + `showcase-filter-grid`), au lieu du couple `form-shell` / `form-grid` divergent.
+
+### Note de vérification
+
+Le défaut de mise en page signalé (champs de filtres tassés en colonne étroite) **n'a pas pu être reproduit sur le build courant** : mesuré sur les bundles compilés, `.form-grid` rend bien 4 colonnes de 228 px. Le balisage divergent a été remplacé par le motif standard, ce qui supprime la cause possible, mais un rafraîchissement forcé du navigateur peut être nécessaire si un ancien bundle CSS reste en cache.
+
+---
+
 ## 2026-08-05 - Verrouillage du circuit de validation, ciblage du paramétrage et cache des filtres
 
 ### Circuit de validation — quatre scénarios de court-circuit fermés

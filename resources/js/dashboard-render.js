@@ -2496,7 +2496,7 @@ function bootDashboardRender(force = false) {
         labels: chart.labels || [],
         datasets: [
           {
-            label: 'PrÃ©vu',
+            label: 'Prévu',
             data: chart.planned || [],
             borderColor: ANBG.primary,
             backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
@@ -2510,7 +2510,7 @@ function bootDashboardRender(force = false) {
             tension: 0.48,
           },
           {
-            label: 'RÃ©alisÃ©',
+            label: 'Réalisé',
             data: chart.realized || [],
             borderColor: ANBG.secondary,
             backgroundColor: (context) => chartGradient(context.chart, ANBG.secondary),
@@ -2532,7 +2532,7 @@ function bootDashboardRender(force = false) {
           ...kpiAnnotations(chart),
           tooltip: {
             callbacks: {
-              title: (items) => items[0]?.label ? `PÃ©riode : ${items[0].label}` : '',
+              title: (items) => items[0]?.label ? `Période : ${items[0].label}` : '',
               label: (ctx) => ` ${ctx.dataset.label} : ${formatNumber(ctx.parsed?.y ?? 0)} %`,
               afterBody(items) {
                 const index = items[0]?.dataIndex ?? 0;
@@ -2541,7 +2541,7 @@ function bootDashboardRender(force = false) {
                 const gap = realized - planned;
                 const sign = gap >= 0 ? '+' : '';
 
-                return [``, ` Ã‰cart rÃ©alisÃ© / prÃ©vu : ${sign}${formatNumber(gap)} pts`];
+                return [``, ` Écart réalisé / prévu : ${sign}${formatNumber(gap)} pts`];
               },
             },
           },
@@ -2558,7 +2558,7 @@ function bootDashboardRender(force = false) {
 
     mountChart('dashboard-decision-pta-execution-chart', baseConfig('doughnut', {
       data: {
-        labels: [chart.label || 'PTA exÃ©cutÃ©', 'Reste'],
+        labels: [chart.label || 'PTA exécuté', 'Reste'],
         datasets: [{
           data: [value, Math.max(0, 100 - value)],
           backgroundColor: [
@@ -2579,11 +2579,11 @@ function bootDashboardRender(force = false) {
           tooltip: {
             filter: (item) => item.dataIndex === 0,
             callbacks: {
-              title: () => chart.title || 'ExÃ©cution du PTA',
+              title: () => chart.title || 'Exécution du PTA',
               label: () => ` Taux global : ${formatNumber(value)} %`,
               afterLabel: () => [
                 ` Actions : ${formatNumber(chart.actions_total || 0)}`,
-                ` TerminÃ©es : ${formatNumber(chart.actions_done || 0)}`,
+                ` Terminées : ${formatNumber(chart.actions_done || 0)}`,
                 ` En retard : ${formatNumber(chart.actions_late || 0)}`,
               ],
             },
@@ -2597,7 +2597,7 @@ function bootDashboardRender(force = false) {
                 offsetY: -8,
               },
               {
-                text: chart.label || 'PTA exÃ©cutÃ©',
+                text: chart.label || 'PTA exécuté',
                 color: theme.muted,
                 font: '700 11px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
                 offsetY: 18,
@@ -3365,7 +3365,7 @@ function bootDashboardRender(force = false) {
     mountDecisionPtaExecution();
 
     const axisProgress = decisionCharts.axis_progress || {};
-    mountChart('dashboard-decision-axis-progress-chart', decisionBarConfig(axisProgress, 'Taux d exÃ©cution', ANBG.primary),
+    mountChart('dashboard-decision-axis-progress-chart', decisionBarConfig(axisProgress, 'Taux d exécution', ANBG.primary),
       ({ element }) => (axisProgress.urls || [])[element?.index] || '');
 
     const operationalObjectives = decisionCharts.operational_objectives || {};

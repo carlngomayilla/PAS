@@ -27,24 +27,23 @@
             </x-slot:actions>
         </x-ui.page-title>
 
-        <section class="app-screen-block grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4 dark:border-slate-700 dark:bg-slate-700" aria-label="Indicateurs des réunions et rapports">
+        {{-- Meme composant que les cartes KPI du tableau de bord : un seul style
+             dans toute l'application. --}}
+        <x-ui.kpi-grid min="200px" class="app-screen-block" aria-label="Indicateurs des réunions et rapports">
             @foreach ([
-                ['Réunions programmées', $summary['meetings_scheduled'] ?? 0, 'text-[#176A9D] dark:text-cyan-200'],
-                ['Tenues dans les délais', $summary['meetings_on_time'] ?? 0, 'text-emerald-700 dark:text-emerald-200'],
-                ['Non tenues à échéance', $summary['meetings_overdue'] ?? 0, 'text-rose-700 dark:text-rose-200'],
-                ['Reportées dans le trimestre', $summary['meetings_postponed'] ?? 0, 'text-amber-700 dark:text-amber-200'],
-                ['Réunions annulées', $summary['meetings_cancelled'] ?? 0, 'text-slate-700 dark:text-slate-200'],
-                ['PV diffusés', $summary['minutes_distributed'] ?? 0, 'text-violet-700 dark:text-violet-200'],
-                ['PV à corriger', $summary['minutes_returned'] ?? 0, 'text-orange-700 dark:text-orange-200'],
-                ['DÃ©cisions Ã  suivre', $summary['meeting_decisions_open'] ?? 0, 'text-rose-700 dark:text-rose-200'],
-                ['Taux de tenue', number_format((float) ($summary['meeting_completion_rate'] ?? 0), 0, ',', ' ').'%', 'text-[#17324a] dark:text-sky-200'],
+                ['Réunions programmées', $summary['meetings_scheduled'] ?? 0, 'blue'],
+                ['Tenues dans les délais', $summary['meetings_on_time'] ?? 0, 'green'],
+                ['Non tenues à échéance', $summary['meetings_overdue'] ?? 0, 'danger'],
+                ['Reportées dans le trimestre', $summary['meetings_postponed'] ?? 0, 'gold'],
+                ['Réunions annulées', $summary['meetings_cancelled'] ?? 0, 'navy'],
+                ['PV diffusés', $summary['minutes_distributed'] ?? 0, 'blue'],
+                ['PV à corriger', $summary['minutes_returned'] ?? 0, 'orange'],
+                ['Décisions à suivre', $summary['meeting_decisions_open'] ?? 0, 'danger'],
+                ['Taux de tenue', \App\Support\UiLabel::percent((float) ($summary['meeting_completion_rate'] ?? 0)), 'navy'],
             ] as [$label, $value, $tone])
-                <div class="min-h-28 bg-white px-4 py-4 dark:bg-slate-900">
-                    <p class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ $label }}</p>
-                    <p class="mt-3 text-3xl font-black {{ $tone }}">{{ $value }}</p>
-                </div>
+                <x-ui.stat-card :label="$label" :value="$value" :tone="$tone" />
             @endforeach
-        </section>
+        </x-ui.kpi-grid>
 
         @if ($followUpDecisions->isNotEmpty())
             <section class="app-screen-block mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -71,10 +70,12 @@
             </section>
         @endif
 
-        <section class="app-screen-block mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <form class="form-shell" method="GET" action="{{ route('workspace.reports.index') }}">
+        {{-- Meme motif de barre de filtres que les pages PAS / PAO / PTA. --}}
+        <section class="showcase-toolbar app-screen-block mt-5">
+            <div><h2 class="showcase-panel-title">Filtres</h2></div>
+            <form method="GET" action="{{ route('workspace.reports.index') }}">
                 <input type="hidden" name="tab" value="{{ $activeTab }}">
-                <div class="form-grid">
+                <div class="showcase-filter-grid">
                     <div><label for="report_q">Recherche</label><input id="report_q" name="q" type="search" value="{{ $filters['q'] }}" placeholder="Objet, résumé ou décision"></div>
                     <div><label for="report_year">Année</label><select id="report_year" name="year"><option value="">Toutes</option>@foreach (range(now()->year - 2, now()->year + 1) as $year)<option value="{{ $year }}" @selected((string) $filters['year'] === (string) $year)>{{ $year }}</option>@endforeach</select></div>
                     <div><label for="report_quarter">Trimestre</label><select id="report_quarter" name="quarter"><option value="">Tous</option>@foreach ([1, 2, 3, 4] as $quarter)<option value="{{ $quarter }}" @selected((string) $filters['quarter'] === (string) $quarter)>T{{ $quarter }}</option>@endforeach</select></div>
@@ -86,7 +87,10 @@
                     <div><label for="report_participant">Participant</label><select id="report_participant" name="participant_id"><option value="">Tous</option>@foreach ($userOptions as $member)<option value="{{ $member->id }}" @selected((string) $filters['participant_id'] === (string) $member->id)>{{ $member->name }}</option>@endforeach</select></div>
                     <div><label for="report_status">Statut</label><select id="report_status" name="status"><option value="">Tous</option><option value="held" @selected($filters['status'] === 'held')>Tenue</option><option value="overdue" @selected($filters['status'] === 'overdue')>Non tenue à échéance</option><option value="postponed" @selected($filters['status'] === 'postponed')>Reportée</option><option value="cancelled" @selected($filters['status'] === 'cancelled')>Annulée</option><option value="minutes_pending" @selected($filters['status'] === 'minutes_pending')>PV en attente</option><option value="verified" @selected($filters['status'] === 'verified')>PV vérifié</option><option value="returned" @selected($filters['status'] === 'returned')>PV à corriger</option></select></div>
                 </div>
-                <div class="form-actions mt-4"><a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.reports.index', ['tab' => $activeTab]) }}">Réinitialiser</a><button class="btn btn-primary min-h-10 px-4" type="submit">Appliquer</button></div>
+                <div class="showcase-filter-actions mt-4">
+                    <button class="btn btn-primary" type="submit">Appliquer</button>
+                    <a class="btn btn-secondary" href="{{ route('workspace.reports.index', ['tab' => $activeTab]) }}">Réinitialiser</a>
+                </div>
             </form>
         </section>
 
