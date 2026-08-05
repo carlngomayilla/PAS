@@ -202,6 +202,126 @@ class ActionTrackingWorkspaceTest extends TestCase
         ]);
     }
 
+    /**
+     * Le circuit ne doit pas pouvoir etre court-circuite : aucune etape ne peut
+     * etre sautee, et personne ne peut poser deux visas successifs.
+     */
+    public function test_control_cannot_review_an_action_that_the_chief_has_not_signed_off(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+
+        // L'action est en attente du chef : le controle ne peut pas se saisir.
+        $this->expectException(\InvalidArgumentException::class);
+        $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+    }
+
+    public function test_planification_cannot_close_an_action_that_control_has_not_transmitted(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+        $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+
+        // L'action attend le controle : la planification ne peut pas cloturer.
+        $this->expectException(\InvalidArgumentException::class);
+        $workflow->reviewActionByPlanification($action, true, null, $planification);
+    }
+
+    public function test_the_responsible_cannot_sign_off_their_own_action_as_chief(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+
+        // Separation des roles : celui qui soumet ne peut pas viser.
+        $this->expectException(\InvalidArgumentException::class);
+        $workflow->reviewAction($action, true, null, $fixture['agent']);
+    }
+
+    public function test_control_cannot_review_an_action_it_already_signed_off_as_chief(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+
+        // Le chef qui a vise ne peut pas ensuite poser le visa de controle.
+        $this->expectException(\InvalidArgumentException::class);
+        $workflow->reviewActionByController($action, true, null, $fixture['chef']);
+    }
+
+    public function test_planification_cannot_close_an_action_it_already_controlled(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+
+        // Le controleur qui a transmis ne peut pas realiser la cloture finale.
+        $this->expectException(\InvalidArgumentException::class);
+        $workflow->reviewActionByPlanification($action, true, null, $fixture['controller']);
+    }
+
+    public function test_an_action_returned_by_planification_becomes_editable_again(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+        $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+        $action = $workflow->reviewActionByPlanification($action, false, 'Preuve insuffisante', $planification);
+
+        $this->assertSame(
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+            $action->statut_validation
+        );
+
+        // Le responsable doit pouvoir corriger puis resoumettre : sans cela
+        // l'action restait gelee definitivement.
+        $action = $workflow->recordActionProgress($action, ['quantite_realisee' => 60], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+
+        $this->assertSame(
+            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            $action->statut_validation
+        );
+    }
+
+    public function test_a_closed_action_cannot_be_reviewed_again(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+        $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
+        $otherPlanification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 100], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
+
+        // Une action cloturee ne se rejoue pas.
+        $this->expectException(\InvalidArgumentException::class);
+        $workflow->reviewActionByPlanification($action, true, null, $otherPlanification);
+    }
+
     public function test_correction_workspace_tells_the_responsible_what_to_do_next(): void
     {
         $fixture = $this->createFixture();

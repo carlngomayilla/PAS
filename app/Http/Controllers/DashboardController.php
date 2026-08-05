@@ -981,6 +981,9 @@ class DashboardController extends Controller
             'periode' => $this->selectedDashboardSynthesisPeriod(),
             'direction_filter' => $this->selectedDashboardDirectionId($user),
             'service_filter' => $this->selectedDashboardServiceId($user),
+            // `responsable_id` manquait : deux filtres RMO differents partageaient
+            // la meme entree de cache et se renvoyaient mutuellement leurs donnees.
+            'responsable_filter' => $this->selectedDashboardSynthesisFilters()['responsable_id'],
             'statut_suivi' => $this->selectedDashboardSynthesisFilters()['statut_suivi'],
             'statut_delai' => $this->selectedDashboardSynthesisFilters()['statut_delai'],
             'alerte_echeance' => $this->selectedDashboardSynthesisFilters()['alerte_echeance'],

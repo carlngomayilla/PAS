@@ -10367,6 +10367,25 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         box-shadow: 0 0 0 7px rgba(57, 150, 211, 0.12) !important;
     }
 
+    /* Action ciblee depuis « Modifier le parametrage » : elle doit etre
+       identifiable sans ambiguite, meme si le defilement se decale. */
+    .pta-context-target {
+        border-color: #3996d3 !important;
+        box-shadow: 0 0 0 3px rgba(57, 150, 211, 0.22) !important;
+    }
+
+    .pta-context-target > summary::after {
+        content: 'Action ciblée';
+        margin-left: 0.5rem;
+        border-radius: 999px;
+        background: #3996d3;
+        padding: 0.1rem 0.5rem;
+        color: #ffffff;
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+    }
+
     body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-pas-row > td {
         background: #2f75b5 !important;
         color: #ffffff !important;

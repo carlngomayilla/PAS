@@ -315,7 +315,8 @@ class PtaSuiviWebTest extends TestCase
                 ->assertDontSee("Report d'échéance", false)
                 ->assertDontSee(route('pta.suivi.actions.update', $action), false);
 
-            $parameterUrl = route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id;
+            // L'URL est comparee telle qu'elle figure dans le HTML : « & » y est echappe.
+            $parameterUrl = route('workspace.pta.edit', $action->pta_id).'?focus=action&amp;action_id='.$action->id.'#action-'.$action->id;
             $response = $this->actingAs($user)->get(route('pta.suivi.index', ['annee' => 'all']));
             if (in_array($role, [User::ROLE_PLANIFICATION, User::ROLE_CHEF_PLANIFICATION], true)) {
                 $response
@@ -534,7 +535,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertDontSee('pta-inline-field', false)
             ->assertDontSee('name="rmo_id"', false)
             ->assertDontSee(route('pta.suivi.actions.update', $action), false)
-            ->assertSee(route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id, false)
+            ->assertSee(route('workspace.pta.edit', $action->pta_id).'?focus=action&amp;action_id='.$action->id.'#action-'.$action->id, false)
             ->assertSee('Modifier le paramétrage', false)
             ->assertDontSee('Faire le suivi', false)
             ->assertDontSee("Report d'échéance", false)

@@ -705,9 +705,12 @@ class PtaSuiviService
             return '';
         }
 
+        // `action_id` est la cible faisant foi : l'ancre seule dependait du saut
+        // natif du navigateur, execute avant l'ouverture des accordeons, ce qui
+        // laissait l'utilisateur sur une action voisine.
         $query = $sousAction instanceof SousAction
-            ? '?focus=sub_action&sub_action_id='.(int) $sousAction->id
-            : '?focus=action';
+            ? '?focus=sub_action&action_id='.(int) $action->id.'&sub_action_id='.(int) $sousAction->id
+            : '?focus=action&action_id='.(int) $action->id;
 
         return route('workspace.pta.edit', $action->pta_id).$query.'#action-'.(int) $action->id;
     }

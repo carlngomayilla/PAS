@@ -86,6 +86,24 @@ class ActionWorkflowService
      */
     public function submitAction(Action $action, array $data, ?User $actor = null): Action
     {
+        return DB::transaction(function () use ($action, $data, $actor): Action {
+            // Verrou : deux soumissions simultanees ne doivent pas se chevaucher.
+            $action = Action::query()
+                ->whereKey($action->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            return $this->applySubmission($action, $data, $actor);
+        });
+    }
+
+    /**
+     * Soumission de l'action, une fois le verrou pose.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function applySubmission(Action $action, array $data, ?User $actor): Action
+    {
         $this->assertActionExecutionEditable($action);
 
         $conformity = $this->calculator->actionConformity(
@@ -136,10 +154,40 @@ class ActionWorkflowService
         ?User $actor = null,
         ?float $progressPercent = null
     ): Action {
-        if ((string) $action->statut_validation !== ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
-            throw new \InvalidArgumentException('Cette action n est pas en attente de validation du chef.');
-        }
+        return DB::transaction(function () use ($action, $approve, $motif, $actor, $progressPercent): Action {
+            // Verrou + relecture : sans cela deux visas simultanes passaient tous
+            // les deux le controle de statut et faisaient sauter une etape.
+            $action = Action::query()
+                ->whereKey($action->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
+            if ((string) $action->statut_validation !== ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+                throw new \InvalidArgumentException('Cette action n est pas en attente de validation du chef.');
+            }
+
+            // Separation des roles : le visa du chef ne peut pas etre pose par la
+            // personne qui a soumis l'action, ni par son responsable.
+            if ($actor instanceof User
+                && ($action->isResponsible($actor) || (int) ($action->soumise_par ?? 0) === (int) $actor->id)
+            ) {
+                throw new \InvalidArgumentException('Le visa du chef doit etre pose par un autre intervenant que le responsable de l action.');
+            }
+
+            return $this->applyChefDecision($action, $approve, $motif, $actor, $progressPercent);
+        });
+    }
+
+    /**
+     * Decision du chef, une fois les verrous et les gardes passes.
+     */
+    private function applyChefDecision(
+        Action $action,
+        bool $approve,
+        ?string $motif,
+        ?User $actor,
+        ?float $progressPercent
+    ): Action {
         if ($approve) {
             $provisional = $this->calculator->provisionalPerformance($action);
             $proposed = $progressPercent ?? $provisional;
@@ -463,12 +511,14 @@ class ActionWorkflowService
             throw new \InvalidArgumentException('Cette action doit etre parametree avant le suivi.');
         }
 
-        if (! in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), [
-            ActionTrackingService::VALIDATION_NON_SOUMISE,
-            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
-            ActionTrackingService::VALIDATION_REJETEE_CHEF,
-            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
-        ], true)) {
+        // Une action renvoyee en correction — par le chef, le controle OU la
+        // planification — doit redevenir modifiable par son responsable.
+        $editableStatuses = array_merge(
+            [ActionTrackingService::VALIDATION_NON_SOUMISE],
+            ActionTrackingService::CORRECTION_VALIDATION_STATUSES
+        );
+
+        if (! in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), $editableStatuses, true)) {
             throw new \InvalidArgumentException('Cette action est gelee pendant la validation.');
         }
 

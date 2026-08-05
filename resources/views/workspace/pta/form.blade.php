@@ -937,15 +937,36 @@
                 return null;
             }
 
+            function resolveTargetActionBlock(url) {
+                // `action_id` fait foi : l'ancre seule dependait du saut natif du
+                // navigateur, execute avant l'ouverture des accordeons.
+                var actionId = url.searchParams.get('action_id') || '';
+
+                if (actionId !== '') {
+                    var byId = actionsList.querySelector('[data-action-block][data-action-id="' + actionId + '"]');
+                    if (byId instanceof HTMLDetailsElement) {
+                        return byId;
+                    }
+                }
+
+                if (!window.location.hash) return null;
+
+                var byHash = document.querySelector(window.location.hash);
+
+                return (byHash instanceof HTMLDetailsElement && byHash.matches('[data-action-block]'))
+                    ? byHash
+                    : null;
+            }
+
             function focusFieldInActionContext() {
-                if (!actionsList || !window.location.hash) return;
+                if (!actionsList) return;
 
                 var url = new URL(window.location.href);
                 var focus = url.searchParams.get('focus') || 'action';
                 var subActionId = url.searchParams.get('sub_action_id') || '';
-                var block = document.querySelector(window.location.hash);
+                var block = resolveTargetActionBlock(url);
 
-                if (!(block instanceof HTMLDetailsElement) || !block.matches('[data-action-block]')) {
+                if (!block) {
                     return;
                 }
 
@@ -979,14 +1000,25 @@
                     }
                 }
 
-                setTimeout(function () {
-                    var target = field || block;
-                    target.classList.add('pta-context-focus');
-                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    if (field && typeof field.focus === 'function' && !field.disabled) {
+                var target = field || block;
+                target.classList.add('pta-context-focus');
+                block.classList.add('pta-context-target');
+
+                // L'ouverture des accordeons decale la mise en page : on recale le
+                // defilement une fois le rendu stabilise, puis une seconde fois.
+                function centerOnTarget(withFocus) {
+                    target.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    if (withFocus && field && typeof field.focus === 'function' && !field.disabled) {
                         field.focus({ preventScroll: true });
                     }
-                }, 120);
+                }
+
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        centerOnTarget(false);
+                        setTimeout(function () { centerOnTarget(true); }, 260);
+                    });
+                });
             }
 
             function addRmo(block) {

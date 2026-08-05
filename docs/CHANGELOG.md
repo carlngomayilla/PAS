@@ -7,6 +7,34 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-08-05 - Verrouillage du circuit de validation, ciblage du paramétrage et cache des filtres
+
+### Circuit de validation — quatre scénarios de court-circuit fermés
+
+L'ordre `RMO → chef de service → contrôle (SCIQ) → planification` pouvait être contourné. Les failles trouvées et corrigées :
+
+| # | Faille | Correctif |
+| --- | --- | --- |
+| 1 | Une action renvoyée en correction **par la planification** restait gelée : `assertActionExecutionEditable()` ne connaissait que les corrections chef et contrôle. Le responsable ne pouvait plus jamais la corriger. | La liste s'appuie sur `CORRECTION_VALIDATION_STATUSES`, qui couvre les trois étapes. |
+| 2 | **Le visa du chef n'avait aucune séparation des rôles** : le responsable de l'action, ou la personne qui l'avait soumise, pouvait la viser elle-même. Les visas contrôle et planification avaient cette garde, pas celui du chef. | Garde ajoutée : le visa du chef est refusé au responsable et au soumettant. |
+| 3 | `reviewAction()` **n'était pas transactionnelle** : deux visas simultanés passaient tous les deux le contrôle de statut et faisaient sauter une étape. | `DB::transaction` + `lockForUpdate` + relecture du statut sous verrou, comme les deux autres étapes. |
+| 4 | `submitAction()` n'était pas verrouillée non plus : deux soumissions concurrentes pouvaient se chevaucher. | Même verrou transactionnel. |
+
+### Bouton « Modifier le paramétrage »
+
+Il ouvrait le bon PTA mais laissait l'utilisateur sur une action voisine : le navigateur sautait à l'ancre **avant** que le script n'ouvre les accordéons, et le décalage de mise en page déplaçait la cible. L'action visée est désormais transmise par un paramètre `action_id` faisant foi (l'ancre reste pour compatibilité), le défilement est recalé après stabilisation du rendu, et le bloc ciblé porte un repère visuel « Action ciblée ».
+
+### Filtres de page
+
+- **Vérifié par mesure** : les filtres de la Synthèse agissent bien sur l'ensemble des données de la page. Avec un filtre Direction, les 36 actions tombent à 9, les 12 services à 3, les 218 lignes agents à 35 — tous les blocs suivent.
+- **Correctif** : la clé de cache du tableau de bord **omettait le filtre RMO**. Deux filtres RMO différents partageaient la même entrée de cache et se renvoyaient mutuellement leurs données. `responsable_id` entre dans la clé.
+
+### Validation
+
+`tests/Feature/ActionTrackingWorkspaceTest.php` : **7 tests ajoutés**, un par scénario de contournement — le contrôle ne peut pas agir avant le chef, la planification ne peut pas clôturer avant le contrôle, le soumettant ne peut pas viser sa propre action, le chef ne peut pas enchaîner sur le visa de contrôle, le contrôleur ne peut pas réaliser la clôture, une action renvoyée par la planification redevient modifiable, une action clôturée ne se rejoue pas. **19 tests passés.**
+
+---
+
 ## 2026-08-05 - Rapport d'évolution par direction/service, filtres du pilotage et cartes KPI
 
 ### Rapport d'évolution du PTA
