@@ -35,6 +35,18 @@ jobs:
           test -d "$DEPLOY_PATH"
           test -x "$DEPLOY_PATH/scripts/deploy.sh"
 
+      - name: Report deployment repository state
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${DEPLOY_PATH:-/var/www/pas-anbg/PAS}"
+          cd "$DEPLOY_PATH"
+          git fetch --prune origin main
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "origin/main=$(git rev-parse origin/main)"
+          git status --short --branch
+          git log --oneline --left-right --cherry-pick --max-count=20 HEAD...origin/main
+
       - name: Deploy verified main branch
         shell: bash
         run: |
