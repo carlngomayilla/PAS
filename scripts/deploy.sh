@@ -75,6 +75,9 @@ if [ -n "$FPM_SERVICE" ] && command -v systemctl >/dev/null 2>&1; then
         || echo "   (rechargement php-fpm ignoré : privilèges insuffisants — à faire manuellement)"
 fi
 
+echo "==> contrôle de santé applicatif"
+php artisan anbg:health-check
+
 # Sortie de maintenance explicite (le trap reste un filet de sécurité).
 php artisan up
 trap - EXIT
