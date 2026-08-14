@@ -36,6 +36,7 @@ jobs:
           test -x "$DEPLOY_PATH/scripts/deploy.sh"
 
       - name: Report deployment repository state
+        id: repository_state
         shell: bash
         run: |
           set -euo pipefail
@@ -47,6 +48,18 @@ jobs:
           git status --short --branch
           git log --oneline --left-right --cherry-pick --max-count=20 HEAD...origin/main
           git show --name-status --format=fuller --no-renames HEAD
+          if [ "$(git rev-parse HEAD)" = "e073cf472aebabf8e0bbaf2e910eb612c0c3c8ec" ]; then
+            git format-patch --stdout "$(git merge-base HEAD origin/main)..HEAD" > "$RUNNER_TEMP/production-local.patch"
+            echo "patch_created=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Preserve production-only commit
+        if: steps.repository_state.outputs.patch_created == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-local-commit-${{ github.run_id }}
+          path: ${{ runner.temp }}/production-local.patch
+          retention-days: 1
 
       - name: Deploy verified main branch
         shell: bash
