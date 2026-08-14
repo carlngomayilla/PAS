@@ -552,7 +552,7 @@ class DeadlineExtensionWorkflowTest extends TestCase
             'responsable_id' => $fixture['agent']->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
-            'statut_parametrage' => 'parametree',
+            'statut_parametrage' => 'parametre',
             'progression_reelle' => 0,
             'progression_theorique' => 0,
             'seuil_alerte_progression' => 10,

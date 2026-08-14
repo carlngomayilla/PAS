@@ -87,6 +87,28 @@ class MeetingDataIntegrityTest extends TestCase
         ]);
     }
 
+    public function test_encryption_backfill_classifies_only_legacy_encrypted_paths(): void
+    {
+        $meeting = Meeting::factory()->create();
+        $encryptedReport = MeetingReport::factory()->create([
+            'meeting_id' => $meeting->id,
+            'file_path' => 'legacy/pv.enc',
+            'is_encrypted' => false,
+        ]);
+        $plainReport = MeetingReport::factory()->create([
+            'meeting_id' => $meeting->id,
+            'file_path' => 'legacy/pv.pdf',
+            'is_encrypted' => false,
+            'version' => 2,
+        ]);
+
+        $migration = require database_path('migrations/2026_08_14_093056_backfill_meeting_report_encryption_state.php');
+        $migration->up();
+
+        $this->assertTrue($encryptedReport->refresh()->is_encrypted);
+        $this->assertFalse($plainReport->refresh()->is_encrypted);
+    }
+
     public function test_deleting_a_plan_preserves_its_notification_history(): void
     {
         $direction = Direction::factory()->create();

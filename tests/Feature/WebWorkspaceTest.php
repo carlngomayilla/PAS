@@ -701,7 +701,7 @@ class WebWorkspaceTest extends TestCase
             'unite' => '%',
             'cible' => 100,
             'seuil_alerte' => 80,
-            'periodicite' => 'mensuelle',
+            'periodicite' => 'mensuel',
             'est_a_renseigner' => true,
         ]);
 

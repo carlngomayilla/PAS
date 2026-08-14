@@ -114,7 +114,7 @@ class EssentialDashboardWorkflowTest extends TestCase
             'responsable_id' => $fixture['agent']->id,
             'statut' => 'en_cours',
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
-            'statut_parametrage' => 'parametree',
+            'statut_parametrage' => 'parametre',
             'progression_reelle' => 20,
             'progression_theorique' => 50,
             'seuil_alerte_progression' => 10,
@@ -162,7 +162,7 @@ class EssentialDashboardWorkflowTest extends TestCase
             'unite' => '%',
             'cible' => 100,
             'seuil_alerte' => 80,
-            'periodicite' => 'mensuelle',
+            'periodicite' => 'mensuel',
             'est_a_renseigner' => true,
         ]);
 
@@ -322,7 +322,7 @@ class EssentialDashboardWorkflowTest extends TestCase
             'responsable_id' => $fixture['agent']->id,
             'statut' => 'en_cours',
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
-            'statut_parametrage' => 'parametree',
+            'statut_parametrage' => 'parametre',
             'progression_reelle' => 40,
             'progression_theorique' => 50,
             'seuil_alerte_progression' => 10,

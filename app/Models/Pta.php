@@ -13,7 +13,7 @@ class Pta extends Model
 {
     use HasFactory, SoftDeletes;
 
-    // Statuts historiques conserves pour compatibilite de lecture/import.
+    // Statut transitoire des PTA importes qui attendent leur parametrage complet.
     public const STATUS_BROUILLON = 'brouillon';
 
     public const STATUS_EN_COURS = 'en_cours';

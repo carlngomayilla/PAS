@@ -15,6 +15,7 @@ use App\Services\UserWorkspaceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -175,10 +176,74 @@ class MeetingWebTest extends TestCase
         $meeting->update(['status' => MeetingStatus::EnValidationPlanification]);
         $report->update(['status' => MeetingStatus::EnValidationPlanification]);
 
-        $this->actingAs($fixture['planning'])
+        $response = $this->actingAs($fixture['planning'])
             ->get(route('workspace.meetings.reports.download', [$meeting, $report]))
             ->assertOk()
             ->assertHeader('x-content-type-options', 'nosniff');
+
+        $this->assertSame('contenu-pv', $response->streamedContent());
+    }
+
+    public function test_legacy_encrypted_report_is_decrypted_before_download(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->fixture();
+        $meeting = Meeting::factory()->create([
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'meeting_type' => MeetingType::Service,
+            'status' => MeetingStatus::EnValidationSciq,
+            'created_by' => $fixture['chief']->id,
+            'responsible_id' => $fixture['chief']->id,
+        ]);
+        $content = '%PDF-1.4 ancien PV chiffre';
+        Storage::disk('local')->put('legacy/pv.enc', Crypt::encryptString(base64_encode($content)));
+        $report = MeetingReport::factory()->create([
+            'meeting_id' => $meeting->id,
+            'file_path' => 'legacy/pv.enc',
+            'original_file_name' => 'pv.pdf',
+            'file_size' => strlen($content),
+            'mime_type' => 'application/pdf',
+            'is_encrypted' => true,
+            'status' => MeetingStatus::EnValidationSciq,
+            'uploaded_by' => $fixture['chief']->id,
+        ]);
+
+        $response = $this->actingAs($fixture['chief'])
+            ->get(route('workspace.meetings.reports.download', [$meeting, $report]))
+            ->assertOk()
+            ->assertHeader('x-content-type-options', 'nosniff');
+
+        $this->assertSame($content, $response->streamedContent());
+    }
+
+    public function test_corrupted_encrypted_report_is_not_served_as_plain_content(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->fixture();
+        $meeting = Meeting::factory()->create([
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'meeting_type' => MeetingType::Service,
+            'status' => MeetingStatus::EnValidationSciq,
+            'created_by' => $fixture['chief']->id,
+            'responsible_id' => $fixture['chief']->id,
+        ]);
+        Storage::disk('local')->put('legacy/corrupted.enc', 'contenu-chiffre-invalide');
+        $report = MeetingReport::factory()->create([
+            'meeting_id' => $meeting->id,
+            'file_path' => 'legacy/corrupted.enc',
+            'original_file_name' => 'pv.pdf',
+            'file_size' => 25,
+            'mime_type' => 'application/pdf',
+            'is_encrypted' => true,
+            'status' => MeetingStatus::EnValidationSciq,
+            'uploaded_by' => $fixture['chief']->id,
+        ]);
+
+        $this->actingAs($fixture['chief'])
+            ->get(route('workspace.meetings.reports.download', [$meeting, $report]))
+            ->assertStatus(500);
     }
 
     public function test_director_can_open_and_download_a_service_meeting_in_their_direction(): void
