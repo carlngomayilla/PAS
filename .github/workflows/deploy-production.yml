@@ -46,6 +46,7 @@ jobs:
           echo "origin/main=$(git rev-parse origin/main)"
           git status --short --branch
           git log --oneline --left-right --cherry-pick --max-count=20 HEAD...origin/main
+          git show --name-status --format=fuller --no-renames HEAD
 
       - name: Deploy verified main branch
         shell: bash
