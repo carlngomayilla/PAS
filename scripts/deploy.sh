@@ -61,6 +61,9 @@ php artisan optimize          # config:cache + event:cache + route:cache + view:
 echo "==> redémarrage du worker de file d'attente"
 php artisan queue:restart
 
+echo "==> redémarrage du serveur temps réel Reverb"
+php artisan reverb:restart
+
 # Rechargement de php-fpm : vide l'OPcache pour que le nouveau code et le
 # config:cache soient pris en compte immédiatement. Sans effet si php-fpm n'est
 # pas géré par systemd ou si sudo non disponible (étape non bloquante).
