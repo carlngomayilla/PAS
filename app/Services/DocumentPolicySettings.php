@@ -284,6 +284,7 @@ class DocumentPolicySettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     /**

@@ -23,6 +23,7 @@ class OrganizationDirectoryService
         User::ROLE_CHEF_UNITE_DGA,
         User::ROLE_CHEF_UNITE_CABINET,
         User::ROLE_CHEF_UNITE_UCAS,
+        User::ROLE_UCAS,
     ];
 
     /** @var list<string> */
@@ -34,6 +35,7 @@ class OrganizationDirectoryService
         User::ROLE_CHEF_UNITE_DGA,
         User::ROLE_CHEF_UNITE_CABINET,
         User::ROLE_CHEF_UNITE_UCAS,
+        User::ROLE_UCAS,
     ];
 
     public function __construct(
@@ -477,6 +479,12 @@ class OrganizationDirectoryService
         if (! $viewer->hasGlobalReadAccess()) {
             $viewer->direction_id !== null
                 ? $query->where('direction_id', (int) $viewer->direction_id)
+                : $query->whereRaw('1 = 0');
+        }
+
+        if ($viewer->hasRole(User::ROLE_UCAS, User::ROLE_CHEF_UNITE_UCAS)) {
+            $viewer->unite_dg_id !== null
+                ? $query->where('unite_dg_id', (int) $viewer->unite_dg_id)
                 : $query->whereRaw('1 = 0');
         }
 

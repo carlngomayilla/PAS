@@ -746,7 +746,7 @@ function bootDashboardRender(force = false) {
 
       optionalPluginsRegistered = true;
     } catch (error) {
-      console.error('Plugins graphiques optionnels indisponibles.', error);
+      console.warn('Plugins graphiques optionnels indisponibles.', error);
     }
   }
 

@@ -28,7 +28,7 @@ class SuperAdminSimulationTest extends TestCase
             ->assertOk()
             ->assertSee('Simulation d’impact')
             ->assertSee('Circuit cible verrouillé')
-            ->assertSee('Agent → Chef de service → Contrôleur');
+            ->assertSee('Agent → Chef de service → Contrôle SCIQ → Planification');
 
         $response = $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.simulation.run'), [
@@ -40,7 +40,7 @@ class SuperAdminSimulationTest extends TestCase
 
         $response
             ->assertRedirect(route('workspace.super-admin.simulation.index'))
-            ->assertSessionHas('simulation_result.simulated.workflow_chain_label', 'Agent -> Chef de service -> Controleur')
+            ->assertSessionHas('simulation_result.simulated.workflow_chain_label', 'Agent -> Chef de service -> Controle SCIQ -> Planification')
             ->assertSessionHas('simulation_result.payload.actions_service_validation_enabled', '1')
             ->assertSessionHas('simulation_result.payload.actions_direction_validation_enabled', '0');
 

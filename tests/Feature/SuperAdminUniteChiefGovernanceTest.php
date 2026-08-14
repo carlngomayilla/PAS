@@ -123,7 +123,7 @@ class SuperAdminUniteChiefGovernanceTest extends TestCase
         $this->assertSame((int) $sciq->id, (int) $member->fresh()->unite_dg_id);
     }
 
-    public function test_sync_removes_an_inactive_chief_and_non_super_admin_is_forbidden(): void
+    public function test_admin_can_remove_a_chief_and_sync_removes_an_inactive_chief(): void
     {
         $admin = $this->createAdminUser();
         [$sciq] = $this->createUnits();
@@ -138,10 +138,11 @@ class SuperAdminUniteChiefGovernanceTest extends TestCase
             ->put(route('workspace.super-admin.unites-dg.set-chef', $sciq), [
                 'chef_user_id' => null,
             ])
-            ->assertForbidden();
+            ->assertRedirect(route('workspace.super-admin.unites-dg.index'));
 
-        $this->assertSame((int) $chief->id, (int) $sciq->fresh()->chef_user_id);
+        $this->assertNull($sciq->fresh()->chef_user_id);
 
+        $sciq->forceFill(['chef_user_id' => $chief->id])->save();
         $chief->forceFill(['is_active' => false])->save();
         app(ChefUniteSyncService::class)->sync($chief);
 

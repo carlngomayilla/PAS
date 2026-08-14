@@ -8,12 +8,14 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Workflow et validations</h1>
-                <p class="mt-2 text-slate-600">Paramétrage du circuit de validation des actions. La validation chef de service est l'étape finale; la direction est notifiée et conserve la lecture du dossier.</p>
+                <p class="mt-2 text-slate-600">Paramétrage du circuit de validation des actions. Le chef de service vise le dossier, SCIQ le contrôle et Planification réalise la validation finale.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.settings.edit') }}">Parametres generaux</a>
+                @if (auth()->user()?->isSuperAdmin())
+                    <a class="btn btn-secondary" href="{{ route('workspace.super-admin.settings.edit') }}">Paramètres généraux</a>
+                @endif
             </div>
         </div>
     </section>
@@ -31,6 +33,10 @@
                     Direction
                 @elseif ($summary['final_stage'] === 'service')
                     Chef de service
+                @elseif ($summary['final_stage'] === 'control')
+                    Contrôle SCIQ
+                @elseif ($summary['final_stage'] === 'planification')
+                    Planification
                 @else
                     Clôture directe
                 @endif
@@ -40,7 +46,7 @@
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Motif de rejet</p>
             <p class="mt-2 text-xl font-semibold">{{ $summary['rejection_comment_required'] ? 'Obligatoire' : 'Optionnel' }}</p>
-            <p class="mt-2 text-sm text-slate-600">Règle appliquée aux validations chef de service.</p>
+            <p class="mt-2 text-sm text-slate-600">Règle appliquée à chaque décision de rejet du circuit.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Workflow PAS</p>
@@ -68,21 +74,21 @@
                 <h2 class="form-section-title">Circuit des actions</h2>
                 <div class="grid gap-4 md:grid-cols-2">
                     <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
-                        <input type="hidden" name="actions_direction_validation_enabled" value="0">
+                        <input type="hidden" name="actions_service_validation_enabled" value="1">
                         <input
-                            class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-400"
                             type="checkbox"
-                            name="actions_service_validation_enabled"
-                            value="1"
-                            @checked(($settings['actions_service_validation_enabled'] ?? '1') === '1')
+                            checked
+                            disabled
                         >
                         <span>
-                            <strong class="block text-slate-900">Activer la validation chef de service</strong>
-                            <span class="mt-1 block text-slate-500">Le chef de service valide ou rejette la clôture. En cas de validation, le circuit est finalisé.</span>
+                            <strong class="block text-slate-900">Visa du chef de service obligatoire</strong>
+                            <span class="mt-1 block text-slate-500">Le chef vise l'action et la transmet au contrôleur. Cette étape canonique ne peut pas être désactivée.</span>
                         </span>
                     </label>
 
                     <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                        <input type="hidden" name="actions_direction_validation_enabled" value="0">
                         <input
                             class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-400"
                             type="checkbox"
@@ -91,8 +97,8 @@
                             disabled
                         >
                         <span>
-                            <strong class="block text-slate-900">Validation direction supprimee</strong>
-                            <span class="mt-1 block text-slate-500">La direction est informee de la validation chef et conserve une lecture du dossier sans action de validation.</span>
+                            <strong class="block text-slate-900">Validation direction supprimée</strong>
+                            <span class="mt-1 block text-slate-500">La direction est informée et conserve une lecture du dossier sans action de validation.</span>
                         </span>
                     </label>
 

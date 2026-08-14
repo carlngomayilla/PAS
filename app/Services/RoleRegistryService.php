@@ -309,6 +309,7 @@ class RoleRegistryService
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     /**

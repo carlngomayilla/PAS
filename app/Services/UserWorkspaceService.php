@@ -27,13 +27,13 @@ class UserWorkspaceService
         if ($user->hasPermission('reporting.read')) {
             $modules[] = [
                 'code' => 'reports',
-                'label' => 'Rapports',
-                'description' => 'Réunions programmées, comptes rendus, incidents et circuit de vérification',
-                'endpoint' => '/workspace/rapports',
+                'label' => 'Réunions & PV',
+                'description' => 'Programmation, dépôt des PV et double visa SCIQ–Planification',
+                'endpoint' => '/workspace/reunions',
                 'can_write' => ! $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE),
                 'actions' => $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE)
                     ? ['Consulter']
-                    : ['Consulter', 'Programmer une réunion', 'Déposer un rapport'],
+                    : ['Consulter', 'Programmer une réunion', 'Déposer un PV'],
             ];
         }
         $modules = array_values(array_filter(
@@ -41,7 +41,18 @@ class UserWorkspaceService
             fn (array $module): bool => $this->moduleAllowedByPermissions($module, $user)
         ));
 
-        return $this->workspaceModuleSettings->applyToModules($modules);
+        return collect($this->workspaceModuleSettings->applyToModules($modules))
+            ->map(function (array $module): array {
+                if (($module['code'] ?? null) === 'reports') {
+                    $module['label'] = 'Réunions & PV';
+                    $module['description'] = 'Programmation, dépôt des PV et double visa SCIQ–Planification';
+                    $module['endpoint'] = '/workspace/reunions';
+                }
+
+                return $module;
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -351,6 +362,7 @@ class UserWorkspaceService
             'can_write' => false,
             'actions' => ['Consulter'],
         ], $extra);
+        $isUcasChief = $user->hasRole(User::ROLE_CHEF_UNITE_UCAS);
 
         return match ($specRole) {
             'readonly' => [
@@ -480,9 +492,18 @@ class UserWorkspaceService
             'ucas' => [
                 $m('pilotage', 'Dashboard unité', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
-                $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier']]),
-                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
-                $m('execution', 'Action', '/workspace/actions', ['can_write' => true, 'actions' => ['Consulter', 'Valider', 'Renvoyer']]),
+                $m('pta', 'PTA', '/workspace/pta', [
+                    'can_write' => $isUcasChief,
+                    'actions' => $isUcasChief ? ['Consulter', 'Créer', 'Modifier'] : ['Consulter'],
+                ]),
+                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', [
+                    'can_write' => $isUcasChief,
+                    'actions' => $isUcasChief ? ['Charger', 'Corriger', 'Valider'] : ['Consulter'],
+                ]),
+                $m('execution', 'Action', '/workspace/actions', [
+                    'can_write' => $isUcasChief,
+                    'actions' => $isUcasChief ? ['Consulter', 'Valider', 'Renvoyer'] : ['Consulter'],
+                ]),
                 // Validation fusionnée dans l'onglet Actions > Validations.
                 $m('agents', 'Agents / RMO', '/workspace/referentiel/utilisateurs'),
                 $m('reporting', 'Reporting unité', '/workspace/reporting'),

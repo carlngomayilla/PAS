@@ -144,9 +144,9 @@
                                 <div class="py-6 text-center">
                                     <p class="font-semibold text-[#1c203d]">Aucun import enregistre.</p>
                                     <p class="mt-1 text-sm text-slate-500">Commencez par télécharger le modele, puis lancez un nouvel import.</p>
-                                    <div class="mt-3 flex justify-center gap-2">
-                                        <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Télécharger le modele</a>
-                                        <a class="btn btn-primary" href="{{ route('workspace.imports.create') }}">Nouvel import</a>
+                                    <div class="import-empty-actions mt-3 flex flex-col justify-center gap-2 sm:flex-row">
+                                        <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}" title="Télécharger le modele">Télécharger le modele</a>
+                                        <a class="btn btn-primary" href="{{ route('workspace.imports.create') }}" title="Nouvel import">Nouvel import</a>
                                     </div>
                                 </div>
                             </td>

@@ -328,7 +328,8 @@ class PlatformSimulationService
             $steps[] = 'Direction';
         }
 
-        $steps[] = 'Controleur';
+        $steps[] = 'Controle SCIQ';
+        $steps[] = 'Planification';
 
         return implode(' -> ', $steps);
     }

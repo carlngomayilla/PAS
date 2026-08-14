@@ -9,6 +9,7 @@ use App\Models\Meeting;
 use App\Models\MeetingApproval;
 use App\Models\MeetingPlan;
 use App\Models\MeetingReport;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -20,17 +21,21 @@ use Illuminate\Support\Carbon;
  */
 class MeetingKpiService
 {
+    public function __construct(
+        private readonly MeetingAccessService $access
+    ) {}
+
     /**
      * @param  array{year?:int|null,quarter?:int|null,month?:int|null,direction_id?:int|null,service_id?:int|null}  $filters
      * @return array<string, mixed>
      */
-    public function summary(array $filters = []): array
+    public function summary(array $filters = [], ?User $user = null): array
     {
-        $meetings = $this->meetingQuery($filters)->get();
-        $expected = (int) $this->planQuery($filters)->sum('expected_count');
+        $meetings = $this->meetingQuery($filters, $user)->get();
+        $expected = (int) $this->planQuery($filters, $user)->sum('expected_count');
 
         $scheduled = $meetings->reject(fn (Meeting $m): bool => $m->status === MeetingStatus::Annulee)->count();
-        $extra = $meetings->filter(fn (Meeting $m): bool => (bool) $m->is_extra)->count();
+        $extra = $meetings->filter(fn (Meeting $m): bool => (bool) $m->is_extra && $m->status !== MeetingStatus::Annulee)->count();
         $validated = $meetings->filter(fn (Meeting $m): bool => $m->isOfficiallyHeld())->count();
         $postponed = $meetings->filter(fn (Meeting $m): bool => (bool) $m->was_postponed)->count();
         $cancelled = $meetings->filter(fn (Meeting $m): bool => $m->status === MeetingStatus::Annulee)->count();
@@ -82,9 +87,9 @@ class MeetingKpiService
      * @param  array<string, mixed>  $filters
      * @return list<array<string, mixed>>
      */
-    public function planProgress(array $filters = []): array
+    public function planProgress(array $filters = [], ?User $user = null): array
     {
-        $plans = $this->planQuery($filters)
+        $plans = $this->planQuery($filters, $user)
             ->with(['direction:id,code,libelle', 'service:id,code,libelle'])
             ->orderBy('direction_id')
             ->orderBy('service_id')
@@ -186,21 +191,45 @@ class MeetingKpiService
     }
 
     /** @param array<string, mixed> $filters */
-    public function meetingQuery(array $filters = []): Builder
+    public function meetingQuery(array $filters = [], ?User $user = null): Builder
     {
         $query = Meeting::query()->withCount('reports');
 
-        return $this->applyFilters($query, $filters);
+        if ($user instanceof User) {
+            $this->access->scopeQueryToUser($query, $user);
+        }
+
+        $this->applyCommonFilters($query, $filters);
+        foreach (['meeting_type', 'status'] as $key) {
+            $value = $filters[$key] ?? null;
+            if ($value !== null && $value !== '' && $value !== 'all') {
+                $query->where($key, $value);
+            }
+        }
+
+        return $query;
     }
 
     /** @param array<string, mixed> $filters */
-    private function planQuery(array $filters = []): Builder
+    private function planQuery(array $filters = [], ?User $user = null): Builder
     {
-        return $this->applyFilters(MeetingPlan::query(), $filters);
+        $query = MeetingPlan::query();
+
+        if ($user instanceof User) {
+            $this->access->scopeQueryToUser($query, $user);
+        }
+
+        $this->applyCommonFilters($query, $filters);
+        $meetingType = $filters['meeting_type'] ?? null;
+        if ($meetingType !== null && $meetingType !== '' && $meetingType !== 'all') {
+            $query->where('meeting_type', $meetingType);
+        }
+
+        return $query;
     }
 
     /** @param array<string, mixed> $filters */
-    private function applyFilters(Builder $query, array $filters): Builder
+    private function applyCommonFilters(Builder $query, array $filters): Builder
     {
         foreach (['year', 'quarter', 'month', 'direction_id', 'service_id'] as $key) {
             $value = $filters[$key] ?? null;

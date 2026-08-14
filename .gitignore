@@ -1,9 +1,11 @@
 *.log
 .DS_Store
 .env
+.env.e2e
 .env.backup
 .env.production
 .env.*
+!.env.e2e.example
 !.env.example
 !.env.production.example
 .phpactor.json
@@ -19,6 +21,9 @@
 /node_modules
 /public/build
 /public/hot
+/playwright-report
+/test-results
+/blob-report
 /public/storage
 /storage/*.key
 /storage/pail

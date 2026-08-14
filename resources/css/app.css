@@ -5282,6 +5282,7 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
 
 @media (max-width: 1023px) {
     #admin-sidebar {
+        z-index: 100002;
         transform: translateX(-100%);
     }
 
@@ -5924,9 +5925,9 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
     html.dark body.admin-theme-scope .btn-primary,
     html.dark body.admin-theme-scope .btn-blue,
     html.dark body.admin-theme-scope .app-btn-primary {
-        background: #3996d3 !important;
+        background: #0f5f99 !important;
         color: #ffffff !important;
-        border-color: #3996d3 !important;
+        border-color: #0f5f99 !important;
     }
 
     html.dark body.admin-theme-scope .btn-green {
@@ -6618,7 +6619,7 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
     .anbg-badge-info,
     .app-badge-info {
         background: #e8f3fb !important;
-        color: #2f86bf !important;
+        color: #0f5f99 !important;
     }
 
     .anbg-badge-success,

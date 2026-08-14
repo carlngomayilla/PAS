@@ -383,7 +383,7 @@
                             <span class="active-filter-chip-remove" aria-hidden="true">×</span>
                         </a>
                     @endforeach
-                    <a href="{{ route('workspace.actions.index', array_filter(['vue' => $filters['vue'], 'layout' => $layoutMode !== 'list' ? $layoutMode : null])) }}" class="text-xs font-bold text-[#b42318] hover:underline ml-1">
+                    <a href="{{ route('workspace.actions.index', array_filter(['vue' => $filters['vue'], 'layout' => $layoutMode !== 'list' ? $layoutMode : null])) }}" class="ml-1 text-xs font-bold text-[#b42318] hover:underline dark:text-[#fca5a5]">
                         Tout effacer
                     </a>
                 </div>

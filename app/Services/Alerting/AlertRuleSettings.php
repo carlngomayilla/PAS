@@ -107,6 +107,8 @@ class AlertRuleSettings
     public function flush(): void
     {
         $this->resolved = null;
+        $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     /**

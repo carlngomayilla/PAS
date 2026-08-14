@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\MeetingStatus;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\DeadlineExtensionRequest;
 use App\Models\DeletionRequest;
+use App\Models\Meeting;
 use App\Models\PlanningUnlockRequest;
 use App\Models\Pta;
 use App\Models\SousAction;
@@ -13,6 +15,7 @@ use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertRoutingService;
 use App\Services\Analytics\AnalyticsCacheVersionService;
+use App\Services\Meetings\MeetingAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -26,7 +29,8 @@ class PersonalTaskService
         private readonly UserWorkspaceService $workspaceService,
         private readonly AlertRoutingService $alertRoutingService,
         private readonly PersonalScoreService $personalScoreService,
-        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService
+        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService,
+        private readonly MeetingAccessService $meetingAccess
     ) {}
 
     /**
@@ -103,6 +107,8 @@ class PersonalTaskService
                 'validation_planification',
                 'controle_pta',
                 'controle_modification',
+                'meeting_validation_sciq',
+                'meeting_validation_planification',
             ])
             ->count();
     }
@@ -151,6 +157,7 @@ class PersonalTaskService
             ->merge($this->actionAlertTasks($user, $role))
             ->merge($this->planningUnlockTasks($user, $role))
             ->merge($this->deletionRequestTasks($user, $role))
+            ->merge($this->meetingTasks($user))
             ->unique('key')
             ->sortBy(fn (array $task): string => sprintf(
                 '%d-%d-%012d-%s',
@@ -160,6 +167,86 @@ class PersonalTaskService
                 (string) ($task['title'] ?? '')
             ))
             ->values();
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private function meetingTasks(User $user): Collection
+    {
+        $tasks = collect();
+
+        if ($this->meetingAccess->canScheduleAny($user)) {
+            $meetings = Meeting::query()
+                ->whereIn('status', [MeetingStatus::PvAttendu->value, MeetingStatus::ACorriger->value])
+                ->with(['direction:id,libelle', 'service:id,libelle', 'responsible:id,name', 'currentReport'])
+                ->orderBy('current_scheduled_date')
+                ->get();
+            $meetings = $meetings->filter(
+                fn (Meeting $meeting): bool => $this->meetingAccess->canScheduleForMeeting($user, $meeting)
+            );
+
+            $tasks = $tasks->merge($meetings->map(function (Meeting $meeting): array {
+                $isCorrection = $meeting->status === MeetingStatus::ACorriger;
+                $receivedAt = $isCorrection
+                    ? $this->carbon($meeting->currentReport?->updated_at)
+                    : $meeting->scheduledAt();
+                $deadline = $receivedAt?->copy()->addHours(48);
+
+                return $this->task(
+                    key: 'meeting-owner:'.$meeting->id,
+                    type: $isCorrection ? 'meeting_correction' : 'meeting_pv',
+                    title: $isCorrection ? 'Corriger le PV de réunion' : 'Déposer le PV de réunion',
+                    subject: $meeting->label,
+                    context: $meeting->structureLabel(),
+                    responsible: $meeting->responsible?->name,
+                    receivedAt: $receivedAt,
+                    deadlineAt: $deadline,
+                    url: route('workspace.meetings.show', $meeting),
+                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                    scoreImpact: 'Le retard de dépôt ou de correction du PV est imputable au responsable de la réunion.'
+                );
+            }));
+        }
+
+        $reviewStatuses = [];
+        if ($this->meetingAccess->isSciq($user) || $this->meetingAccess->isAdministrator($user)) {
+            $reviewStatuses[] = MeetingStatus::EnValidationSciq->value;
+        }
+        if ($this->meetingAccess->isPlanification($user) || $this->meetingAccess->isAdministrator($user)) {
+            $reviewStatuses[] = MeetingStatus::EnValidationPlanification->value;
+        }
+
+        if ($reviewStatuses !== []) {
+            $reviews = Meeting::query()
+                ->whereIn('status', array_values(array_unique($reviewStatuses)))
+                ->with(['direction:id,libelle', 'service:id,libelle', 'responsible:id,name', 'currentReport.approvals'])
+                ->orderBy('updated_at')
+                ->get()
+                ->filter(fn (Meeting $meeting): bool => $meeting->currentReport !== null
+                    && $this->meetingAccess->canReviewReport($user, $meeting->currentReport));
+
+            $tasks = $tasks->merge($reviews->map(function (Meeting $meeting): array {
+                $isSciq = $meeting->status === MeetingStatus::EnValidationSciq;
+                $receivedAt = $this->carbon($meeting->currentReport?->uploaded_at)
+                    ?? $this->carbon($meeting->updated_at);
+                $deadline = $receivedAt?->copy()->addHours(48);
+
+                return $this->task(
+                    key: 'meeting-review:'.$meeting->id.':'.$meeting->status->value,
+                    type: $isSciq ? 'meeting_validation_sciq' : 'meeting_validation_planification',
+                    title: $isSciq ? 'Contrôler un PV de réunion' : 'Poser le visa final du PV',
+                    subject: $meeting->label,
+                    context: $meeting->structureLabel(),
+                    responsible: $meeting->responsible?->name,
+                    receivedAt: $receivedAt,
+                    deadlineAt: $deadline,
+                    url: route('workspace.meetings.show', $meeting),
+                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                    scoreImpact: 'Le délai de traitement du visa est imputable au niveau de contrôle concerné.'
+                );
+            }));
+        }
+
+        return $tasks->values();
     }
 
     /**
@@ -950,8 +1037,9 @@ class PersonalTaskService
     {
         return match ($type) {
             'execution_action', 'execution_sous_action' => 'execution',
-            'correction_action', 'correction_financement', 'complement_suppression' => 'corrections',
-            'validation_chef', 'validation_sous_action_chef', 'validation_controleur', 'validation_planification' => 'validations',
+            'correction_action', 'correction_financement', 'complement_suppression', 'meeting_correction' => 'corrections',
+            'validation_chef', 'validation_sous_action_chef', 'validation_controleur', 'validation_planification', 'meeting_validation_sciq', 'meeting_validation_planification' => 'validations',
+            'meeting_pv' => 'execution',
             'financement_rmo', 'financement_daf', 'financement_dg' => 'financements',
             'alerte_action' => 'alertes',
             'decision_suppression', 'decision_modification_dg', 'controle_modification' => 'decisions',

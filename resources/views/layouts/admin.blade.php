@@ -196,10 +196,10 @@
         default => 'none',
     };
     $headerBellBadgeClass = match ($headerBellBadgeKind) {
-        'both' => 'bg-[#7c3aed]',
-        'alert' => 'bg-[#f59e0b]',
-        'notification' => 'bg-[#3996d3]',
-        default => 'bg-[#3996d3]',
+        'both' => 'bg-[#6d28d9]',
+        'alert' => 'bg-[#92400e]',
+        'notification' => 'bg-[#0f5f99]',
+        default => 'bg-[#0f5f99]',
     };
 
     $layoutModuleCodes = collect($layoutUser?->workspaceModules() ?? [])
@@ -254,6 +254,19 @@
             <div class="admin-shell-frame flex min-h-screen flex-col overflow-hidden">
                 <header id="admin-shell-header" class="admin-page-header app-navbar sticky top-0 z-30">
                     <div class="admin-navbar-inner flex min-h-16 items-center gap-3 px-4 py-2 sm:px-5 lg:px-6">
+                        <button
+                            type="button"
+                            id="admin-sidebar-open"
+                            class="admin-navbar-icon-button admin-navbar-action-button inline-flex h-10 w-10 shrink-0 items-center justify-center lg:hidden"
+                            aria-label="Ouvrir le menu principal"
+                            aria-controls="admin-sidebar"
+                            aria-expanded="false"
+                        >
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+
                         @unless (in_array($routeName, ['dashboard', 'workspace.index'], true))
                             <button
                                 type="button"
@@ -272,9 +285,9 @@
 
                         <div class="flex min-w-0 flex-1 items-center gap-3">
                             <div class="min-w-0 flex-1">
-                                <h1 class="admin-navbar-title truncate text-xl font-bold leading-tight text-[#17324a]">
+                                <p class="admin-navbar-title truncate text-xl font-bold leading-tight text-[#17324a]" title="@yield('title', 'Dashboard')">
                                     @yield('title', 'Dashboard')
-                                </h1>
+                                </p>
                                 <p class="starline-greeting">{{ $platformSettings->get('admin_header_eyebrow', 'Pilotage institutionnel ANBG') }}</p>
                             </div>
                         </div>
@@ -476,7 +489,7 @@
                             <div class="admin-navbar-user admin-navbar-profile flex items-center gap-3 px-3 py-2">
                                 <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-user-copy min-w-0 text-left transition-opacity hover:opacity-75" data-navbar-user-copy>
                                     <p class="truncate text-sm font-semibold text-[#17324a]" title="{{ $layoutUser?->name ?? 'Utilisateur' }}">{{ $layoutUser?->name ?? 'Utilisateur' }}</p>
-                                    <p class="truncate text-xs text-[#667085]">{{ $layoutUser?->roleLabel() ?? 'Compte' }}</p>
+                                    <p class="truncate text-xs text-[#667085]" title="{{ $layoutUser?->roleLabel() ?? 'Compte' }}">{{ $layoutUser?->roleLabel() ?? 'Compte' }}</p>
                                 </a>
                                 <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-avatar inline-flex items-center justify-center transition-opacity hover:opacity-75">
                                     @if ($layoutUser?->profile_photo_url)

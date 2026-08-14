@@ -219,7 +219,7 @@
                         </div>
                         <div>
                             <label for="objectif_echeance_label">Échéance</label>
-                            <input id="objectif_echeance_label" type="text" value="{{ optional($selectedObjectif?->echeance)->format('Y-m-d') }}" readonly>
+                            <input id="objectif_echeance_label" type="text" value="{{ optional($selectedObjectif?->echeance)->format('d/m/Y') }}" readonly>
                         </div>
                         <div class="hidden">
                             <label for="statut" class="hidden">Statut</label>
@@ -448,6 +448,12 @@
                 return option ? (option.getAttribute(key) || '').trim() : '';
             }
 
+            function displayDate(value) {
+                var parts = value.split('-');
+
+                return parts.length === 3 ? [parts[2], parts[1], parts[0]].join('/') : value;
+            }
+
             function syncScope() {
                 var option = objectifSelect ? objectifSelect.options[objectifSelect.selectedIndex] : null;
                 var ptaTitle = optionValue(option, 'data-pta-title') || 'PTA - SERVICE';
@@ -460,7 +466,7 @@
                 if (titleInput) titleInput.value = ptaTitle;
                 if (titleLabel) titleLabel.value = ptaTitle;
                 if (strategicObjectiveLabel) strategicObjectiveLabel.value = optionValue(option, 'data-strategic-objective-label');
-                if (echeanceLabel) echeanceLabel.value = optionValue(option, 'data-echeance');
+                if (echeanceLabel) echeanceLabel.value = displayDate(optionValue(option, 'data-echeance'));
                 document.querySelectorAll('[data-action-block]').forEach(function (block) {
                     syncActionEcheance(block);
                 });

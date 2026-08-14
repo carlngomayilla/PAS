@@ -74,7 +74,7 @@
                 <tbody>
                     @forelse ($recentAudits as $audit)
                         <tr>
-                            <td class="px-3 py-2">{{ $audit->created_at?->format('Y-m-d H:i') }}</td>
+                            <td class="px-3 py-2">{{ $audit->created_at?->format('d/m/Y H:i') }}</td>
                             <td class="px-3 py-2">{{ $audit->user?->email ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $audit->module }}</td>
                             <td class="px-3 py-2">{{ $audit->action }}</td>

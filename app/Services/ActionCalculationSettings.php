@@ -370,6 +370,7 @@ class ActionCalculationSettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     private function hasSettingsTable(): bool

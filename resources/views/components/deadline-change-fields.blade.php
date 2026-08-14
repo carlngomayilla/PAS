@@ -6,6 +6,7 @@
     'changes' => [],
     'responsableOptions' => null,
     'showTarget' => false,
+    'allowMainAction' => true,
 ])
 
 @php
@@ -26,7 +27,9 @@
         <div>
             <label for="{{ $prefix }}_target">Élément à modifier</label>
             <select id="{{ $prefix }}_target" name="sous_action_id">
-                <option value="">Action principale</option>
+                @if ($allowMainAction)
+                    <option value="">Action principale</option>
+                @endif
                 @foreach ($subActions as $sousAction)
                     <option value="{{ $sousAction->id }}" @selected((string) old('sous_action_id', $selectedSubActionId) === (string) $sousAction->id)>
                         Sous-action · {{ $sousAction->libelle }}

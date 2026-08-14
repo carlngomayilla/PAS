@@ -39,7 +39,7 @@ class InstitutionalReportWebController extends Controller
         $user = $this->authenticatedUser($request);
         $this->authorize('viewAny', InstitutionalReport::class);
 
-        $activeTab = in_array((string) $request->query('tab'), ['register', 'schedule', 'review'], true)
+        $activeTab = in_array((string) $request->query('tab'), ['register', 'review'], true)
             ? (string) $request->query('tab')
             : 'register';
         $filters = $this->reportFilters($request);
@@ -49,11 +49,8 @@ class InstitutionalReportWebController extends Controller
             'submittedBy:id,name,email',
             'responsible:id,name,email',
             'justificatifs:id,justifiable_type,justifiable_id,nom_original,description,ajoute_par,created_at',
-        ]);
+        ])->where('report_type', '!=', InstitutionalReport::TYPE_MEETING);
 
-        if ($activeTab === 'schedule') {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING);
-        }
         if ($activeTab === 'review') {
             $query->whereIn('status', [
                 InstitutionalReport::STATUS_SUBMITTED_SCIQ,
@@ -63,31 +60,31 @@ class InstitutionalReportWebController extends Controller
             ]);
         }
 
+        $otherReports = $reports->filteredVisibleQuery($user, $filters)
+            ->where('report_type', '!=', InstitutionalReport::TYPE_MEETING);
+
         return view('workspace.reports.index', [
             'reports' => $query->latest('scheduled_at')->latest('id')->paginate(20)->withQueryString(),
-            'summary' => $reports->summaryFor($user, $filters),
+            'summary' => [
+                'total' => (clone $otherReports)->count(),
+                'pending' => (clone $otherReports)->whereIn('status', [
+                    InstitutionalReport::STATUS_SUBMITTED_SCIQ,
+                    InstitutionalReport::STATUS_SUBMITTED_PLANNING,
+                    InstitutionalReport::STATUS_SUBMITTED_SCIQ_CHIEF,
+                    InstitutionalReport::STATUS_SUBMITTED_PLANNING_CHIEF,
+                ])->count(),
+                'verified' => (clone $otherReports)->where('status', InstitutionalReport::STATUS_VERIFIED)->count(),
+            ],
             'filters' => $filters,
             'activeTab' => $activeTab,
             'canSubmit' => $reports->canSubmit($user),
-            'canScheduleMeeting' => $reports->canScheduleMeeting($user),
+            'canScheduleMeeting' => false,
             'canReview' => $reports->canReviewAnything($user),
-            'canExportMeetings' => $reports->canExportMeetingReports($user),
+            'canExportMeetings' => false,
             'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
             'userOptions' => $this->participantOptionsFor($user),
-            'followUpDecisions' => InstitutionalMeetingDecision::query()
-                ->whereIn('institutional_report_id', $reports->filteredVisibleQuery($user, $filters)
-                    ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                    ->select('id'))
-                ->where('status', '!=', InstitutionalMeetingDecision::STATUS_COMPLETED)
-                ->with([
-                    'institutionalReport:id,title,scheduled_at',
-                    'responsible:id,name,email',
-                ])
-                ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
-                ->orderBy('due_at')
-                ->limit(8)
-                ->get(),
+            'followUpDecisions' => collect(),
             'reportService' => $reports,
         ]);
     }

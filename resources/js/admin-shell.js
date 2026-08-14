@@ -209,16 +209,48 @@
         if (!sidebar || !overlay) {
             return;
         }
+
         sidebar.classList.remove('-translate-x-full');
+        sidebar.removeAttribute('inert');
+        sidebar.setAttribute('aria-hidden', 'false');
         overlay.classList.remove('hidden');
+        if (openButton) {
+            openButton.setAttribute('aria-expanded', 'true');
+        }
+        window.requestAnimationFrame(function () {
+            if (closeButton) {
+                closeButton.focus();
+            }
+        });
     }
 
-    function closeSidebar() {
+    function closeSidebar(restoreFocus) {
         if (!sidebar || !overlay) {
             return;
         }
+
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.removeAttribute('inert');
+            sidebar.setAttribute('aria-hidden', 'false');
+            overlay.classList.add('hidden');
+            if (openButton) {
+                openButton.setAttribute('aria-expanded', 'false');
+            }
+
+            return;
+        }
+
         sidebar.classList.add('-translate-x-full');
+        sidebar.setAttribute('inert', '');
+        sidebar.setAttribute('aria-hidden', 'true');
         overlay.classList.add('hidden');
+        if (openButton) {
+            openButton.setAttribute('aria-expanded', 'false');
+            if (restoreFocus !== false) {
+                openButton.focus();
+            }
+        }
     }
 
     function syncDesktopSidebarLayout(forceExpanded) {
@@ -352,8 +384,8 @@
 
         notificationsBadge.textContent = total > 99 ? '99+' : String(total);
         notificationsBadge.classList.toggle('hidden', total <= 0);
-        notificationsBadge.classList.remove('bg-[#3996d3]', 'bg-[#f59e0b]', 'bg-[#7c3aed]');
-        notificationsBadge.classList.add(kind === 'both' ? 'bg-[#7c3aed]' : (kind === 'alert' ? 'bg-[#f59e0b]' : 'bg-[#3996d3]'));
+        notificationsBadge.classList.remove('bg-[#0f5f99]', 'bg-[#92400e]', 'bg-[#6d28d9]');
+        notificationsBadge.classList.add(kind === 'both' ? 'bg-[#6d28d9]' : (kind === 'alert' ? 'bg-[#92400e]' : 'bg-[#0f5f99]'));
         notificationsBadge.dataset.notificationUnread = String(previousNotificationUnreadCount);
         notificationsBadge.dataset.alertUnread = String(previousAlertUnreadCount);
         notificationsBadge.dataset.badgeKind = kind;
@@ -778,13 +810,16 @@
 
         if (window.matchMedia('(min-width: 1024px)').matches) {
             sidebar.classList.remove('-translate-x-full');
+            sidebar.removeAttribute('inert');
+            sidebar.setAttribute('aria-hidden', 'false');
             overlay.classList.add('hidden');
+            if (openButton) {
+                openButton.setAttribute('aria-expanded', 'false');
+            }
             return;
         }
 
-        if (!sidebar.classList.contains('-translate-x-full')) {
-            overlay.classList.remove('hidden');
-        }
+        closeSidebar(false);
     }
 
     syncSidebarForViewport();

@@ -24,7 +24,7 @@
             <div><label for="format">Format</label><select id="format" name="format"><option value="">Tous</option>@foreach ($formatOptions as $option)<option value="{{ $option }}" @selected($filters['format'] === $option)>{{ strtoupper($option) }}</option>@endforeach</select></div>
             <div><label for="module">Module</label><select id="module" name="module"><option value="">Tous</option>@foreach ($moduleOptions as $option)<option value="{{ $option }}" @selected($filters['module'] === $option)>{{ $option }}</option>@endforeach</select></div>
             <div><label for="status">Statut</label><select id="status" name="status"><option value="">Tous</option>@foreach ($statusOptions as $option)<option value="{{ $option }}" @selected($filters['status'] === $option)>{{ $option }}</option>@endforeach</select></div>
-            <div><label for="target_profile">Profil</label><select id="target_profile" name="target_profile"><option value="">Tous</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected($filters['target_profile'] === $option)>{{ $option }}</option>@endforeach</select></div>
+            <div><label for="target_profile">Profil</label><select id="target_profile" name="target_profile"><option value="">Tous</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected($filters['target_profile'] === $option)>{{ $profileLabels[$option] ?? $option }}</option>@endforeach</select></div>
             <div class="flex items-end gap-2"><button class="btn btn-primary" type="submit">Filtrer</button><a class="btn btn-secondary" href="{{ route('workspace.super-admin.templates.index') }}">Reset</a></div>
         </form>
     </section>
@@ -57,7 +57,7 @@
                             <td><div class="font-semibold">{{ $row->name }}</div><div class="text-xs text-slate-500">{{ $row->code }}</div></td>
                             <td>{{ $row->formatLabel() }}</td>
                             <td>{{ $row->module }}</td>
-                            <td>{{ $row->target_profile ?: 'Tous profils' }}</td>
+                            <td>{{ $row->target_profile ? ($profileLabels[$row->target_profile] ?? $row->target_profile) : 'Tous profils' }}</td>
                             <td>{{ $row->reading_level ?: 'Non borne' }}</td>
                             <td>{{ $row->statusLabel() }}</td>
                             <td>{{ $row->assignments_count }}</td>

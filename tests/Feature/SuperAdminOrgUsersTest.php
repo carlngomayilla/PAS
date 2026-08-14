@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\DeletionRequest;
 use App\Models\Direction;
 use App\Models\Service;
 use App\Models\User;
@@ -73,8 +74,12 @@ class SuperAdminOrgUsersTest extends TestCase
             ])
             ->assertRedirect(route('workspace.super-admin.organization.index'));
 
-        $this->assertSame(User::ROLE_DIRECTION, $agent->fresh()->role);
-        $this->assertSame(User::ROLE_DIRECTION, $secondAgent->fresh()->role);
+        $this->assertSame(User::ROLE_SERVICE, $agent->fresh()->role);
+        $this->assertSame(User::ROLE_AGENT, $secondAgent->fresh()->role);
+        $this->assertSame(2, DeletionRequest::query()
+            ->where('requested_action', 'assign_role')
+            ->where('status', DeletionRequest::STATUS_PENDING)
+            ->count());
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.users.bulk'), [
@@ -116,8 +121,8 @@ class SuperAdminOrgUsersTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('journal_audit', [
-            'module' => 'super_admin',
-            'action' => 'organization_user_bulk_assign_role',
+            'module' => 'access_control',
+            'action' => 'user_role_change_requested',
         ]);
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'super_admin',

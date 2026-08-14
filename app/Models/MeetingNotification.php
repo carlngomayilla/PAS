@@ -24,7 +24,11 @@ class MeetingNotification extends Model
 
     public const TYPE_REMINDER = 'reminder';
 
+    public const TYPE_REPORT_EXPECTED = 'report_expected';
+
     public const TYPE_REPORT_SUBMITTED = 'report_submitted';
+
+    public const TYPE_REPORT_AWAITING_PLANIFICATION = 'report_awaiting_planification';
 
     public const TYPE_CORRECTION_REQUESTED = 'correction_requested';
 
@@ -32,6 +36,7 @@ class MeetingNotification extends Model
 
     protected $fillable = [
         'meeting_id',
+        'meeting_plan_id',
         'meeting_report_id',
         'user_id',
         'notification_type',
@@ -51,6 +56,11 @@ class MeetingNotification extends Model
     public function meeting(): BelongsTo
     {
         return $this->belongsTo(Meeting::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(MeetingPlan::class, 'meeting_plan_id');
     }
 
     public function report(): BelongsTo

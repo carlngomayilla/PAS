@@ -115,7 +115,7 @@
                         <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Référence active</p>
                         <h2 class="mt-1 text-lg font-bold text-slate-950 dark:text-white">Configuration courante</h2>
                     </div>
-                    <a class="text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-300" href="{{ route('workspace.super-admin.settings.edit') }}">Modifier</a>
+                    <a class="text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-300" href="{{ $isTechnicalAdministrator ? route('workspace.super-admin.settings.edit') : route('workspace.super-admin.appearance.edit') }}">Modifier</a>
                 </div>
 
                 <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
@@ -153,14 +153,16 @@
                     </div>
                 </dl>
 
-                <div class="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
-                    <div class="flex items-center justify-between gap-3 text-sm">
-                        <span class="text-slate-500 dark:text-slate-400">Dernier snapshot</span>
-                        <a class="font-semibold text-slate-900 hover:text-cyan-700 dark:text-white dark:hover:text-cyan-300" href="{{ route('workspace.super-admin.snapshots.index') }}">
-                            {{ $latestSnapshot?->created_at?->format('d/m/Y H:i') ?? 'Absent' }}
-                        </a>
+                @if ($isTechnicalAdministrator)
+                    <div class="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+                        <div class="flex items-center justify-between gap-3 text-sm">
+                            <span class="text-slate-500 dark:text-slate-400">Dernier snapshot</span>
+                            <a class="font-semibold text-slate-900 hover:text-cyan-700 dark:text-white dark:hover:text-cyan-300" href="{{ route('workspace.super-admin.snapshots.index') }}">
+                                {{ $latestSnapshot?->created_at?->format('d/m/Y H:i') ?? 'Absent' }}
+                            </a>
+                        </div>
                     </div>
-                </div>
+                @endif
             </aside>
         </section>
 

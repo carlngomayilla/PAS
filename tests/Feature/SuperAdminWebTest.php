@@ -54,7 +54,20 @@ class SuperAdminWebTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.workflow.edit'))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('Planification')
+            ->assertDontSee(route('workspace.super-admin.settings.edit'), false);
+
+        $this->actingAs($admin)
+            ->get(route('workspace.super-admin.appearance.edit'))
+            ->assertOk()
+            ->assertDontSee(route('workspace.super-admin.modules.edit'), false)
+            ->assertDontSee(route('workspace.super-admin.maintenance.index'), false);
+
+        $this->actingAs($admin)
+            ->get(route('workspace.super-admin.referentials.edit'))
+            ->assertOk()
+            ->assertDontSee(route('workspace.super-admin.roles.edit'), false);
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.organization.index'))
@@ -71,6 +84,14 @@ class SuperAdminWebTest extends TestCase
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.maintenance.index'))
             ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.analyses.model'))
+            ->assertForbidden();
+
+        $this->actingAs($this->createSuperAdminUser())
+            ->get(route('workspace.analyses.model'))
+            ->assertOk();
     }
 
     public function test_admin_cannot_manage_a_super_admin_account(): void

@@ -108,6 +108,7 @@ class PlanningArchiveSettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     private function hasSettingsTable(): bool

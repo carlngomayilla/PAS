@@ -39,7 +39,7 @@ class PtaAdministrativeDetailTest extends TestCase
             ->assertSee('1 Reports d echeance actifs')
             ->assertSee('50,0%')
             ->assertSee('Faire le suivi')
-            ->assertSee("Report d'echeance", false)
+            ->assertSee("Report d'échéance", false)
             ->assertSee(route('workspace.actions.suivi', $fixture['action']), false)
             ->assertSee(route('workspace.actions.suivi', $fixture['action']).'#action-echeances', false)
             ->assertSee(route('workspace.deadline-extension.show', $fixture['deadline_request']), false);

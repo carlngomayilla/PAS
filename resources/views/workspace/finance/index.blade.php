@@ -39,7 +39,12 @@
                         Les montants planifies constituent le budget de reference. La DAF enregistre les engagements et decaissements justifies ; les depassements suivent le circuit DAF puis DG.
                     </p>
                 </div>
-                <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Voir les actions</a>
+                <div class="flex flex-wrap gap-2">
+                    @if ($canViewFinancingRequests ?? false)
+                        <a class="btn btn-primary" href="{{ route('workspace.daf.financing-requests.index') }}">Demandes à instruire</a>
+                    @endif
+                    <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Voir les actions</a>
+                </div>
             </div>
         </section>
 

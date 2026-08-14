@@ -39,9 +39,9 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><h2 class="text-base">Métadonnées</h2><p class="mt-2 text-sm text-slate-600">Code : <code>{{ $template->code }}</code></p><p class="mt-1 text-sm text-slate-600">Type de rapport : <strong>{{ $template->report_type }}</strong></p><p class="mt-1 text-sm text-slate-600">Profil destinataire : <strong>{{ $template->target_profile ?: 'Tous profils' }}</strong></p><p class="mt-1 text-sm text-slate-600">Titre document : <strong>{{ $template->documentTitle() }}</strong></p><p class="mt-1 text-sm text-slate-600">Préfixe fichier : <strong>{{ $template->filenamePrefix() }}</strong></p></article>
+        <article class="ui-card !mb-0"><h2 class="text-base">Métadonnées</h2><p class="mt-2 text-sm text-slate-600">Code : <code>{{ $template->code }}</code></p><p class="mt-1 text-sm text-slate-600">Type de rapport : <strong>{{ $template->report_type }}</strong></p><p class="mt-1 text-sm text-slate-600">Profil destinataire : <strong>{{ $template->target_profile ? ($profileLabels[$template->target_profile] ?? $template->target_profile) : 'Tous profils' }}</strong></p><p class="mt-1 text-sm text-slate-600">Titre document : <strong>{{ $template->documentTitle() }}</strong></p><p class="mt-1 text-sm text-slate-600">Préfixe fichier : <strong>{{ $template->filenamePrefix() }}</strong></p></article>
         <article class="ui-card !mb-0"><h2 class="text-base">Mise en page</h2><p class="mt-2 text-sm text-slate-600">Papier : <strong>{{ $template->paperSize() }}</strong></p><p class="mt-1 text-sm text-slate-600">Orientation : <strong>{{ $template->orientation() }}</strong></p><p class="mt-1 text-sm text-slate-600">Filigrane : <strong>{{ $template->layout_config['watermark_text'] ?? 'Aucun' }}</strong></p><p class="mt-1 text-sm text-slate-600">Police : <strong>{{ $template->style_config['font_family'] ?? 'Inter' }}</strong></p></article>
-        <article class="ui-card !mb-0"><h2 class="text-base">Cycle de vie</h2><p class="mt-2 text-sm text-slate-600">Créé par : <strong>{{ $template->creator?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Mis à jour par : <strong>{{ $template->updater?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Publié le : <strong>{{ $template->published_at?->format('Y-m-d H:i') ?? 'Non publié' }}</strong></p></article>
+        <article class="ui-card !mb-0"><h2 class="text-base">Cycle de vie</h2><p class="mt-2 text-sm text-slate-600">Créé par : <strong>{{ $template->creator?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Mis à jour par : <strong>{{ $template->updater?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Publié le : <strong>{{ $template->published_at?->format('d/m/Y H:i') ?? 'Non publié' }}</strong></p></article>
     </section>
 
     <section class="showcase-panel mb-4">
@@ -79,7 +79,7 @@
                     <tbody>
                         @forelse ($template->assignments as $assignment)
                             <tr>
-                                <td data-label="Profil">{{ $assignment->target_profile ?: 'Tous profils' }}</td>
+                                <td data-label="Profil">{{ $assignment->target_profile ? ($profileLabels[$assignment->target_profile] ?? $assignment->target_profile) : 'Tous profils' }}</td>
                                 <td data-label="Niveau">{{ $readingLevelLabel($assignment->reading_level) }}</td>
                                 <td data-label="Périmètre">{{ $assignment->service?->code ?: ($assignment->direction?->code ?: 'Global') }}</td>
                                 <td data-label="État">
@@ -123,7 +123,7 @@
                 <input name="module" type="hidden" value="{{ $assignmentDefaults['module'] }}">
                 <input name="report_type" type="hidden" value="{{ $assignmentDefaults['report_type'] }}">
                 <input name="format" type="hidden" value="{{ $assignmentDefaults['format'] }}">
-                <div><label for="assign_target_profile">Profil</label><select id="assign_target_profile" name="target_profile"><option value="">Tous profils</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['target_profile'] === $option)>{{ $option }}</option>@endforeach</select></div>
+                <div><label for="assign_target_profile">Profil</label><select id="assign_target_profile" name="target_profile"><option value="">Tous profils</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['target_profile'] === $option)>{{ $profileLabels[$option] ?? $option }}</option>@endforeach</select></div>
                 <div><label for="assign_reading_level">Niveau</label><select id="assign_reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['reading_level'] === $option)>{{ $readingLevelLabels[$option] ?? $option }}</option>@endforeach</select></div>
                 <div><label for="assign_direction_id">Direction</label><select id="assign_direction_id" name="direction_id"><option value="">Globale</option>@foreach ($directionOptions as $direction)<option value="{{ $direction->id }}">{{ $direction->code }} - {{ $direction->libelle }}</option>@endforeach</select></div>
                 <div><label for="assign_service_id">Service</label><select id="assign_service_id" name="service_id"><option value="">Aucun</option>@foreach ($serviceOptions as $service)<option value="{{ $service->id }}">{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>@endforeach</select></div>
@@ -148,7 +148,7 @@
                             <td>{{ $version->status }}</td>
                             <td>{{ $version->note ?: '-' }}</td>
                             <td>{{ $version->creator?->name ?? 'Système' }}</td>
-                            <td>{{ $version->created_at?->format('Y-m-d H:i') }}</td>
+                            <td>{{ $version->created_at?->format('d/m/Y H:i') }}</td>
                             <td>
                                 <div class="text-xs text-slate-500">
                                     {{ $version->snapshot['format'] ?? '-' }} /

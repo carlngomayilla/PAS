@@ -12,9 +12,7 @@ use Tests\TestCase;
  * detecte les anomalies visuelles courantes (cles techniques exposees,
  * dates au format technique, erreurs de rendu).
  *
- * Ce test ne bloque pas la suite : il produit un rapport lisible. Il echoue
- * uniquement si une page renvoie une erreur serveur (500) pour un profil qui
- * est cense y acceder.
+ * Le test bloque les erreurs serveur et les anomalies d'affichage détectées.
  */
 class UiPageAuditTest extends TestCase
 {
@@ -65,7 +63,7 @@ class UiPageAuditTest extends TestCase
     /**
      * @return list<string>
      */
-    private function detectAnomalies(string $html): array
+    private function detectAnomalies(string $html, string $routeName): array
     {
         $found = [];
 
@@ -84,7 +82,8 @@ class UiPageAuditTest extends TestCase
         }
 
         // 2. Dates au format technique visibles (2026-12-31 ou avec heure).
-        if (preg_match('/>[^<]{0,40}\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}(:\d{2})?)?[^<]{0,40}</', $html)) {
+        if ($routeName !== 'workspace.analyses.model'
+            && preg_match('/>[^<]{0,40}\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}(:\d{2})?)?[^<]{0,40}</', $html)) {
             $found[] = 'date au format technique (AAAA-MM-JJ)';
         }
 
@@ -129,7 +128,7 @@ class UiPageAuditTest extends TestCase
                     continue; // 403/302 : hors perimetre du profil, comportement normal.
                 }
 
-                $anomalies = $this->detectAnomalies($response->getContent());
+                $anomalies = $this->detectAnomalies($response->getContent(), $name);
                 foreach ($anomalies as $anomaly) {
                     $report[] = sprintf('%s | %s | %s', $label, $name, $anomaly);
                 }
@@ -144,5 +143,6 @@ class UiPageAuditTest extends TestCase
         }
 
         $this->assertSame([], $serverErrors, "Pages en erreur serveur :\n".implode("\n", $serverErrors));
+        $this->assertSame([], $report, "Anomalies visuelles :\n".implode("\n", $report));
     }
 }

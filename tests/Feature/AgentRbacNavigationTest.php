@@ -26,6 +26,8 @@ class AgentRbacNavigationTest extends TestCase
             'execution',
             'corrections',
             'notifications',
+            'reports_echeance',
+            'reports',
         ], $codes);
 
         $this->assertNotContains('messagerie', $codes);

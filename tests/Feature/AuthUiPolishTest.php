@@ -37,6 +37,11 @@ class AuthUiPolishTest extends TestCase
             $this->assertStringNotContainsString('>CACHER<', $view);
         }
 
+        $login = (string) file_get_contents(resource_path('views/auth/lamp-login.blade.php'));
+        $this->assertStringContainsString('aria-label="Identifiant de connexion"', $login);
+        $this->assertStringContainsString('aria-label="Mot de passe"', $login);
+        $this->assertStringNotContainsString('auth-password-toggle-label', $component);
+
         foreach ($workspacePasswordViews as $viewPath) {
             $view = (string) file_get_contents($viewPath);
 
@@ -96,7 +101,8 @@ class AuthUiPolishTest extends TestCase
         $this->assertStringNotContainsString('#admin-sidebar:has(:focus-visible)', $css);
         $this->assertStringNotContainsString('#admin-sidebar:focus-within', $css);
         $this->assertStringContainsString('.admin-navbar-back-button', $css);
-        $this->assertStringContainsString("url('/images/logo-anbg-flamme.png')", $css);
+        $this->assertStringContainsString("asset('favicon.png')", $sidebar);
+        $this->assertStringContainsString('app-sidebar-logo-flame', $sidebar);
         $this->assertStringContainsString('.admin-navbar-notification-badge', $css);
         $this->assertStringContainsString('.admin-navbar-profile', $css);
         $this->assertStringContainsString('@media (min-width: 768px) and (max-width: 1180px)', $css);

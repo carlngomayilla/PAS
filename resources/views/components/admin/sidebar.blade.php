@@ -196,9 +196,9 @@
         $pilotageItems[] = [
             'code' => 'reports',
             'label' => $moduleLabel('reports', 'Rapports'),
-            'route' => 'workspace.reports.index',
+            'route' => 'workspace.meetings.index',
             'icon' => 'reporting',
-            'patterns' => ['workspace.reports.*'],
+            'patterns' => ['workspace.meetings.*'],
             'badge' => (int) ($moduleBadges['reports'] ?? 0),
             'display_order' => $moduleOrder('reports', 71),
         ];
@@ -472,7 +472,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $iconPath }}" />
                                         </svg>
                                     </span>
-                                    <span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $item['label'] }}</span>
+                                    <span class="min-w-0 flex-1 truncate" data-sidebar-label title="{{ $item['label'] }}">{{ $item['label'] }}</span>
                                     @if ($badgeCount > 0)
                                         <span class="app-sidebar-notification-dot" aria-hidden="true"></span>
                                         <span class="app-sidebar-badge inline-flex min-w-[1.55rem] items-center justify-center px-1.5 py-1 text-[10px] leading-none" data-sidebar-badge-for="{{ $moduleCode }}">{{ $badgeCount > 99 ? '99+' : $badgeCount }}</span>
@@ -493,7 +493,7 @@
                         <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $icons['logout'] }}" />
                         </svg>
-                        <span data-sidebar-label>Déconnexion</span>
+                        <span data-sidebar-label title="Déconnexion">Déconnexion</span>
                     </button>
                 </form>
             </div>

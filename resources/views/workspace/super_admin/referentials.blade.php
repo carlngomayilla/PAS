@@ -13,7 +13,9 @@
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.roles.edit') }}">Rôles et permissions</a>
+                @if (auth()->user()?->isSuperAdmin())
+                    <a class="btn btn-secondary" href="{{ route('workspace.super-admin.roles.edit') }}">Rôles et permissions</a>
+                @endif
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.notifications.edit') }}">Alertes et notifications</a>
             </div>
         </div>
@@ -118,12 +120,12 @@
                 <h2 class="form-section-title">Libellés des statuts de validation</h2>
                 <p class="form-section-subtitle">Ces textes remappent les libellés visibles dans le suivi et les vues analytiques sans modifier le workflow effectif.</p>
                 <div class="form-grid">
-                    <div><label for="validation_status_label_non_soumise">Statut `non_soumise`</label><input id="validation_status_label_non_soumise" name="validation_status_label_non_soumise" type="text" maxlength="60" value="{{ old('validation_status_label_non_soumise', $settings['validation_status_labels']['non_soumise'] ?? 'Non soumise') }}" required></div>
-                    <div><label for="validation_status_label_soumise_chef">Statut `soumise_chef`</label><input id="validation_status_label_soumise_chef" name="validation_status_label_soumise_chef" type="text" maxlength="60" value="{{ old('validation_status_label_soumise_chef', $settings['validation_status_labels']['soumise_chef'] ?? 'Soumise au chef') }}" required></div>
-                    <div><label for="validation_status_label_rejetee_chef">Statut `rejetee_chef`</label><input id="validation_status_label_rejetee_chef" name="validation_status_label_rejetee_chef" type="text" maxlength="60" value="{{ old('validation_status_label_rejetee_chef', $settings['validation_status_labels']['rejetee_chef'] ?? 'Rejetée par le chef') }}" required></div>
-                    <div><label for="validation_status_label_validee_chef">Statut `validee_chef`</label><input id="validation_status_label_validee_chef" name="validation_status_label_validee_chef" type="text" maxlength="60" value="{{ old('validation_status_label_validee_chef', $settings['validation_status_labels']['validee_chef'] ?? 'Validée chef') }}" required></div>
-                    <div><label for="validation_status_label_rejetee_direction">Statut `rejetee_direction`</label><input id="validation_status_label_rejetee_direction" name="validation_status_label_rejetee_direction" type="text" maxlength="60" value="{{ old('validation_status_label_rejetee_direction', $settings['validation_status_labels']['rejetee_direction'] ?? 'Rejetée direction') }}" required></div>
-                    <div><label for="validation_status_label_validee_direction">Statut `validee_direction`</label><input id="validation_status_label_validee_direction" name="validation_status_label_validee_direction" type="text" maxlength="60" value="{{ old('validation_status_label_validee_direction', $settings['validation_status_labels']['validee_direction'] ?? 'Validée direction') }}" required></div>
+                    <div><label for="validation_status_label_non_soumise">Action non soumise</label><input id="validation_status_label_non_soumise" name="validation_status_label_non_soumise" type="text" maxlength="60" value="{{ old('validation_status_label_non_soumise', $settings['validation_status_labels']['non_soumise'] ?? 'Non soumise') }}" required></div>
+                    <div><label for="validation_status_label_soumise_chef">Action soumise au chef</label><input id="validation_status_label_soumise_chef" name="validation_status_label_soumise_chef" type="text" maxlength="60" value="{{ old('validation_status_label_soumise_chef', $settings['validation_status_labels']['soumise_chef'] ?? 'Soumise au chef') }}" required></div>
+                    <div><label for="validation_status_label_rejetee_chef">Action rejetée par le chef</label><input id="validation_status_label_rejetee_chef" name="validation_status_label_rejetee_chef" type="text" maxlength="60" value="{{ old('validation_status_label_rejetee_chef', $settings['validation_status_labels']['rejetee_chef'] ?? 'Rejetée par le chef') }}" required></div>
+                    <div><label for="validation_status_label_validee_chef">Action validée par le chef</label><input id="validation_status_label_validee_chef" name="validation_status_label_validee_chef" type="text" maxlength="60" value="{{ old('validation_status_label_validee_chef', $settings['validation_status_labels']['validee_chef'] ?? 'Validée chef') }}" required></div>
+                    <div><label for="validation_status_label_rejetee_direction">Action rejetée par la direction</label><input id="validation_status_label_rejetee_direction" name="validation_status_label_rejetee_direction" type="text" maxlength="60" value="{{ old('validation_status_label_rejetee_direction', $settings['validation_status_labels']['rejetee_direction'] ?? 'Rejetée direction') }}" required></div>
+                    <div><label for="validation_status_label_validee_direction">Action validée par la direction</label><input id="validation_status_label_validee_direction" name="validation_status_label_validee_direction" type="text" maxlength="60" value="{{ old('validation_status_label_validee_direction', $settings['validation_status_labels']['validee_direction'] ?? 'Validée direction') }}" required></div>
                 </div>
             </div>
 

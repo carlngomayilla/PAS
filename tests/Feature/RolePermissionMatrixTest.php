@@ -255,25 +255,25 @@ class RolePermissionMatrixTest extends TestCase
     public function test_workspace_modules_match_corrected_visibility_matrix_for_all_profiles(): void
     {
         $expected = [
-            User::ROLE_SUPER_ADMIN => ['pilotage', 'super_admin', 'imports_excel', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
-            User::ROLE_ADMIN_FONCTIONNEL => ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
-            User::ROLE_DG => ['pilotage', 'mes_taches', 'reports_echeance', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'ai_reports', 'notifications'],
+            User::ROLE_SUPER_ADMIN => ['pilotage', 'super_admin', 'imports_excel', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'reports'],
+            User::ROLE_ADMIN_FONCTIONNEL => ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'reports'],
+            User::ROLE_DG => ['pilotage', 'mes_taches', 'reports_echeance', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'ai_reports', 'notifications', 'reports'],
             // Fusion modules 2026-05-28 : 'mes_actions' supprime — fusionne avec 'execution'
             // (label "Action") qui couvre les deux vues via les onglets de la page.
-            User::ROLE_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_CHEF_UNITE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_CHEF_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications'],
-            User::ROLE_CHEF_UNITE_CABINET => ['financement', 'pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications'],
-            User::ROLE_CHEF_UNITE_UCAS => ['pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_DIRECTION => ['financement', 'pilotage', 'mes_taches', 'pao', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'services_agents', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_SERVICE => ['financement', 'pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications'],
-            User::ROLE_AGENT => ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications'],
-            User::ROLE_AUDITEUR => ['pilotage', 'reporting', 'notifications'],
-            User::ROLE_INVITE_LECTURE => ['pilotage', 'reporting', 'notifications'],
+            User::ROLE_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_CHEF_UNITE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_CHEF_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications', 'reports'],
+            User::ROLE_CHEF_UNITE_CABINET => ['financement', 'pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications', 'reports'],
+            User::ROLE_CHEF_UNITE_UCAS => ['pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_DIRECTION => ['financement', 'pilotage', 'mes_taches', 'pao', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'services_agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_SERVICE => ['financement', 'pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_AGENT => ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications', 'reports'],
+            User::ROLE_AUDITEUR => ['pilotage', 'reporting', 'notifications', 'reports'],
+            User::ROLE_INVITE_LECTURE => ['pilotage', 'reporting', 'notifications', 'reports'],
         ];
 
         foreach ($expected as $role => $modules) {
@@ -348,7 +348,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertTrue((bool) $ossa->is_agent);
         $this->assertEqualsCanonicalizing(
             // Fusion 2026-05-28 : mes_actions remplace par execution (label "Action").
-            ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications'],
+            ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications', 'reports'],
             collect($ossa->workspaceModules())->pluck('code')->all()
         );
     }
@@ -369,7 +369,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertNull($admin->direction_id);
         $this->assertNull($admin->service_id);
         $this->assertEqualsCanonicalizing(
-            ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
+            ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'reports'],
             collect($admin->workspaceModules())->pluck('code')->all()
         );
     }

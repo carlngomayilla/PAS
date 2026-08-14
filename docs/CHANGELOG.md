@@ -7,6 +7,40 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-08-14 - Durcissement des migrations Réunions et audit UI responsive
+
+### Changement
+
+- **Compatibilité des PV historiques** : le champ `is_encrypted` est initialisé à `false` pour ne pas tenter de déchiffrer les anciens fichiers stockés en clair. Les nouveaux dépôts continuent à renseigner explicitement leur état de chiffrement.
+- **Intégrité des plans** : `scope_key` est dérivé du type de réunion et du périmètre réel. La migration refuse les données historiques incohérentes ou dupliquées avant de poser l'unicité.
+- **Historique des notifications** : la suppression d'un plan conserve ses notifications (`SET NULL`) et un index composé accélère leur ciblage par plan, utilisateur et type.
+- **Accessibilité et responsive** : contrastes, libellés de connexion, bascule du mot de passe, badges, avatars, navigation mobile et boutons d'import ont été corrigés. L'audit ignore désormais correctement les descendants d'un conteneur `inert`.
+
+### Validation
+
+- Les cinq migrations ont passé un rollback puis une réapplication sur PostgreSQL ; les colonnes, contraintes et index ont été contrôlés sur le schéma final.
+- Audit desktop des 17 profils : zéro anomalie. Audit responsive sur quatre profils et 80 rendus clair/sombre : zéro anomalie. Audit Firefox représentatif : zéro anomalie.
+- Build Vite de production et formatage Pint validés. Suite PHPUnit complète : 838 tests réussis, 5 389 assertions et 3 tests ignorés explicitement.
+- Scénarios E2E Chromium : authentification, cycle Réunion/PV, navigation clavier, report, annulation, cloisonnement, téléchargement et correction versionnée validés. Le cycle métier complet passe également sous Firefox et Chrome mobile.
+- Les helpers Playwright suivent explicitement les redirects POST afin d'éviter les attentes de navigation instables entre moteurs, tout en continuant à signaler les erreurs JavaScript, réseau réelles et réponses HTTP 500.
+
+## 2026-08-06 - Nouveau module Réunions & PV et retrait de l’ancien workflow
+
+### Changement
+
+- **Espace unifié `/workspace/reunions`** : objectifs mensuels SCIQ, programmation par le chef de service ou le directeur, participants, responsable, report, annulation, dépôt chiffré du PV et historique versionné.
+- **Circuit obligatoire à deux visas distincts** : SCIQ puis Planification. Le déposant ne peut pas viser son propre PV et une même personne ne peut pas poser les deux visas. Une correction crée une nouvelle version et redémarre au SCIQ.
+- **Périmètres appliqués côté serveur** : chef de service limité à son service, directeur à sa direction, lecteurs limités à leur périmètre, Planification sans accès au PV avant le visa SCIQ.
+- **Pilotage et alertes** : indicateurs par objectif, tâches personnelles, notifications ciblées dans le centre commun et rappels automatiques. Les réunions échues deviennent automatiquement « PV attendu ».
+- **Retrait de l’ancien registre** : le menu pointe vers le nouveau module, les réunions historiques ne sont plus affichées dans les autres rapports et l’ancien endpoint refuse toute nouvelle réunion. Les archives existantes restent lisibles/exportables pendant la transition ; les rapports d’activité, d’incident et autres rapports sont conservés.
+- **Données et sécurité** : nouveaux champs opérationnels, unicité fiable des objectifs par périmètre, pièces jointes chiffrées, somme de contrôle, journal des transitions et téléchargements protégés contre les accès hors circuit.
+
+### Validation
+
+- `MeetingWorkflowTest` : workflow complet, correction versionnée, ordre et séparation des visas, auto-validation refusée, changement de mois, réunion échue, tâches personnelles et notification du PV attendu.
+- `MeetingWebTest` : rendu par rôle, cloisonnement des périmètres, validation des participants, dépôt anticipé refusé, téléchargement après visa SCIQ et retrait de l’ancien registre.
+- Régressions ciblées du module historique : création par l’ancien endpoint refusée, archives masquées du registre, exports et rappels historiques conservés.
+
 ## 2026-08-05 - Page Rapports institutionnels : encodage, cartes KPI et barre de filtres
 
 ### Changement

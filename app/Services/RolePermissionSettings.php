@@ -631,6 +631,7 @@ class RolePermissionSettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     /**

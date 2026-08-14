@@ -82,7 +82,7 @@ class ReportingReportCatalogTest extends TestCase
         $this->assertStringNotContainsString('JUSTIFICATIFS', (string) $workbookXml);
         $this->assertStringNotContainsString('ANOMALIES', (string) $workbookXml);
         $this->assertStringNotContainsString('FINANCEMENT', (string) $workbookXml);
-        $this->assertStringContainsString('Mode execution', (string) $sheetXml);
+        $this->assertStringContainsString('Mode exécution', (string) $sheetXml);
         $this->assertStringContainsString('Financement', (string) $sheetXml);
         $this->assertStringContainsString('Risque', (string) $sheetXml);
         $this->assertStringContainsString('KPI global (%)', (string) $sheetXml);
@@ -153,7 +153,7 @@ class ReportingReportCatalogTest extends TestCase
 
         $this->assertStringContainsString('Rapport Actions - PAS ANBG', $html);
         $this->assertStringContainsString('Actions detaillees', $html);
-        $this->assertStringContainsString('Mode execution', $html);
+        $this->assertStringContainsString('Mode exécution', $html);
         $this->assertStringContainsString('Financement', $html);
         $this->assertStringContainsString('Risque', $html);
         $this->assertStringContainsString('KPI global (%)', $html);

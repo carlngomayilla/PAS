@@ -53,7 +53,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('Aucune action PTA', false)
             ->assertSee('>Synthèse</a>', false)
             ->assertSee('onclick="window.print()"', false)
-            ->assertDontSee('id="admin-sidebar-open"', false);
+            ->assertSee('id="admin-sidebar-open"', false);
     }
 
     public function test_pta_suivi_displays_all_pas_axes_even_without_actions(): void

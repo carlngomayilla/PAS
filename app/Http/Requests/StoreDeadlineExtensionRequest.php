@@ -101,14 +101,28 @@ class StoreDeadlineExtensionRequest extends FormRequest
 
     protected function selectedSousAction(Action $action, Validator $validator): ?SousAction
     {
+        $user = $this->user();
+        $isAssignedSubActionAgent = $user instanceof User
+            && $user->isAgent()
+            && ! $action->isResponsible($user);
         $sousActionId = (int) $this->input('sous_action_id', 0);
         if ($sousActionId <= 0) {
+            if ($isAssignedSubActionAgent) {
+                $validator->errors()->add('sous_action_id', 'Selectionnez la sous-action qui vous est affectee.');
+            }
+
             return null;
         }
 
         $sousAction = $action->sousActions()->whereKey($sousActionId)->first();
         if (! $sousAction instanceof SousAction) {
             $validator->errors()->add('sous_action_id', 'La sous-action sélectionnée ne correspond pas à cette action.');
+
+            return null;
+        }
+
+        if ($isAssignedSubActionAgent && (int) $sousAction->agent_id !== (int) $user->id) {
+            $validator->errors()->add('sous_action_id', 'Vous ne pouvez demander une modification que pour votre sous-action.');
 
             return null;
         }

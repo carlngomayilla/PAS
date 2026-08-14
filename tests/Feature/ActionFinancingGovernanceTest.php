@@ -69,6 +69,11 @@ class ActionFinancingGovernanceTest extends TestCase
         $this->actingAs($fixture['daf'])
             ->get(route('workspace.daf.financements.index'))
             ->assertOk()
+            ->assertSee(route('workspace.daf.financing-requests.index'), false);
+
+        $this->actingAs($fixture['daf'])
+            ->get(route('workspace.daf.financing-requests.index'))
+            ->assertOk()
             ->assertSee('A instruire DAF')
             ->assertSee('Instruire DAF');
     }

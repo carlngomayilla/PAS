@@ -245,6 +245,10 @@
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
                 modalBody.innerHTML = '<div class="p-6 text-center text-sm font-semibold text-slate-600">Chargement...</div>';
+                const loaderToken = window.AnBGLoader?.start({
+                    operation: 'load',
+                    message: 'Chargement du détail de l’action…',
+                });
 
                 try {
                     const response = await fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -252,6 +256,8 @@
                     modalBody.innerHTML = await response.text();
                 } catch (error) {
                     modalBody.innerHTML = '<div class="p-6 text-center text-sm font-semibold text-red-700">Impossible de charger le detail de cette action.</div>';
+                } finally {
+                    window.AnBGLoader?.finish(loaderToken);
                 }
             });
 

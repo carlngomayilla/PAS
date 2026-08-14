@@ -137,6 +137,7 @@ class ActionManagementSettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     private function hasSettingsTable(): bool

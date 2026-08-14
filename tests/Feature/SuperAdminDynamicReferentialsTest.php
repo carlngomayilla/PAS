@@ -84,12 +84,13 @@ class SuperAdminDynamicReferentialsTest extends TestCase
             ->assertRedirect(route('workspace.pta.index'));
     }
 
-    public function test_admin_cannot_access_dynamic_referential_settings(): void
+    public function test_admin_can_access_dynamic_referential_settings(): void
     {
         $admin = $this->createAdminUser();
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.referentials.edit'))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Référentiels dynamiques');
     }
 }

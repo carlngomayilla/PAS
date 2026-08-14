@@ -111,7 +111,7 @@ class PlatformSettings
     {
         return [
             'd/m/Y' => '31/12/2026',
-            'Y-m-d' => '2026-12-31',
+            'Y-m-d' => 'Année-mois-jour (ISO)',
             'd-m-Y' => '31-12-2026',
         ];
     }
@@ -123,7 +123,7 @@ class PlatformSettings
     {
         return [
             'd/m/Y H:i' => '31/12/2026 14:30',
-            'Y-m-d H:i' => '2026-12-31 14:30',
+            'Y-m-d H:i' => 'Année-mois-jour et heure (ISO)',
             'd-m-Y H:i' => '31-12-2026 14:30',
         ];
     }

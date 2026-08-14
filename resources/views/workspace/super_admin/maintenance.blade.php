@@ -77,7 +77,7 @@
                 <tbody>
                     @forelse ($recentAudits as $audit)
                         <tr>
-                            <td>{{ $audit->created_at?->format('Y-m-d H:i') }}</td>
+                            <td>{{ $audit->created_at?->format('d/m/Y H:i') }}</td>
                             <td>{{ $audit->user?->name ?? 'Système' }}</td>
                             <td>{{ $audit->action }}</td>
                         </tr>

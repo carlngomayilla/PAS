@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Database\Connectors\PostgresConnector;
 use App\Models\Action;
 use App\Models\DeadlineExtensionRequest;
+use App\Models\Meeting;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\Pta;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Observers\ActionObserver;
 use App\Observers\PlanningCacheObserver;
 use App\Policies\ActionPolicy;
+use App\Policies\MeetingPolicy;
 use App\Policies\PaoPolicy;
 use App\Policies\PasPolicy;
 use App\Services\ActionCalculationSettings;
@@ -99,6 +101,7 @@ class AppServiceProvider extends ServiceProvider
         User::observe(PlanningCacheObserver::class);
 
         Gate::policy(Action::class, ActionPolicy::class);
+        Gate::policy(Meeting::class, MeetingPolicy::class);
         Gate::policy(Pas::class, PasPolicy::class);
         Gate::policy(Pao::class, PaoPolicy::class);
 

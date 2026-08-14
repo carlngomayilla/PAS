@@ -28,6 +28,7 @@ class KpiExcludeRejectedActionsTest extends TestCase
 
         $this->assertSame(ActionCalculationSettings::LEVEL_VALIDATION_SCIQ, $settings->statisticalScope());
         $this->assertSame([
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], $settings->statisticalValidationStatuses());
@@ -123,15 +124,17 @@ class KpiExcludeRejectedActionsTest extends TestCase
         $items = collect([
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_REJETEE_CHEF],
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_REJETEE_DIRECTION],
+            (object) ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION],
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE],
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION],
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF],
         ]);
 
         $kept = $settings->filterStatistical($items);
-        $this->assertCount(2, $kept);
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $kept[0]->statut_validation);
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $kept[1]->statut_validation);
+        $this->assertCount(3, $kept);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $kept[0]->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $kept[1]->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $kept[2]->statut_validation);
     }
 
     /**

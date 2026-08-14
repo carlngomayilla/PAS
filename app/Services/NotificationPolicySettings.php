@@ -459,6 +459,7 @@ class NotificationPolicySettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     /**

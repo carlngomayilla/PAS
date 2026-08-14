@@ -42,7 +42,7 @@ async function bootDashboardCharts() {
       Chart.register(annotation);
     }
   } catch (error) {
-    console.error('Plugins graphiques optionnels indisponibles.', error);
+    console.warn('Plugins graphiques optionnels indisponibles.', error);
   }
 
   chartTheme.applyAnbgChartDefaults(Chart);

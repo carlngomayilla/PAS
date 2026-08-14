@@ -153,6 +153,10 @@ class GovernanceQueueWebTest extends TestCase
     public function test_requester_can_resubmit_requested_complement_with_audit_and_notification(): void
     {
         $superAdmin = $this->createSuperAdminUser();
+        $planningChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'password_changed_at' => now(),
+        ]);
         $requester = User::factory()->create([
             'role' => User::ROLE_DIRECTION,
             'password_changed_at' => now(),
@@ -189,18 +193,21 @@ class GovernanceQueueWebTest extends TestCase
             'entite_id' => $deletionRequest->id,
         ]);
         $this->assertTrue(DB::table('notifications')
-            ->where('notifiable_id', $superAdmin->id)
+            ->where('notifiable_id', $planningChief->id)
             ->where('data', 'like', '%Demande de suppression a traiter%')
             ->exists());
     }
 
-    public function test_super_admin_decision_can_return_to_governance_queue(): void
+    public function test_planning_chief_decision_can_return_to_governance_queue(): void
     {
-        $superAdmin = $this->createSuperAdminUser();
+        $planningChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'password_changed_at' => now(),
+        ]);
         $requester = User::factory()->create(['password_changed_at' => now()]);
         $deletionRequest = $this->deletionRequest($requester, 'Demande à refuser');
 
-        $this->actingAs($superAdmin)
+        $this->actingAs($planningChief)
             ->post(route('workspace.super-admin.organization.deletion-requests.decision', $deletionRequest), [
                 'decision' => DeletionRequest::DECISION_REJECT,
                 'reviewer_note' => 'Demande refusée après contrôle du contexte.',
@@ -209,6 +216,31 @@ class GovernanceQueueWebTest extends TestCase
             ->assertRedirect(route('workspace.deletion-requests.index'));
 
         $this->assertSame(DeletionRequest::STATUS_REJECTED, $deletionRequest->fresh()->status);
+    }
+
+    public function test_super_admin_organization_only_lists_requests_approved_for_execution(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $planningChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'password_changed_at' => now(),
+        ]);
+        $requester = User::factory()->create(['password_changed_at' => now()]);
+        $pendingRequest = $this->deletionRequest($requester, 'Demande encore en attente');
+        $approvedRequest = $this->deletionRequest($requester, 'Demande approuvée à exécuter');
+        $approvedRequest->forceFill([
+            'status' => DeletionRequest::STATUS_APPROVED,
+            'decision' => DeletionRequest::DECISION_APPROVE,
+            'approved_by' => $planningChief->id,
+            'approved_at' => now(),
+        ])->save();
+
+        $this->actingAs($superAdmin)
+            ->get(route('workspace.super-admin.organization.index'))
+            ->assertOk()
+            ->assertSee($approvedRequest->entity_label)
+            ->assertDontSee($pendingRequest->entity_label)
+            ->assertSee('Demandes approuvées à exécuter');
     }
 
     public function test_other_user_cannot_resubmit_a_complement(): void

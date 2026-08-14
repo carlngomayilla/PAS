@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\MeetingStatus;
+use App\Enums\MeetingType;
 use App\Models\Direction;
 use App\Models\InstitutionalMeetingDecision;
 use App\Models\InstitutionalReport;
+use App\Models\Meeting;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -88,13 +91,9 @@ class InstitutionalReportingWorkflowTest extends TestCase
         $this->assertSame('2026-08-10 09:30:00', $meeting->held_at?->format('Y-m-d H:i:s'));
     }
 
-    public function test_a_service_chief_can_schedule_and_postpone_a_meeting_within_the_same_quarter(): void
+    public function test_a_service_chief_cannot_create_a_meeting_through_the_retired_register(): void
     {
         $fixture = $this->createFixture();
-        $participant = User::factory()->create([
-            'direction_id' => $fixture['direction']->id,
-            'service_id' => $fixture['service']->id,
-        ]);
 
         $this->actingAs($fixture['reporter'])
             ->post(route('workspace.reports.store'), [
@@ -105,69 +104,58 @@ class InstitutionalReportingWorkflowTest extends TestCase
                 'scheduled_at' => '2026-08-10 09:00:00',
                 'location' => 'Salle de reunion',
                 'responsible_id' => $fixture['reporter']->id,
-                'participant_ids' => [$fixture['reporter']->id, $participant->id],
+                'participant_ids' => [$fixture['reporter']->id],
             ])
-            ->assertRedirect(route('workspace.reports.index', ['tab' => 'schedule']));
+            ->assertSessionHasErrors('report_type');
 
-        $meeting = InstitutionalReport::query()->sole();
-        $this->assertSame(InstitutionalReport::MEETING_TYPE_SERVICE, $meeting->meeting_type);
-        $this->assertSame([$fixture['reporter']->id, $participant->id], $meeting->participant_ids);
-        $this->assertSame('2026-08-10 09:00:00', $meeting->original_scheduled_at?->format('Y-m-d H:i:s'));
-
-        $this->actingAs($fixture['reporter'])
-            ->post(route('workspace.reports.postpone', $meeting), [
-                'scheduled_at' => '2026-09-08 10:00:00',
-                'reason' => 'Indisponibilite ponctuelle des participants essentiels.',
-            ])
-            ->assertRedirect(route('workspace.reports.show', $meeting));
-
-        $meeting->refresh();
-        $this->assertSame('2026-09-08 10:00:00', $meeting->scheduled_at?->format('Y-m-d H:i:s'));
-        $this->assertSame(1, $meeting->postponement_count);
-
-        $this->actingAs($fixture['reporter'])
-            ->post(route('workspace.reports.postpone', $meeting), [
-                'scheduled_at' => '2026-10-01 10:00:00',
-                'reason' => 'Cette date ne doit pas sortir du trimestre initial.',
-            ])
-            ->assertSessionHasErrors('scheduled_at');
+        $this->assertDatabaseCount('institutional_reports', 0);
     }
 
     public function test_an_agent_cannot_schedule_or_postpone_a_meeting_outside_the_management_roles(): void
     {
         $fixture = $this->createFixture();
         $agent = User::factory()->create([
+            'role' => User::ROLE_AGENT,
             'direction_id' => $fixture['direction']->id,
             'service_id' => $fixture['service']->id,
         ]);
 
         $this->actingAs($agent)
-            ->post(route('workspace.reports.store'), [
-                'report_type' => InstitutionalReport::TYPE_MEETING,
-                'meeting_type' => InstitutionalReport::MEETING_TYPE_SERVICE,
+            ->post(route('workspace.meetings.store'), [
+                'meeting_type' => MeetingType::Service->value,
                 'direction_id' => $fixture['direction']->id,
                 'service_id' => $fixture['service']->id,
-                'scheduled_at' => '2026-08-10 09:00:00',
-                'location' => 'Salle de reunion',
-                'responsible_id' => $agent->id,
+                'label' => 'Réunion non autorisée de l’agent',
+                'scheduled_date' => now()->addDay()->format('Y-m-d'),
+                'scheduled_time' => '09:00',
+                'location' => 'Salle de réunion',
+                'responsible_id' => $fixture['reporter']->id,
                 'participant_ids' => [$agent->id],
             ])
             ->assertForbidden();
 
-        $meeting = InstitutionalReport::query()->create([
-            'report_type' => InstitutionalReport::TYPE_MEETING,
-            'meeting_type' => InstitutionalReport::MEETING_TYPE_SERVICE,
-            'title' => 'Reunion de coordination',
+        $meeting = Meeting::query()->create([
+            'meeting_type' => MeetingType::Service,
+            'label' => 'Réunion de coordination',
             'direction_id' => $fixture['direction']->id,
             'service_id' => $fixture['service']->id,
-            'scheduled_at' => '2026-08-10 09:00:00',
-            'status' => InstitutionalReport::STATUS_DRAFT,
-            'submitted_by' => $fixture['reporter']->id,
+            'location' => 'Salle de réunion',
+            'participant_ids' => [$agent->id],
+            'year' => (int) now()->addDay()->format('Y'),
+            'quarter' => now()->addDay()->quarter,
+            'month' => (int) now()->addDay()->format('m'),
+            'original_scheduled_date' => now()->addDay()->format('Y-m-d'),
+            'current_scheduled_date' => now()->addDay()->format('Y-m-d'),
+            'scheduled_time' => '09:00',
+            'status' => MeetingStatus::Programmee,
+            'created_by' => $fixture['reporter']->id,
+            'responsible_id' => $fixture['reporter']->id,
         ]);
 
         $this->actingAs($agent)
-            ->post(route('workspace.reports.postpone', $meeting), [
-                'scheduled_at' => '2026-09-08 10:00:00',
+            ->post(route('workspace.meetings.postpone', $meeting), [
+                'scheduled_date' => now()->addDays(2)->format('Y-m-d'),
+                'scheduled_time' => '10:00',
                 'reason' => 'Tentative non autorisee de modification du calendrier.',
             ])
             ->assertForbidden();
@@ -280,7 +268,7 @@ class InstitutionalReportingWorkflowTest extends TestCase
             ->assertSuccessful();
     }
 
-    public function test_meeting_filters_and_excel_export_follow_the_users_accessible_scope(): void
+    public function test_legacy_meetings_are_hidden_from_the_register_but_remain_exportable_during_archival(): void
     {
         $fixture = $this->createFixture();
         $heldMeeting = InstitutionalReport::query()->create([
@@ -309,8 +297,9 @@ class InstitutionalReportingWorkflowTest extends TestCase
         $this->actingAs($fixture['reporter'])
             ->get(route('workspace.reports.index', ['tab' => 'schedule', 'status' => 'held']))
             ->assertOk()
-            ->assertSee($heldMeeting->title)
-            ->assertDontSee('Reunion annulee a exclure');
+            ->assertDontSee($heldMeeting->title)
+            ->assertDontSee('Reunion annulee a exclure')
+            ->assertSee('Réunions & PV');
 
         $this->actingAs($fixture['reporter'])
             ->get(route('workspace.reports.export', ['format' => 'xlsx', 'status' => 'held']))

@@ -95,7 +95,7 @@ class PaoProgressiveHierarchyTest extends TestCase
         $this->actingAs($fixture['admin'])
             ->get(route('workspace.pao.show', $fixture['empty_pao']))
             ->assertOk()
-            ->assertSee('Aucun objectif operationnel visible dans votre perimetre pour ce PAO.');
+            ->assertSee('Aucun objectif opérationnel visible dans votre périmètre pour ce PAO.');
     }
 
     public function test_read_only_profile_can_open_the_explorer_from_the_pao_list(): void

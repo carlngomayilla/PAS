@@ -9,7 +9,8 @@
             'Agent',
             $defaults['actions_service_validation_enabled'] === '1' ? 'Chef de service' : null,
             $defaults['actions_direction_validation_enabled'] === '1' ? 'Direction' : null,
-            'Controleur',
+            'Controle SCIQ',
+            'Planification',
         ])->filter()->implode(' -> ');
     @endphp
 
@@ -48,19 +49,23 @@
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Circuit cible verrouillé</p>
-                            <h2 class="form-section-title mt-1">Agent → Chef de service → Contrôleur</h2>
+                            <h2 class="form-section-title mt-1">Agent → Chef de service → Contrôle SCIQ → Planification</h2>
                         </div>
                         <span class="anbg-badge anbg-badge-success">Conforme</span>
                     </div>
 
-                    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <div class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
                             <p class="text-xs text-slate-500 dark:text-slate-400">Visa métier</p>
                             <p class="mt-1 text-sm font-semibold text-slate-950 dark:text-white">Chef de service requis</p>
                         </div>
                         <div class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Contrôle de conformité</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-950 dark:text-white">SCIQ requis</p>
+                        </div>
+                        <div class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
                             <p class="text-xs text-slate-500 dark:text-slate-400">Décision finale</p>
-                            <p class="mt-1 text-sm font-semibold text-slate-950 dark:text-white">SCIQ / Planification</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-950 dark:text-white">Planification requise</p>
                         </div>
                         <div class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
                             <p class="text-xs text-slate-500 dark:text-slate-400">Base statistique</p>

@@ -293,7 +293,7 @@ class ReferentielWebController extends Controller
         // DG, Planification, etc.) afin que le module sidebar "Agents / RMO" soit
         // operationnel. Les operations d'ecriture (create/update/destroy) restent
         // protegees par denyUnlessUserManager dans les methodes correspondantes.
-        $this->denyUnlessReferentielReader($user);
+        $this->denyUnlessUserDirectoryReader($user);
         $filters = $this->organizationDirectoryService->normalizeUserFilters($request->query());
         $workspace = $this->organizationDirectoryService->usersWorkspace($user, $filters);
 
@@ -316,7 +316,7 @@ class ReferentielWebController extends Controller
     public function utilisateursExport(Request $request): StreamedResponse
     {
         $user = $this->authUser($request);
-        $this->denyUnlessReferentielReader($user);
+        $this->denyUnlessUserDirectoryReader($user);
         $filters = $this->organizationDirectoryService->normalizeUserFilters($request->query());
 
         return $this->streamCsv('referentiel-utilisateurs', function ($stream) use ($user, $filters): void {
@@ -331,7 +331,7 @@ class ReferentielWebController extends Controller
     public function utilisateursExportWord(Request $request): Response
     {
         $user = $this->authUser($request);
-        $this->denyUnlessReferentielReader($user);
+        $this->denyUnlessUserDirectoryReader($user);
         $filters = $this->organizationDirectoryService->normalizeUserFilters($request->query());
         $rows = $this->organizationDirectoryService->usersForWordExport($user, $filters);
 
@@ -994,6 +994,17 @@ class ReferentielWebController extends Controller
     private function denyUnlessReferentielReader(User $user): void
     {
         if ($user->hasAnyPermission('referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles')) {
+            return;
+        }
+
+        abort(403, 'Acces non autorise.');
+    }
+
+    private function denyUnlessUserDirectoryReader(User $user): void
+    {
+        if ($user->hasAnyPermission('referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles')
+            || $user->hasRole(User::ROLE_UCAS, User::ROLE_CHEF_UNITE_UCAS)
+        ) {
             return;
         }
 

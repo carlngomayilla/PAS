@@ -11,172 +11,259 @@ use App\Models\MeetingApproval;
 use App\Models\MeetingPlan;
 use App\Models\MeetingReport;
 use App\Models\MeetingStatusHistory;
+use App\Models\Service;
 use App\Models\User;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Throwable;
 
-/**
- * Coeur metier du module de reunions.
- *
- * Toutes les transitions passent par `assertTransitionAllowed()`, qui refuse
- * tout saut non declare dans la machine a etats : le circuit ne peut pas etre
- * court-circuite. Chaque operation sensible est verrouillee en base et tracee.
- */
 class MeetingWorkflowService
 {
     public function __construct(
         private readonly MeetingAccessService $access,
         private readonly MeetingNotificationService $notifications,
-        private readonly SecureJustificatifStorage $storage
+        private readonly SecureJustificatifStorage $storage,
+        private readonly AnalyticsCacheVersionService $cacheVersions
     ) {}
 
     /**
-     * Definit ou met a jour l'objectif d'un mois. Seul le SCIQ y a acces.
-     *
      * @param  array{direction_id:int,service_id:?int,meeting_type:string,year:int,month:int,expected_count:int}  $data
      */
     public function definePlan(array $data, User $actor): MeetingPlan
     {
         if (! $this->access->canDefinePlans($actor)) {
-            throw new InvalidArgumentException('Seul le SCIQ definit le nombre de reunions attendu.');
+            throw new InvalidArgumentException('Seul le SCIQ peut définir les objectifs de réunions.');
         }
 
         $type = MeetingType::from((string) $data['meeting_type']);
-        $serviceId = $type->requiresService() ? ($data['service_id'] ?? null) : null;
-
-        if ($type->requiresService() && $serviceId === null) {
-            throw new InvalidArgumentException('Une reunion de service doit viser un service.');
+        $directionId = (int) $data['direction_id'];
+        $serviceId = $type->requiresService() ? (int) ($data['service_id'] ?? 0) : null;
+        if ($type->requiresService() && $serviceId <= 0) {
+            throw new InvalidArgumentException('Une réunion de service doit viser un service.');
+        }
+        if ($serviceId !== null && ! Service::query()
+            ->whereKey($serviceId)
+            ->where('direction_id', $directionId)
+            ->where('actif', true)
+            ->exists()) {
+            throw new InvalidArgumentException('Le service sélectionné n’appartient pas à la direction concernée.');
         }
 
         $month = (int) $data['month'];
+        $year = (int) $data['year'];
+        $scopeKey = MeetingPlan::scopeKey($type, $directionId, $serviceId);
 
-        return MeetingPlan::query()->updateOrCreate(
-            [
-                'direction_id' => (int) $data['direction_id'],
-                'service_id' => $serviceId !== null ? (int) $serviceId : null,
-                'meeting_type' => $type->value,
-                'year' => (int) $data['year'],
-                'month' => $month,
-            ],
-            [
+        $plan = DB::transaction(function () use ($data, $actor, $type, $directionId, $serviceId, $month, $year, $scopeKey): MeetingPlan {
+            $plan = MeetingPlan::query()
+                ->where('scope_key', $scopeKey)
+                ->where('meeting_type', $type->value)
+                ->where('year', $year)
+                ->where('month', $month)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $plan instanceof MeetingPlan) {
+                $plan = new MeetingPlan([
+                    'direction_id' => $directionId,
+                    'service_id' => $serviceId,
+                    'scope_key' => $scopeKey,
+                    'meeting_type' => $type,
+                    'year' => $year,
+                    'month' => $month,
+                ]);
+            }
+
+            $plan->forceFill([
                 'quarter' => MeetingPlan::quarterForMonth($month),
                 'expected_count' => max(0, (int) $data['expected_count']),
                 'created_by' => $actor->id,
-            ]
-        );
+            ])->save();
+
+            Meeting::query()
+                ->whereNull('meeting_plan_id')
+                ->where('direction_id', $directionId)
+                ->where('service_id', $serviceId)
+                ->where('meeting_type', $type->value)
+                ->where('year', $year)
+                ->where('month', $month)
+                ->update(['meeting_plan_id' => $plan->id]);
+
+            $this->synchronizeExtraFlags($plan);
+
+            return $plan->refresh();
+        });
+
+        $this->notifications->planPublished($plan);
+        $this->cacheVersions->bumpAlerts();
+
+        return $plan;
     }
 
     /**
-     * Programme une reunion. La structure, la periode et le statut sont deduits :
-     * le formulaire ne demande que la date, l'heure et le libelle.
-     *
-     * @param  array{direction_id:int,service_id:?int,meeting_type:string,label:string,scheduled_date:string,scheduled_time:?string}  $data
+     * @param  array{direction_id:int,service_id:?int,meeting_type:string,label:string,location:string,agenda?:?string,responsible_id:int,participant_ids?:list<int>,scheduled_date:string,scheduled_time:string}  $data
      */
     public function scheduleMeeting(array $data, User $actor): Meeting
     {
         $type = MeetingType::from((string) $data['meeting_type']);
         $directionId = (int) $data['direction_id'];
-        $serviceId = $type->requiresService() ? (int) $data['service_id'] : null;
-
+        $serviceId = $type->requiresService() ? (int) ($data['service_id'] ?? 0) : null;
         if (! $this->access->canScheduleFor($actor, $type, $directionId, $serviceId)) {
-            throw new InvalidArgumentException('Vous ne pouvez pas programmer de reunion pour cette structure.');
+            throw new InvalidArgumentException('Vous ne pouvez pas programmer de réunion pour cette structure.');
+        }
+        if ($serviceId !== null && ! Service::query()
+            ->whereKey($serviceId)
+            ->where('direction_id', $directionId)
+            ->where('actif', true)
+            ->exists()) {
+            throw new InvalidArgumentException('Le service sélectionné n’appartient pas à la direction concernée.');
+        }
+
+        $responsible = User::query()->where('is_active', true)->find((int) $data['responsible_id']);
+        if (! $responsible instanceof User
+            || ! $this->access->canScheduleFor($responsible, $type, $directionId, $serviceId)) {
+            throw new InvalidArgumentException('Le responsable doit être le chef de la structure concernée ou son directeur.');
+        }
+
+        $participantIds = $this->normalizedIds($data['participant_ids'] ?? []);
+        $participants = User::query()->whereIn('id', $participantIds)->get(['id', 'direction_id', 'is_active']);
+        if ($participants->count() !== count($participantIds)
+            || $participants->contains(fn (User $participant): bool => ! $participant->is_active
+                || (int) $participant->direction_id !== $directionId)) {
+            throw new InvalidArgumentException('Tous les participants doivent être actifs et appartenir à la direction concernée.');
         }
 
         $date = Carbon::parse((string) $data['scheduled_date'])->startOfDay();
-        $month = (int) $date->month;
-        $year = (int) $date->year;
+        $time = trim((string) $data['scheduled_time']);
+        $scheduledAt = Carbon::parse($date->toDateString().' '.$time);
+        if ($scheduledAt->isPast()) {
+            throw new InvalidArgumentException('Une réunion ne peut pas être programmée dans le passé.');
+        }
 
-        $plan = MeetingPlan::query()
-            ->where('direction_id', $directionId)
-            ->where('service_id', $serviceId)
-            ->where('meeting_type', $type->value)
-            ->where('year', $year)
-            ->where('month', $month)
-            ->first();
+        $meeting = DB::transaction(function () use ($data, $actor, $type, $directionId, $serviceId, $date, $time, $participantIds): Meeting {
+            $plan = $this->lockedPlanFor($type, $directionId, $serviceId, (int) $date->year, (int) $date->month);
+            $scheduledCount = $plan instanceof MeetingPlan
+                ? Meeting::query()
+                    ->where('meeting_plan_id', $plan->id)
+                    ->where('status', '!=', MeetingStatus::Annulee->value)
+                    ->lockForUpdate()
+                    ->get(['id'])
+                    ->count()
+                : 0;
 
-        // Une structure peut programmer au-dela de l'objectif : la reunion est
-        // alors identifiee comme supplementaire, jamais bloquee.
-        $alreadyScheduled = $plan !== null
-            ? Meeting::query()
-                ->where('meeting_plan_id', $plan->id)
-                ->where('status', '!=', MeetingStatus::Annulee->value)
-                ->count()
-            : 0;
-        $isExtra = $plan === null || $alreadyScheduled >= (int) $plan->expected_count;
+            $meeting = Meeting::query()->create([
+                'meeting_plan_id' => $plan?->id,
+                'direction_id' => $directionId,
+                'service_id' => $serviceId,
+                'meeting_type' => $type->value,
+                'label' => trim((string) $data['label']),
+                'location' => trim((string) $data['location']),
+                'agenda' => $this->nullableText($data['agenda'] ?? null),
+                'participant_ids' => $participantIds,
+                'responsible_id' => (int) $data['responsible_id'],
+                'year' => (int) $date->year,
+                'quarter' => MeetingPlan::quarterForMonth((int) $date->month),
+                'month' => (int) $date->month,
+                'original_scheduled_date' => $date->toDateString(),
+                'current_scheduled_date' => $date->toDateString(),
+                'scheduled_time' => $time,
+                'status' => MeetingStatus::Programmee->value,
+                'is_extra' => ! $plan instanceof MeetingPlan || $scheduledCount >= (int) $plan->expected_count,
+                'created_by' => $actor->id,
+            ]);
 
-        $meeting = new Meeting([
-            'meeting_plan_id' => $plan?->id,
-            'direction_id' => $directionId,
-            'service_id' => $serviceId,
-            'meeting_type' => $type->value,
-            'label' => trim((string) $data['label']),
-            'year' => $year,
-            'quarter' => MeetingPlan::quarterForMonth($month),
-            'month' => $month,
-            'original_scheduled_date' => $date->toDateString(),
-            'current_scheduled_date' => $date->toDateString(),
-            'scheduled_time' => $data['scheduled_time'] ?? null,
-            'status' => MeetingStatus::Programmee->value,
-            'is_extra' => $isExtra,
-            'created_by' => $actor->id,
-        ]);
-        $meeting->save();
+            $this->log($meeting, null, null, MeetingStatus::Programmee, $actor, 'Réunion programmée.');
 
-        $this->log($meeting, null, null, MeetingStatus::Programmee, $actor, 'Réunion programmée.');
+            return $meeting->refresh();
+        });
+
         $this->notifications->meetingScheduled($meeting);
+        $this->cacheVersions->bumpAlerts();
 
-        return $meeting->refresh();
+        return $meeting;
     }
 
-    /**
-     * Reporte une reunion sans la supprimer : la date initiale est conservee et
-     * l'historique enregistre chaque report (regles metier 4 et 5).
-     */
-    public function postponeMeeting(Meeting $meeting, string $newDate, ?string $newTime, string $reason, User $actor): Meeting
+    public function postponeMeeting(Meeting $meeting, string $newDate, string $newTime, string $reason, User $actor): Meeting
     {
         if (trim($reason) === '') {
             throw new InvalidArgumentException('Le motif du report est obligatoire.');
         }
 
-        return DB::transaction(function () use ($meeting, $newDate, $newTime, $reason, $actor): Meeting {
-            $locked = Meeting::query()->whereKey($meeting->getKey())->lockForUpdate()->firstOrFail();
+        $date = Carbon::parse($newDate)->startOfDay();
+        $scheduledAt = Carbon::parse($date->toDateString().' '.$newTime);
+        if ($scheduledAt->isPast()) {
+            throw new InvalidArgumentException('La nouvelle date doit être située dans le futur.');
+        }
 
-            if (! $this->access->canScheduleForMeeting($actor, $locked)) {
-                throw new InvalidArgumentException('Vous ne pouvez pas reporter cette reunion.');
+        $previousDate = null;
+        $updated = DB::transaction(function () use ($meeting, $date, $newTime, $reason, $actor, &$previousDate): Meeting {
+            $locked = Meeting::query()->whereKey($meeting->getKey())->lockForUpdate()->firstOrFail();
+            if (! $this->access->canPostpone($actor, $locked)) {
+                throw new InvalidArgumentException('Vous ne pouvez pas reporter cette réunion.');
+            }
+            if ($locked->hasOccurred() && ! $this->access->isAdministrator($actor)) {
+                throw new InvalidArgumentException('Une réunion échue ne peut plus être reportée. Déposez son PV ou contactez un administrateur.');
+            }
+            if ($locked->scheduledAt()?->gte(Carbon::parse($date->toDateString().' '.$newTime))) {
+                throw new InvalidArgumentException('La nouvelle programmation doit être postérieure à la date actuelle.');
             }
 
             $this->assertTransitionAllowed($locked->status, MeetingStatus::Reportee);
-
-            $previousStatus = $locked->status;
+            $oldStatus = $locked->status;
             $previousDate = $locked->current_scheduled_date?->toDateString();
-            $previousMonth = (int) $locked->month;
-            $date = Carbon::parse($newDate)->startOfDay();
+            $oldPlan = $locked->plan()->lockForUpdate()->first();
+            $newPlan = $this->lockedPlanFor(
+                $locked->meeting_type,
+                (int) $locked->direction_id,
+                $locked->service_id !== null ? (int) $locked->service_id : null,
+                (int) $date->year,
+                (int) $date->month
+            );
+            $scheduledCount = $newPlan instanceof MeetingPlan
+                ? Meeting::query()
+                    ->where('meeting_plan_id', $newPlan->id)
+                    ->whereKeyNot($locked->id)
+                    ->where('status', '!=', MeetingStatus::Annulee->value)
+                    ->lockForUpdate()
+                    ->get(['id'])
+                    ->count()
+                : 0;
 
             $locked->forceFill([
+                'meeting_plan_id' => $newPlan?->id,
                 'current_scheduled_date' => $date->toDateString(),
-                'scheduled_time' => $newTime ?? $locked->scheduled_time,
+                'scheduled_time' => $newTime,
                 'year' => (int) $date->year,
                 'month' => (int) $date->month,
                 'quarter' => MeetingPlan::quarterForMonth((int) $date->month),
                 'status' => MeetingStatus::Reportee->value,
+                'is_extra' => ! $newPlan instanceof MeetingPlan || $scheduledCount >= (int) $newPlan->expected_count,
                 'was_postponed' => true,
                 'postponement_count' => (int) $locked->postponement_count + 1,
             ])->save();
 
-            $this->log($locked, null, $previousStatus, MeetingStatus::Reportee, $actor, $reason, [
+            $this->log($locked, null, $oldStatus, MeetingStatus::Reportee, $actor, $reason, [
                 'ancienne_date' => $previousDate,
                 'nouvelle_date' => $date->toDateString(),
-                'ancien_mois' => $previousMonth,
-                'nouveau_mois' => (int) $date->month,
             ]);
 
-            $this->notifications->meetingPostponed($locked, $previousDate, $reason);
+            if ($oldPlan instanceof MeetingPlan) {
+                $this->synchronizeExtraFlags($oldPlan);
+            }
+            if ($newPlan instanceof MeetingPlan) {
+                $this->synchronizeExtraFlags($newPlan);
+            }
 
             return $locked->refresh();
         });
+
+        $this->notifications->meetingPostponed($updated, $previousDate, $reason);
+        $this->cacheVersions->bumpAlerts();
+
+        return $updated;
     }
 
     public function cancelMeeting(Meeting $meeting, string $reason, User $actor): Meeting
@@ -185,16 +272,17 @@ class MeetingWorkflowService
             throw new InvalidArgumentException("Le motif d'annulation est obligatoire.");
         }
 
-        return DB::transaction(function () use ($meeting, $reason, $actor): Meeting {
+        $updated = DB::transaction(function () use ($meeting, $reason, $actor): Meeting {
             $locked = Meeting::query()->whereKey($meeting->getKey())->lockForUpdate()->firstOrFail();
-
-            if (! $this->access->canScheduleForMeeting($actor, $locked)) {
-                throw new InvalidArgumentException('Vous ne pouvez pas annuler cette reunion.');
+            if (! $this->access->canCancel($actor, $locked)) {
+                throw new InvalidArgumentException('Vous ne pouvez pas annuler cette réunion.');
+            }
+            if ($locked->hasOccurred() && ! $this->access->isAdministrator($actor)) {
+                throw new InvalidArgumentException('Une réunion échue ne peut plus être annulée.');
             }
 
             $this->assertTransitionAllowed($locked->status, MeetingStatus::Annulee);
             $old = $locked->status;
-
             $locked->forceFill([
                 'status' => MeetingStatus::Annulee->value,
                 'cancellation_reason' => trim($reason),
@@ -203,72 +291,90 @@ class MeetingWorkflowService
             ])->save();
 
             $this->log($locked, null, $old, MeetingStatus::Annulee, $actor, $reason);
-            $this->notifications->meetingCancelled($locked, $reason);
+            $plan = $locked->plan()->lockForUpdate()->first();
+            if ($plan instanceof MeetingPlan) {
+                $this->synchronizeExtraFlags($plan);
+            }
 
             return $locked->refresh();
         });
+
+        $this->notifications->meetingCancelled($updated, $reason);
+        $this->cacheVersions->bumpAlerts();
+
+        return $updated;
     }
 
     /**
-     * Depot du PV. Le circuit de validation demarre automatiquement au SCIQ
-     * (regles metier 7 et 10).
+     * @param  array{observation?:?string,summary:string,actual_agenda?:?string,decisions?:?string,recommendations?:?string,difficulties?:?string,observations?:?string}  $data
      */
-    public function submitReport(Meeting $meeting, UploadedFile $file, ?string $observation, User $actor): MeetingReport
+    public function submitReport(Meeting $meeting, UploadedFile $file, array $data, User $actor): MeetingReport
     {
-        return DB::transaction(function () use ($meeting, $file, $observation, $actor): MeetingReport {
-            $locked = Meeting::query()->whereKey($meeting->getKey())->lockForUpdate()->firstOrFail();
+        $storedPath = null;
 
-            if (! $this->access->canSubmitReport($actor, $locked)) {
-                throw new InvalidArgumentException('Vous ne pouvez pas deposer de PV pour cette reunion.');
-            }
+        try {
+            $report = DB::transaction(function () use ($meeting, $file, $data, $actor, &$storedPath): MeetingReport {
+                $locked = Meeting::query()->whereKey($meeting->getKey())->lockForUpdate()->firstOrFail();
+                if (! $this->access->canSubmitReport($actor, $locked)) {
+                    throw new InvalidArgumentException('Vous ne pouvez pas déposer de PV pour cette réunion.');
+                }
+                if (! $locked->hasOccurred()) {
+                    throw new InvalidArgumentException('Le PV ne peut être déposé qu’après l’heure prévue de la réunion.');
+                }
+                if ($locked->status->isUnderReview()) {
+                    throw new InvalidArgumentException('Un PV est déjà en cours de validation pour cette réunion.');
+                }
 
-            if ($locked->status->isClosed()) {
-                throw new InvalidArgumentException('Cette reunion est cloturee : son PV ne peut plus etre modifie.');
-            }
+                $this->assertTransitionAllowed($locked->status, MeetingStatus::EnValidationSciq);
+                $checksum = $file->getRealPath() !== false ? hash_file('sha256', $file->getRealPath()) : null;
+                $stored = $this->storage->store($file, 'meetings/pv/'.date('Y/m'));
+                $storedPath = $stored['path'];
+                $version = (int) MeetingReport::query()->where('meeting_id', $locked->id)->max('version') + 1;
 
-            if ($locked->status->isUnderReview()) {
-                throw new InvalidArgumentException('Un PV est deja en cours de validation pour cette reunion.');
-            }
+                $report = MeetingReport::query()->create([
+                    'meeting_id' => $locked->id,
+                    'file_path' => $stored['path'],
+                    'original_file_name' => $stored['nom_original'],
+                    'file_size' => $stored['taille_octets'],
+                    'mime_type' => $stored['mime_type'],
+                    'checksum' => $checksum !== false ? $checksum : null,
+                    'is_encrypted' => $stored['est_chiffre'],
+                    'version' => $version,
+                    'status' => MeetingStatus::EnValidationSciq->value,
+                    'observation' => $this->nullableText($data['observation'] ?? null),
+                    'summary' => trim((string) $data['summary']),
+                    'actual_agenda' => $this->nullableText($data['actual_agenda'] ?? null),
+                    'decisions' => $this->nullableText($data['decisions'] ?? null),
+                    'recommendations' => $this->nullableText($data['recommendations'] ?? null),
+                    'difficulties' => $this->nullableText($data['difficulties'] ?? null),
+                    'observations' => $this->nullableText($data['observations'] ?? null),
+                    'uploaded_by' => $actor->id,
+                    'uploaded_at' => now(),
+                ]);
 
-            $this->assertTransitionAllowed($locked->status, MeetingStatus::EnValidationSciq);
+                $old = $locked->status;
+                $locked->forceFill([
+                    'status' => MeetingStatus::EnValidationSciq->value,
+                    'held_at' => $locked->held_at ?? now(),
+                ])->save();
+                $this->log($locked, $report, $old, MeetingStatus::EnValidationSciq, $actor, 'PV déposé (version '.$version.').');
 
-            $checksum = $file->getRealPath() !== false ? hash_file('sha256', $file->getRealPath()) : null;
-            $stored = $this->storage->store($file, 'meetings/pv/'.date('Y/m'));
-            $version = (int) MeetingReport::query()->where('meeting_id', $locked->id)->max('version') + 1;
+                return $report->refresh();
+            });
+        } catch (Throwable $exception) {
+            $this->storage->deleteByPath($storedPath);
 
-            $report = MeetingReport::query()->create([
-                'meeting_id' => $locked->id,
-                'file_path' => $stored['path'],
-                'original_file_name' => $stored['nom_original'],
-                'file_size' => $stored['taille_octets'],
-                'mime_type' => $stored['mime_type'],
-                'checksum' => $checksum !== false ? $checksum : null,
-                'version' => $version,
-                'status' => MeetingStatus::EnValidationSciq->value,
-                'observation' => $observation !== null ? trim($observation) : null,
-                'uploaded_by' => $actor->id,
-                'uploaded_at' => now(),
-            ]);
+            throw $exception;
+        }
 
-            $old = $locked->status;
-            $locked->forceFill(['status' => MeetingStatus::EnValidationSciq->value])->save();
+        $this->notifications->reportSubmitted($report->meeting, $report);
+        $this->cacheVersions->bumpAlerts();
 
-            $this->log($locked, $report, $old, MeetingStatus::EnValidationSciq, $actor, 'PV déposé (version '.$version.').');
-            $this->notifications->reportSubmitted($locked, $report);
-
-            return $report->refresh();
-        });
+        return $report;
     }
 
-    /**
-     * Visa d'un niveau sur la version courante du PV.
-     *
-     * La Planification ne peut pas viser avant le SCIQ : le statut courant du PV
-     * determine seul le niveau attendu.
-     */
     public function review(
         MeetingReport $report,
-        MeetingApprovalLevel $level,
         MeetingApprovalDecision $decision,
         ?string $comment,
         User $actor
@@ -277,115 +383,150 @@ class MeetingWorkflowService
             throw new InvalidArgumentException('Le motif est obligatoire pour demander une correction.');
         }
 
-        if (! $this->access->canReviewAt($actor, $level)) {
-            throw new InvalidArgumentException("Vous n'etes pas autorise a poser ce visa.");
-        }
-
-        return DB::transaction(function () use ($report, $level, $decision, $comment, $actor): MeetingReport {
+        $outcome = null;
+        $updated = DB::transaction(function () use ($report, $decision, $comment, $actor, &$outcome): MeetingReport {
             $locked = MeetingReport::query()->whereKey($report->getKey())->lockForUpdate()->firstOrFail();
             $meeting = Meeting::query()->whereKey($locked->meeting_id)->lockForUpdate()->firstOrFail();
-
-            if ($locked->isLocked()) {
-                throw new InvalidArgumentException('Ce PV est definitivement valide : il ne peut plus etre modifie.');
-            }
-
             $expected = $locked->pendingLevel();
-            if ($expected === null) {
-                throw new InvalidArgumentException("Ce PV n'attend aucun visa.");
-            }
 
-            if ($expected !== $level) {
-                throw new InvalidArgumentException(
-                    'Ce PV attend le visa « '.$expected->label().' » : le circuit doit etre respecte.'
-                );
+            if (! $expected instanceof MeetingApprovalLevel || ! $this->access->canReviewAt($actor, $expected)) {
+                throw new InvalidArgumentException("Vous n'êtes pas autorisé à poser le visa attendu.");
             }
-
-            // Un controleur ne valide pas son propre depot (regle metier 17).
+            if ($locked->isLocked()) {
+                throw new InvalidArgumentException('Ce PV est définitivement validé et verrouillé.');
+            }
+            if ($meeting->status !== $locked->status || (int) $meeting->currentReport()->value('id') !== (int) $locked->id) {
+                throw new InvalidArgumentException('Seule la version courante du PV peut être instruite.');
+            }
             if ((int) $locked->uploaded_by === (int) $actor->id) {
-                throw new InvalidArgumentException('Un controleur ne peut pas valider son propre depot.');
+                throw new InvalidArgumentException('Un contrôleur ne peut pas valider son propre dépôt.');
+            }
+            if (MeetingApproval::query()
+                ->where('meeting_report_id', $locked->id)
+                ->where('reviewer_id', $actor->id)
+                ->exists()) {
+                throw new InvalidArgumentException('Deux visas distincts doivent être posés par deux personnes différentes.');
             }
 
             MeetingApproval::query()->create([
                 'meeting_report_id' => $locked->id,
-                'approval_level' => $level->value,
+                'approval_level' => $expected->value,
                 'decision' => $decision->value,
-                'comment' => $comment !== null ? trim($comment) : null,
+                'comment' => $this->nullableText($comment),
                 'reviewer_id' => $actor->id,
                 'reviewed_at' => now(),
             ]);
 
             $old = $meeting->status;
-
             if ($decision === MeetingApprovalDecision::CorrectionRequested) {
                 $this->assertTransitionAllowed($old, MeetingStatus::ACorriger);
                 $locked->forceFill(['status' => MeetingStatus::ACorriger->value])->save();
                 $meeting->forceFill(['status' => MeetingStatus::ACorriger->value])->save();
-
                 $this->log($meeting, $locked, $old, MeetingStatus::ACorriger, $actor, $comment);
-                $this->notifications->correctionRequested($meeting, $locked, (string) $comment);
+                $outcome = MeetingApprovalDecision::CorrectionRequested;
 
                 return $locked->refresh();
             }
 
-            $next = $level->validatedStatus();
+            $next = $expected->validatedStatus();
             $this->assertTransitionAllowed($old, $next);
-
             $locked->forceFill([
                 'status' => $next->value,
                 'locked_at' => $next === MeetingStatus::ValideeDefinitivement ? now() : null,
             ])->save();
-
             $meeting->forceFill([
                 'status' => $next->value,
                 'validated_at' => $next === MeetingStatus::ValideeDefinitivement ? now() : null,
             ])->save();
-
             $this->log($meeting, $locked, $old, $next, $actor, $comment);
-
-            if ($next === MeetingStatus::ValideeDefinitivement) {
-                $this->notifications->reportValidated($meeting, $locked);
-            } else {
-                $this->notifications->reportAwaitingPlanification($meeting, $locked);
-            }
+            $outcome = $next;
 
             return $locked->refresh();
         });
+
+        $meeting = $updated->meeting;
+        if ($outcome === MeetingApprovalDecision::CorrectionRequested) {
+            $this->notifications->correctionRequested($meeting, $updated, (string) $comment);
+        } elseif ($outcome === MeetingStatus::ValideeDefinitivement) {
+            $this->notifications->reportValidated($meeting, $updated);
+        } else {
+            $this->notifications->reportAwaitingPlanification($meeting, $updated);
+        }
+        $this->cacheVersions->bumpAlerts();
+
+        return $updated;
     }
 
-    /**
-     * Passe en « PV attendu » les reunions dont la date est passee et pour
-     * lesquelles aucun PV n'a ete depose (regle metier 6).
-     */
     public function markDueMeetingsAsAwaitingReport(?Carbon $reference = null): int
     {
-        $reference = $reference?->copy() ?? Carbon::today();
-
-        $meetings = Meeting::query()
-            ->whereIn('status', [MeetingStatus::Programmee->value, MeetingStatus::Reportee->value])
-            ->whereDate('current_scheduled_date', '<', $reference->toDateString())
-            ->get();
-
+        $reference = $reference?->copy() ?? now();
         $count = 0;
-        foreach ($meetings as $meeting) {
-            if (! $meeting->status->canTransitionTo(MeetingStatus::PvAttendu)) {
-                continue;
-            }
+        $dueMeetings = collect();
 
-            $old = $meeting->status;
-            $meeting->forceFill(['status' => MeetingStatus::PvAttendu->value])->save();
-            $this->log($meeting, null, $old, MeetingStatus::PvAttendu, null, 'Échéance dépassée sans PV déposé.');
-            $count++;
+        Meeting::query()
+            ->whereIn('status', [MeetingStatus::Programmee->value, MeetingStatus::Reportee->value])
+            ->whereDate('current_scheduled_date', '<=', $reference->toDateString())
+            ->orderBy('id')
+            ->chunkById(200, function ($meetings) use ($reference, &$count, $dueMeetings): void {
+                foreach ($meetings as $meeting) {
+                    DB::transaction(function () use ($meeting, $reference, &$count, $dueMeetings): void {
+                        $locked = Meeting::query()->whereKey($meeting->id)->lockForUpdate()->first();
+                        if (! $locked instanceof Meeting || ! $locked->hasOccurred($reference)
+                            || ! $locked->status->canTransitionTo(MeetingStatus::PvAttendu)) {
+                            return;
+                        }
+
+                        $old = $locked->status;
+                        $locked->forceFill(['status' => MeetingStatus::PvAttendu->value])->save();
+                        $this->log($locked, null, $old, MeetingStatus::PvAttendu, null, 'Échéance dépassée sans PV déposé.');
+                        $dueMeetings->push($locked->fresh());
+                        $count++;
+                    });
+                }
+            });
+
+        if ($count > 0) {
+            $dueMeetings->each(fn (Meeting $meeting): int => $this->notifications->reportExpected($meeting));
+            $this->cacheVersions->bumpAlerts();
         }
 
         return $count;
     }
 
-    /** Refuse toute transition non declaree dans la machine a etats. */
+    private function lockedPlanFor(MeetingType $type, int $directionId, ?int $serviceId, int $year, int $month): ?MeetingPlan
+    {
+        return MeetingPlan::query()
+            ->where('scope_key', MeetingPlan::scopeKey($type, $directionId, $serviceId))
+            ->where('meeting_type', $type->value)
+            ->where('year', $year)
+            ->where('month', $month)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function synchronizeExtraFlags(MeetingPlan $plan): void
+    {
+        Meeting::query()
+            ->where('meeting_plan_id', $plan->id)
+            ->where('status', '!=', MeetingStatus::Annulee->value)
+            ->orderBy('original_scheduled_date')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id', 'is_extra'])
+            ->values()
+            ->each(function (Meeting $meeting, int $index) use ($plan): void {
+                $isExtra = $index >= (int) $plan->expected_count;
+                if ((bool) $meeting->is_extra !== $isExtra) {
+                    $meeting->forceFill(['is_extra' => $isExtra])->save();
+                }
+            });
+    }
+
     private function assertTransitionAllowed(MeetingStatus $from, MeetingStatus $to): void
     {
         if (! $from->canTransitionTo($to)) {
             throw new InvalidArgumentException(
-                'Transition refusee : « '.$from->label().' » ne peut pas devenir « '.$to->label().' ».'
+                'Transition refusée : « '.$from->label().' » ne peut pas devenir « '.$to->label().' ». '
             );
         }
     }
@@ -405,10 +546,28 @@ class MeetingWorkflowService
             'meeting_report_id' => $report?->id,
             'old_status' => $old?->value,
             'new_status' => $new->value,
-            'comment' => $comment !== null ? trim($comment) : null,
+            'comment' => $this->nullableText($comment),
             'context' => $context !== [] ? $context : null,
             'changed_by' => $actor?->id,
             'changed_at' => now(),
         ]);
+    }
+
+    private function nullableText(mixed $value): ?string
+    {
+        $text = trim((string) $value);
+
+        return $text !== '' ? $text : null;
+    }
+
+    /** @return list<int> */
+    private function normalizedIds(mixed $ids): array
+    {
+        return collect(is_array($ids) ? $ids : [])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

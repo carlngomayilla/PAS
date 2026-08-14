@@ -49,18 +49,25 @@ class SuperAdminCalculationPolicyTest extends TestCase
             ->assertSee('Filtre actif');
     }
 
-    public function test_admin_cannot_access_or_update_action_calculation_policy(): void
+    public function test_admin_can_access_and_update_action_calculation_policy(): void
     {
         $admin = $this->createAdminUser();
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.calculation.edit'))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Politique de calcul des actions');
 
         $this->actingAs($admin)
             ->put(route('workspace.super-admin.calculation.update'), [
                 'actions_official_validation_status' => ActionCalculationSettings::LEVEL_VALIDATION_CHEF,
             ])
-            ->assertForbidden();
+            ->assertRedirect(route('workspace.super-admin.calculation.edit'));
+
+        $this->assertDatabaseHas('platform_settings', [
+            'group' => 'action_calculation',
+            'key' => 'actions_official_validation_status',
+            'value' => ActionCalculationSettings::LEVEL_VALIDATION_CHEF,
+        ]);
     }
 }

@@ -67,12 +67,14 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
-        $tables->assertSee('Priorites');
+        // Les tables secondaires par role sont masquees dans l'onglet detaille.
+        $tables->assertDontSee('Priorites');
         $tables->assertSee('Retards');
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('actions par statut');
+        // Le graphique « Repartition des statuts » a ete retire pour tous les roles.
+        $charts->assertDontSee('dashboard-role-status-chart', false);
         $charts->assertSee('dashboard-role-trend-chart', false);
     }
 
@@ -89,7 +91,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
         $tables->assertSee('Services');
-        $tables->assertSee('Actions critiques');
+        $tables->assertDontSee('Actions critiques');
         $tables->assertSee('SFC');
         $tables->assertSee('AJARH');
 

@@ -489,7 +489,7 @@
                             <td>
                                 @if ($row->isSuspended())
                                     <div><span class="anbg-badge anbg-badge-warning px-3">Suspendu</span></div>
-                                    <div class="mt-1 text-xs text-slate-500">Jusqu au {{ $row->suspended_until?->format('Y-m-d') }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">Jusqu’au {{ $row->suspended_until?->format('d/m/Y') }}</div>
                                     @if ($row->suspension_reason)
                                         <div class="mt-1 text-xs text-slate-500">{{ $row->suspension_reason }}</div>
                                     @endif
@@ -498,7 +498,7 @@
                                 @endif
                             </td>
                             <td>{{ (int) ($row->sessions_total ?? 0) }}</td>
-                            <td>{{ $row->last_session_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                            <td>{{ $row->last_session_at?->format('d/m/Y H:i') ?? '-' }}</td>
                             <td>
                                 <div class="flex flex-wrap gap-2">
                                     <a class="btn btn-secondary btn-sm rounded-xl" href="{{ route('workspace.super-admin.organization.index', ['edit_user' => $row->id]) }}">Editer</a>
@@ -554,7 +554,7 @@
                 <tbody>
                     @forelse ($loginHistory as $row)
                         <tr>
-                            <td>{{ $row->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                            <td>{{ $row->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
                             <td>
                                 <div class="font-semibold text-slate-900">{{ $row->user?->name ?? 'Utilisateur supprime' }}</div>
                                 <div class="text-xs text-slate-500">{{ $row->user?->email ?? '-' }}</div>
@@ -686,10 +686,10 @@
     <section id="deletion-requests" class="ui-card mt-3.5">
         <div class="flex items-center justify-between gap-3">
             <div>
-                <h2>Demandes de suppression</h2>
-                <p class="text-slate-600">Demandes motivees avec analyse d impact avant decision Super Admin.</p>
+                <h2>Demandes approuvées à exécuter</h2>
+                <p class="text-slate-600">Demandes autorisées par le Chef Planification et prêtes pour la décision administrative finale.</p>
             </div>
-            <span class="showcase-chip">{{ count($deletionRequests ?? []) }} ouvertes</span>
+            <span class="showcase-chip">{{ count($deletionRequests ?? []) }} à exécuter</span>
         </div>
         <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
@@ -701,9 +701,12 @@
                             $openAssignments = (int) data_get($impact, 'open_assignments.total', 0);
                             $totalImpact = (int) data_get($impact, 'total', 0);
                             $blockingImpact = (int) data_get($impact, 'blocking_total', $totalImpact);
+                            $isUserRequest = $row->entity_type === \App\Models\User::class;
+                            $canArchive = in_array($row->module, ['pas', 'pao', 'pta'], true);
+                            $isAccessChange = $row->module === 'access_control';
                         @endphp
                         <tr>
-                            <td>{{ $row->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                            <td>{{ $row->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
                             <td>
                                 <p class="font-medium text-slate-900">{{ $row->requester?->name ?? 'Systeme' }}</p>
                                 <p class="text-xs text-slate-600">{{ $row->requester?->email ?? '-' }}</p>
@@ -723,21 +726,24 @@
                                 <form method="POST" action="{{ route('workspace.super-admin.organization.deletion-requests.decision', $row) }}" class="grid min-w-[22rem] gap-2">
                                     @csrf
                                     <select name="decision" required>
-                                        <option value="request_complement">Demander complement</option>
-                                        <option value="reject">Refuser</option>
-                                        <option value="disable">Desactiver</option>
-                                        <option value="delete">Supprimer si impact metier nul</option>
-                                        <option value="archive">Archiver la demande</option>
-                                        <option value="correct">Marquer corrige</option>
+                                        @if ($isAccessChange)
+                                            <option value="apply">Appliquer les rôles et permissions</option>
+                                        @else
+                                            <option value="delete">Supprimer définitivement si l’impact métier est nul</option>
+                                        @endif
+                                        @if ($isUserRequest)<option value="disable">Désactiver et transférer</option>@endif
+                                        @if ($canArchive)<option value="archive">Archiver</option>@endif
                                     </select>
-                                    <select name="transfer_to_user_id">
-                                        <option value="">Repreneur si desactivation</option>
-                                        @foreach ($transferUserOptions as $candidate)
-                                            <option value="{{ $candidate->id }}">{{ $candidate->name }} - {{ $candidate->service?->code ?? $candidate->direction?->code ?? 'global' }}</option>
-                                        @endforeach
-                                    </select>
-                                    <input name="reviewer_note" type="text" placeholder="Motif de decision" required>
-                                    <button class="btn btn-primary" type="submit">Enregistrer</button>
+                                    @if ($isUserRequest)
+                                        <select name="transfer_to_user_id">
+                                            <option value="">Repreneur si désactivation</option>
+                                            @foreach ($transferUserOptions as $candidate)
+                                                <option value="{{ $candidate->id }}">{{ $candidate->name }} - {{ $candidate->service?->code ?? $candidate->direction?->code ?? 'global' }}</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
+                                    <input name="reviewer_note" type="text" placeholder="Motif d’exécution" required>
+                                    <button class="btn btn-primary" type="submit">Exécuter</button>
                                 </form>
                             </td>
                         </tr>
@@ -745,8 +751,8 @@
                         <tr>
                             <td colspan="5">
                                 <x-ui.empty-state
-                                    title="Aucune demande ouverte"
-                                    message="Les demandes de suppression motivees apparaitront ici."
+                                    title="Aucune demande approuvée"
+                                    message="Les demandes apparaîtront ici après l’accord du Chef Planification."
                                     icon="shield"
                                     tone="info"
                                     class="my-4"
@@ -773,7 +779,7 @@
                 <tbody>
                     @forelse (($orgHistory ?? []) as $row)
                         <tr>
-                            <td>{{ $row->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                            <td>{{ $row->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
                             <td>{{ $row->user?->email ?? 'Système' }}</td>
                             <td>{{ $row->action }}</td>
                             <td>{{ $row->entite_type ?? '-' }} #{{ $row->entite_id ?? '-' }}</td>

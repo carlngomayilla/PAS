@@ -137,7 +137,7 @@ class WorkflowSettings
 
     public function actionFinalStage(): string
     {
-        return 'control';
+        return 'planification';
     }
 
     /**
@@ -152,15 +152,16 @@ class WorkflowSettings
             'service_enabled' => $this->serviceValidationEnabled(),
             'direction_enabled' => false,
             'control_enabled' => true,
+            'planification_enabled' => true,
             'rejection_comment_required' => $this->rejectionCommentRequired(),
             'submission_target' => $submissionTarget,
             'final_stage' => $finalStage,
-            'chain_label' => 'Agent -> Chef de service -> Controleur',
-            'submission_help_text' => 'L action est visee par le chef de service, puis validee par SCIQ ou Planification.',
+            'chain_label' => 'Agent -> Chef de service -> Controle SCIQ -> Planification',
+            'submission_help_text' => 'L action est visee par le chef de service, contrôlée par SCIQ, puis validée définitivement par Planification.',
             'submission_button_label' => 'Soumettre',
             'service_review_button_label' => 'Viser et transmettre au controle',
             'service_review_success_text' => 'Visa du chef enregistre. L action est transmise au controleur.',
-            'final_statistics_hint' => 'Oui apres validation finale du controleur.',
+            'final_statistics_hint' => 'Oui après validation finale par Planification.',
         ];
     }
 
@@ -218,6 +219,7 @@ class WorkflowSettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     private function hasSettingsTable(): bool

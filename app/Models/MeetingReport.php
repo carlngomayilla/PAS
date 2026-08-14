@@ -18,6 +18,10 @@ class MeetingReport extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'is_encrypted' => false,
+    ];
+
     protected $fillable = [
         'meeting_id',
         'file_path',
@@ -25,9 +29,16 @@ class MeetingReport extends Model
         'file_size',
         'mime_type',
         'checksum',
+        'is_encrypted',
         'version',
         'status',
         'observation',
+        'summary',
+        'actual_agenda',
+        'decisions',
+        'recommendations',
+        'difficulties',
+        'observations',
         'uploaded_by',
         'uploaded_at',
         'locked_at',
@@ -39,6 +50,7 @@ class MeetingReport extends Model
             'status' => MeetingStatus::class,
             'version' => 'integer',
             'file_size' => 'integer',
+            'is_encrypted' => 'boolean',
             'uploaded_at' => 'datetime',
             'locked_at' => 'datetime',
         ];

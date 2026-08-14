@@ -22,7 +22,7 @@ class SuperAdminOverviewTest extends TestCase
         $this->seed();
     }
 
-    public function test_super_admin_can_open_actionable_command_center_while_admin_is_forbidden(): void
+    public function test_administrators_open_a_command_center_limited_to_their_privileges(): void
     {
         $superAdmin = $this->createSuperAdminUser();
         $admin = $this->createAdminUser();
@@ -38,13 +38,24 @@ class SuperAdminOverviewTest extends TestCase
             ->assertSee('Rétention et archivage')
             ->assertSee(route('workspace.super-admin.roles.edit'), false)
             ->assertSee(route('workspace.retention.index'), false)
+            ->assertViewHas('isTechnicalAdministrator', true)
             ->assertViewHas('summary', fn (array $summary): bool => array_key_exists('diagnostic_warnings', $summary)
                 && array_key_exists('pending_deletion_requests', $summary)
                 && array_key_exists('configuration_drafts', $summary));
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.index'))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Centre de commandement')
+            ->assertSee(route('workspace.super-admin.appearance.edit'), false)
+            ->assertSee(route('workspace.super-admin.organization.index'), false)
+            ->assertDontSee(route('workspace.super-admin.settings.edit'), false)
+            ->assertDontSee(route('workspace.super-admin.roles.edit'), false)
+            ->assertDontSee(route('workspace.super-admin.snapshots.index'), false)
+            ->assertDontSee(route('workspace.super-admin.simulation.index'), false)
+            ->assertDontSee(route('workspace.super-admin.audit-diagnostic.index'), false)
+            ->assertDontSee(route('workspace.super-admin.maintenance.index'), false)
+            ->assertViewHas('isTechnicalAdministrator', false);
     }
 
     public function test_pending_governance_decision_and_configuration_draft_are_prioritized(): void

@@ -25,7 +25,6 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9.88 4.66A10.72 10.72 0 0 1 12 4.45c6 0 9.75 7.55 9.75 7.55a17.08 17.08 0 0 1-2.44 3.33" />
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6.23 6.85C3.73 8.48 2.25 12 2.25 12s3.75 7.55 9.75 7.55a10.4 10.4 0 0 0 4.13-.86" />
     </svg>
-    <span class="auth-password-toggle-label" data-password-toggle-label>{{ $label }}</span>
 </button>
 
 @once

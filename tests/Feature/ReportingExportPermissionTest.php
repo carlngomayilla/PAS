@@ -21,6 +21,9 @@ class ReportingExportPermissionTest extends TestCase
             'is_active' => true,
         ]);
 
+        $this->assertFalse($user->hasPermission('reporting.read'));
+        $this->assertTrue($user->hasPermission('alerts.read'));
+
         $this->actingAs($user)
             ->get(route('workspace.reporting.export.pdf'))
             ->assertForbidden();
@@ -34,6 +37,9 @@ class ReportingExportPermissionTest extends TestCase
             'role' => User::ROLE_SERVICE,
             'is_active' => true,
         ]);
+
+        $this->assertTrue($user->hasPermission('reporting.read'));
+        $this->assertFalse($user->hasPermission('alerts.read'));
 
         $response = $this->actingAs($user)
             ->get(route('workspace.reporting.export.pdf'));

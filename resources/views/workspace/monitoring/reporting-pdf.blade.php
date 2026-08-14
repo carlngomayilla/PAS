@@ -35,7 +35,7 @@
         $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
         $officialBaseText = 'Base statistique : '.$officialBaseLabel;
         $generatedAtValue = $generatedAt ?? now();
-        $generatedAtLabel = $generatedAtValue instanceof \Carbon\CarbonInterface ? $generatedAtValue->format('Y-m-d H:i:s') : now()->format('Y-m-d H:i:s');
+        $generatedAtLabel = $generatedAtValue instanceof \Carbon\CarbonInterface ? $generatedAtValue->format('d/m/Y H:i:s') : now()->format('d/m/Y H:i:s');
         $generatedYear = $generatedAtValue instanceof \Carbon\CarbonInterface ? $generatedAtValue->format('Y') : now()->format('Y');
         $directionServiceReport = collect($details['direction_service_report'] ?? []);
         $logoPath = public_path('images/logo-wordmark.png');

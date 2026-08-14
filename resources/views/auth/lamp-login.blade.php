@@ -80,6 +80,7 @@
                         name="email"
                         value="{{ old('email') }}"
                         placeholder="{{ $identifierPlaceholder }}"
+                        aria-label="Identifiant de connexion"
                         autocomplete="username"
                         class="login-input"
                         required
@@ -97,6 +98,7 @@
                         type="password"
                         name="password"
                         placeholder="Mot de passe"
+                        aria-label="Mot de passe"
                         autocomplete="current-password"
                         class="login-input"
                         data-password-toggle-target

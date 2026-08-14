@@ -27,7 +27,8 @@ class SuperAdminDashboardProfilesTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.dashboard-profiles.edit'))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Dashboards par profil');
 
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.dashboard-profiles.edit'))

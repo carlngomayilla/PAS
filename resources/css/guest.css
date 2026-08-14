@@ -225,7 +225,7 @@
 .login-subtitle {
     margin: 0;
     font-size: 0.8rem;
-    color: #94a3b8;
+    color: #526174;
     line-height: 1.5;
 }
 
@@ -388,8 +388,8 @@
 }
 
 .login-check {
-    width: 0.95rem;
-    height: 0.95rem;
+    width: 1.5rem;
+    height: 1.5rem;
     accent-color: #3996d3;
     cursor: pointer;
     flex-shrink: 0;
@@ -398,7 +398,7 @@
 .login-forgot {
     font-size: 0.78rem;
     font-weight: 600;
-    color: #3996d3;
+    color: #0f5f99;
     text-decoration: none;
     transition: color 0.15s ease;
     white-space: nowrap;
@@ -493,13 +493,13 @@
 .login-note {
     text-align: center;
     font-size: 0.74rem;
-    color: #94a3b8;
+    color: #526174;
     line-height: 1.5;
     margin-top: 0.25rem;
 }
 
 .login-note a {
-    color: #3996d3;
+    color: #0f5f99;
     font-weight: 700;
     text-decoration: none;
 }

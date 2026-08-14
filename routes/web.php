@@ -25,6 +25,7 @@ use App\Http\Controllers\Web\GovernanceWebController;
 use App\Http\Controllers\Web\InstitutionalReportWebController;
 use App\Http\Controllers\Web\KpiMesureWebController;
 use App\Http\Controllers\Web\KpiWebController;
+use App\Http\Controllers\Web\MeetingWebController;
 use App\Http\Controllers\Web\MonitoringWebController;
 use App\Http\Controllers\Web\NotificationWebController;
 use App\Http\Controllers\Web\PaoWebController;
@@ -43,6 +44,8 @@ use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\EnsurePasswordIsFresh;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // ── ACCUEIL ────────────────────────────────────────────────────────────────────
@@ -142,6 +145,23 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::get('/workspace/mes-taches', [PersonalTaskWebController::class, 'index'])
             ->name('workspace.tasks.index');
 
+        Route::prefix('/workspace/reunions')->name('workspace.meetings.')->group(function (): void {
+            Route::get('/', [MeetingWebController::class, 'index'])->name('index');
+            Route::post('/objectifs', [MeetingWebController::class, 'storePlan'])->name('plans.store');
+            Route::post('/', [MeetingWebController::class, 'store'])->name('store');
+            Route::get('/{meeting}', [MeetingWebController::class, 'show'])->whereNumber('meeting')->name('show');
+            Route::post('/{meeting}/reporter', [MeetingWebController::class, 'postpone'])->whereNumber('meeting')->name('postpone');
+            Route::post('/{meeting}/annuler', [MeetingWebController::class, 'cancel'])->whereNumber('meeting')->name('cancel');
+            Route::post('/{meeting}/pv', [MeetingWebController::class, 'submitReport'])->whereNumber('meeting')->name('reports.store');
+            Route::post('/{meeting}/pv/{meetingReport}/viser', [MeetingWebController::class, 'reviewReport'])
+                ->whereNumber(['meeting', 'meetingReport'])
+                ->name('reports.review');
+            Route::get('/{meeting}/pv/{meetingReport}/telecharger', [MeetingWebController::class, 'downloadReport'])
+                ->whereNumber(['meeting', 'meetingReport'])
+                ->middleware('throttle:api-downloads')
+                ->name('reports.download');
+        });
+
         Route::get('/workspace/rapports', [InstitutionalReportWebController::class, 'index'])
             ->name('workspace.reports.index');
         Route::post('/workspace/rapports', [InstitutionalReportWebController::class, 'store'])
@@ -224,8 +244,12 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
         // ── GOUVERNANCE (Documentation API, Rétention, Délégations) ──────────────
         // Analyse canonique du modele PAS (kit IDE/dark, vue statique).
-        Route::get('/workspace/analyses/model', fn () => view('analyses.model'))
-            ->name('workspace.analyses.model');
+        Route::get('/workspace/analyses/model', function (Request $request) {
+            $user = $request->user();
+            abort_unless($user instanceof User && $user->isSuperAdmin(), 403);
+
+            return view('analyses.model');
+        })->name('workspace.analyses.model');
 
         Route::get('/workspace/documentation-api', [GovernanceWebController::class, 'apiDocumentation'])
             ->name('workspace.api-docs.index');
@@ -354,6 +378,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             // Tâches concrètes rattachées à un PTA : suivi, validation, clôture, KPI.
             Route::get('daf/financements-actions', [FinancialMonitoringWebController::class, 'index'])
                 ->name('daf.financements.index');
+            Route::get('daf/demandes-financement-actions', [ActionWebController::class, 'financingRequests'])
+                ->name('daf.financing-requests.index');
             Route::post('finances/actions/{action}/operations', [FinancialMonitoringWebController::class, 'storeTransaction'])
                 ->name('finances.transactions.store');
             Route::post('finances/depassements', [FinancialMonitoringWebController::class, 'storeOverrun'])

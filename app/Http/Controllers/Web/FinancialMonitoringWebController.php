@@ -117,6 +117,9 @@ class FinancialMonitoringWebController extends Controller
             'canRecord' => $finance->canRecord($user),
             'isDafDirector' => $finance->isDafDirector($user),
             'isDg' => $user->hasRole(User::ROLE_DG),
+            'canViewFinancingRequests' => $finance->isDafDirector($user)
+                || $user->hasRole(User::ROLE_DG)
+                || $user->hasGlobalReadAccess(),
             'summary' => [
                 'budget' => $budget,
                 'approved_extra' => $approvedExtra,

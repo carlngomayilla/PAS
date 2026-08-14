@@ -144,7 +144,7 @@
                             <tr>
                                 <td>
                                     <div class="flex min-w-[250px] items-center gap-3">
-                                        @if ($row->profile_photo_url)<img src="{{ $row->profile_photo_url }}" alt="Photo de {{ $row->name }}" class="h-10 w-10 rounded-full object-cover ring-2 ring-white shadow-sm dark:ring-slate-700">@else<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3996D3] text-xs font-bold text-white">{{ $row->profile_initials }}</span>@endif
+                                        @if ($row->profile_photo_url)<img src="{{ $row->profile_photo_url }}" alt="Photo de {{ $row->name }}" class="h-10 w-10 rounded-full object-cover ring-2 ring-white shadow-sm dark:ring-slate-700">@else<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0f5f99] text-xs font-bold text-white">{{ $row->profile_initials }}</span>@endif
                                         <div class="min-w-0"><strong class="block truncate text-slate-900 dark:text-slate-100">{{ $row->name }}</strong><span class="block truncate text-xs text-slate-500 dark:text-slate-400">{{ $row->email }}</span></div>
                                     </div>
                                 </td>

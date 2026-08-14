@@ -6217,7 +6217,8 @@ class DashboardController extends Controller
 
     private function canReadDashboard(User $user): bool
     {
-        return $user->hasGlobalReadAccess()
+        return $user->hasPermission('planning.read')
+            || $user->hasGlobalReadAccess()
             || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE)
             || $user->isAgent();
     }

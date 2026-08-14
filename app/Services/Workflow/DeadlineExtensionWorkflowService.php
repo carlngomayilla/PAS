@@ -27,6 +27,7 @@ class DeadlineExtensionWorkflowService
     {
         $action->loadMissing('pta:id,direction_id,service_id');
         $sousAction = $this->targetSousAction($action, $payload['sous_action_id'] ?? null);
+        $this->ensureActorCanRequestTarget($action, $sousAction, $actor);
         $oldDeadline = $this->targetDeadline($action, $sousAction);
         $requestedChanges = $this->changeSet->requestedChanges($payload, $sousAction instanceof SousAction);
         $originalValues = $this->changeSet->snapshot($action, $sousAction, array_keys($requestedChanges));
@@ -488,6 +489,21 @@ class DeadlineExtensionWorkflowService
         }
 
         return $sousAction;
+    }
+
+    private function ensureActorCanRequestTarget(Action $action, ?SousAction $sousAction, User $actor): void
+    {
+        if ($action->isResponsible($actor)) {
+            return;
+        }
+
+        if ($actor->isAgent() && $sousAction instanceof SousAction && (int) $sousAction->agent_id === (int) $actor->id) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'sous_action_id' => 'Vous ne pouvez demander une modification que pour votre sous-action.',
+        ]);
     }
 
     private function targetDeadline(Action $action, ?SousAction $sousAction): Carbon

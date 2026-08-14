@@ -58,7 +58,7 @@ class FinancialDashboardKpiTest extends TestCase
         $this->assertIsString($dashboardPanel);
         $this->assertStringContainsString("['financial_summary']", $controller);
         $this->assertStringContainsString('Suivi budgétaire', $dashboardPanel);
-        $this->assertStringContainsString('Solde budgétaire à décaisser', $dashboardPanel);
+        $this->assertStringContainsString('Solde à décaisser', $dashboardPanel);
     }
 
     /** @return array{action:Action,serviceChief:User,agent:User,director:User,planning:User,planningChief:User,sciq:User,sciqChief:User,dg:User} */

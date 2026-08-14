@@ -1360,6 +1360,7 @@ class ActionWebController extends Controller
     {
         return $user->hasGlobalReadAccess()
             || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE)
+            || $user->hasRole(User::ROLE_UCAS, User::ROLE_CHEF_UNITE_UCAS)
             || $user->isAgent()
             || $user->hasDelegatedPermission('action_review')
             || $user->hasDelegatedPermission('planning_write');
@@ -1570,6 +1571,18 @@ class ActionWebController extends Controller
     private function scopeAction(Builder $query, User $user): void
     {
         if ($user->hasGlobalReadAccess()) {
+            return;
+        }
+
+        if ($user->hasRole(User::ROLE_UCAS, User::ROLE_CHEF_UNITE_UCAS)) {
+            if ($user->unite_dg_id === null) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->where('unite_dg_id', (int) $user->unite_dg_id);
+
             return;
         }
 

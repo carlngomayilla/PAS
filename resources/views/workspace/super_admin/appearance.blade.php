@@ -35,8 +35,10 @@
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.modules.edit') }}">Modules</a>
-                <a class="btn btn-primary" href="{{ route('workspace.super-admin.maintenance.index') }}">Maintenance</a>
+                @if (auth()->user()?->isSuperAdmin())
+                    <a class="btn btn-secondary" href="{{ route('workspace.super-admin.modules.edit') }}">Modules</a>
+                    <a class="btn btn-primary" href="{{ route('workspace.super-admin.maintenance.index') }}">Maintenance</a>
+                @endif
             </div>
         </div>
     </section>

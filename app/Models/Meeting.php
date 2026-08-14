@@ -24,12 +24,16 @@ class Meeting extends Model
         'service_id',
         'meeting_type',
         'label',
+        'location',
+        'agenda',
+        'participant_ids',
         'year',
         'quarter',
         'month',
         'original_scheduled_date',
         'current_scheduled_date',
         'scheduled_time',
+        'held_at',
         'status',
         'is_extra',
         'was_postponed',
@@ -39,6 +43,7 @@ class Meeting extends Model
         'cancelled_by',
         'validated_at',
         'created_by',
+        'responsible_id',
     ];
 
     protected function casts(): array
@@ -51,6 +56,8 @@ class Meeting extends Model
             'month' => 'integer',
             'original_scheduled_date' => 'date',
             'current_scheduled_date' => 'date',
+            'participant_ids' => 'array',
+            'held_at' => 'datetime',
             'is_extra' => 'boolean',
             'was_postponed' => 'boolean',
             'postponement_count' => 'integer',
@@ -77,6 +84,11 @@ class Meeting extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function responsible(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsible_id');
     }
 
     public function cancelledBy(): BelongsTo
@@ -119,6 +131,31 @@ class Meeting extends Model
 
         return $this->current_scheduled_date instanceof Carbon
             && $this->current_scheduled_date->copy()->startOfDay()->lte($reference->startOfDay());
+    }
+
+    public function scheduledAt(): ?Carbon
+    {
+        if (! $this->current_scheduled_date instanceof Carbon) {
+            return null;
+        }
+
+        $scheduledAt = $this->current_scheduled_date->copy()->startOfDay();
+        $time = trim((string) $this->scheduled_time);
+
+        if ($time !== '') {
+            [$hour, $minute] = array_pad(array_map('intval', explode(':', $time)), 2, 0);
+            $scheduledAt->setTime($hour, $minute);
+        }
+
+        return $scheduledAt;
+    }
+
+    public function hasOccurred(?Carbon $reference = null): bool
+    {
+        $scheduledAt = $this->scheduledAt();
+
+        return $scheduledAt instanceof Carbon
+            && $scheduledAt->lte($reference?->copy() ?? now());
     }
 
     /** Reunion echue sans PV depose : elle n'est pas justifiee. */

@@ -41,13 +41,15 @@ class SuperAdminOverviewService
     /**
      * @return array<string, mixed>
      */
-    public function build(): array
+    public function build(User $user): array
     {
+        $isTechnicalAdministrator = $user->isSuperAdmin();
         $diagnostics = collect($this->platformDiagnosticService->checks());
         $diagnosticWarnings = $diagnostics->where('status', 'warning')->values();
         $maintenance = $this->platformMaintenanceService->status();
-        $drafts = $this->configurationDrafts();
+        $drafts = $this->configurationDrafts($isTechnicalAdministrator);
         $draftsTotal = $drafts->where('has_draft', true)->count();
+        $draftRoute = data_get($drafts->firstWhere('has_draft', true), 'route');
         $pendingDeletionRequests = DeletionRequest::query()
             ->whereIn('status', [
                 DeletionRequest::STATUS_PENDING,
@@ -102,24 +104,27 @@ class SuperAdminOverviewService
                 $diagnosticWarnings,
                 $pendingDeletionRequests,
                 $draftsTotal,
+                is_string($draftRoute) ? $draftRoute : null,
                 $latestSnapshot,
-                $draftTemplates
+                $draftTemplates,
+                $isTechnicalAdministrator
             ),
             'configurationDrafts' => $drafts,
             'configurationFacts' => $this->configurationFacts(),
-            'areas' => $this->areas($summary),
+            'areas' => $this->areas($summary, $isTechnicalAdministrator),
             'activity' => $this->activity(),
             'recentAudits' => $this->recentAudits(),
             'latestSnapshot' => $latestSnapshot,
+            'isTechnicalAdministrator' => $isTechnicalAdministrator,
         ];
     }
 
     /**
      * @return Collection<int, array{key:string,label:string,has_draft:bool,updated_at:Carbon|null,route:string}>
      */
-    private function configurationDrafts(): Collection
+    private function configurationDrafts(bool $isTechnicalAdministrator): Collection
     {
-        return collect([
+        $drafts = collect([
             [
                 'key' => 'general',
                 'label' => 'Paramètres généraux',
@@ -142,6 +147,10 @@ class SuperAdminOverviewService
                 'route' => route('workspace.super-admin.appearance.edit'),
             ],
         ]);
+
+        return $isTechnicalAdministrator
+            ? $drafts
+            : $drafts->where('key', 'appearance')->values();
     }
 
     /**
@@ -193,12 +202,14 @@ class SuperAdminOverviewService
         Collection $diagnosticWarnings,
         int $pendingDeletionRequests,
         int $draftsTotal,
+        ?string $draftRoute,
         ?PlatformSettingSnapshot $latestSnapshot,
-        int $draftTemplates
+        int $draftTemplates,
+        bool $isTechnicalAdministrator
     ): Collection {
         $items = collect();
 
-        if ($maintenanceActive) {
+        if ($isTechnicalAdministrator && $maintenanceActive) {
             $items->push([
                 'label' => 'Maintenance active',
                 'meta' => 'Accès utilisateurs potentiellement restreint',
@@ -207,7 +218,7 @@ class SuperAdminOverviewService
             ]);
         }
 
-        if ($diagnosticWarnings->isNotEmpty()) {
+        if ($isTechnicalAdministrator && $diagnosticWarnings->isNotEmpty()) {
             $affectedRecords = $diagnosticWarnings->sum(fn (array $check): int => (int) ($check['count'] ?? 0));
             $items->push([
                 'label' => $diagnosticWarnings->count().' contrôle(s) en anomalie',
@@ -231,11 +242,11 @@ class SuperAdminOverviewService
                 'label' => $draftsTotal.' brouillon(s) de configuration',
                 'meta' => 'Publication ou abandon à décider',
                 'tone' => 'info',
-                'route' => route('workspace.super-admin.settings.edit'),
+                'route' => $draftRoute ?? route('workspace.super-admin.appearance.edit'),
             ]);
         }
 
-        if ($latestSnapshot === null || $latestSnapshot->created_at?->lt(now()->subDays(30))) {
+        if ($isTechnicalAdministrator && ($latestSnapshot === null || $latestSnapshot->created_at?->lt(now()->subDays(30)))) {
             $items->push([
                 'label' => $latestSnapshot === null ? 'Aucun snapshot de configuration' : 'Snapshot de configuration ancien',
                 'meta' => $latestSnapshot === null
@@ -260,7 +271,9 @@ class SuperAdminOverviewService
                 'label' => 'Aucune intervention prioritaire',
                 'meta' => 'Contrôles, décisions et publications à jour',
                 'tone' => 'success',
-                'route' => route('workspace.super-admin.audit-diagnostic.index'),
+                'route' => $isTechnicalAdministrator
+                    ? route('workspace.super-admin.audit-diagnostic.index')
+                    : route('workspace.super-admin.templates.index'),
             ]);
         }
 
@@ -291,28 +304,28 @@ class SuperAdminOverviewService
      * @param  array<string, int>  $summary
      * @return array<int, array{key:string,label:string,items:array<int, array{label:string,meta:string,route:string}>}>
      */
-    private function areas(array $summary): array
+    private function areas(array $summary, bool $isTechnicalAdministrator): array
     {
-        return [
+        $areas = [
             [
                 'key' => 'platform',
                 'label' => 'Plateforme',
                 'items' => [
-                    ['label' => 'Paramètres généraux', 'meta' => $this->platformSettings->locale().' · '.$this->platformSettings->timezone(), 'route' => route('workspace.super-admin.settings.edit')],
+                    ['label' => 'Paramètres généraux', 'meta' => $this->platformSettings->locale().' · '.$this->platformSettings->timezone(), 'route' => route('workspace.super-admin.settings.edit'), 'technical' => true],
                     ['label' => 'Apparence', 'meta' => ucfirst((string) $this->appearanceSettings->get('default_theme', 'dark')), 'route' => route('workspace.super-admin.appearance.edit')],
-                    ['label' => 'Modules et navigation', 'meta' => $summary['modules_active'].' / '.$summary['modules_total'].' actifs', 'route' => route('workspace.super-admin.modules.edit')],
-                    ['label' => 'Maintenance', 'meta' => 'Caches et exploitation', 'route' => route('workspace.super-admin.maintenance.index')],
+                    ['label' => 'Modules et navigation', 'meta' => $summary['modules_active'].' / '.$summary['modules_total'].' actifs', 'route' => route('workspace.super-admin.modules.edit'), 'technical' => true],
+                    ['label' => 'Maintenance', 'meta' => 'Caches et exploitation', 'route' => route('workspace.super-admin.maintenance.index'), 'technical' => true],
                 ],
             ],
             [
                 'key' => 'governance',
                 'label' => 'Gouvernance',
                 'items' => [
-                    ['label' => 'Rôles et permissions', 'meta' => count($this->rolePermissionSettings->groupedPermissions()).' groupes', 'route' => route('workspace.super-admin.roles.edit')],
+                    ['label' => 'Rôles et permissions', 'meta' => count($this->rolePermissionSettings->groupedPermissions()).' groupes', 'route' => route('workspace.super-admin.roles.edit'), 'technical' => true],
                     ['label' => 'Organisation et utilisateurs', 'meta' => $summary['active_users'].' actifs', 'route' => route('workspace.super-admin.organization.index')],
                     ['label' => 'Unités DG', 'meta' => UniteDg::query()->where('actif', true)->count().' actives', 'route' => route('workspace.super-admin.unites-dg.index')],
                     ['label' => 'Dashboards par profil', 'meta' => count($this->dashboardProfileSettings->all()).' profils', 'route' => route('workspace.super-admin.dashboard-profiles.edit')],
-                    ['label' => 'Audit et diagnostic', 'meta' => $summary['diagnostic_warnings'].' alerte(s)', 'route' => route('workspace.super-admin.audit-diagnostic.index')],
+                    ['label' => 'Audit et diagnostic', 'meta' => $summary['diagnostic_warnings'].' alerte(s)', 'route' => route('workspace.super-admin.audit-diagnostic.index'), 'technical' => true],
                     ['label' => 'Journal d’audit', 'meta' => 'Traçabilité globale', 'route' => route('workspace.audit.index')],
                 ],
             ],
@@ -334,13 +347,31 @@ class SuperAdminOverviewService
                 'key' => 'continuity',
                 'label' => 'Continuité et sorties',
                 'items' => [
-                    ['label' => 'Snapshots de configuration', 'meta' => $summary['snapshots_total'].' point(s)', 'route' => route('workspace.super-admin.snapshots.index')],
-                    ['label' => 'Simulation', 'meta' => 'Impact avant application', 'route' => route('workspace.super-admin.simulation.index')],
+                    ['label' => 'Snapshots de configuration', 'meta' => $summary['snapshots_total'].' point(s)', 'route' => route('workspace.super-admin.snapshots.index'), 'technical' => true],
+                    ['label' => 'Simulation', 'meta' => 'Impact avant application', 'route' => route('workspace.super-admin.simulation.index'), 'technical' => true],
                     ['label' => 'Templates d’export', 'meta' => $summary['templates_published'].' publiés', 'route' => route('workspace.super-admin.templates.index')],
                     ['label' => 'Rétention et archivage', 'meta' => $summary['archives_total'].' archive(s)', 'route' => route('workspace.retention.index')],
                 ],
             ],
         ];
+
+        return collect($areas)
+            ->map(function (array $area) use ($isTechnicalAdministrator): array {
+                $area['items'] = collect($area['items'])
+                    ->filter(fn (array $item): bool => $isTechnicalAdministrator || ! ($item['technical'] ?? false))
+                    ->map(function (array $item): array {
+                        unset($item['technical']);
+
+                        return $item;
+                    })
+                    ->values()
+                    ->all();
+
+                return $area;
+            })
+            ->filter(fn (array $area): bool => $area['items'] !== [])
+            ->values()
+            ->all();
     }
 
     /**

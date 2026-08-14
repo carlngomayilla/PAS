@@ -11,7 +11,7 @@
    ======================================================== */
 body.anbg-glass-theme {
     /* Couleurs de la palette ANBG */
-    --glass-blue: #3996d3;
+    --glass-blue: #0f5f99;
     --glass-blue-deep: #1c5f91;
     --glass-navy: #1c203d;
     --glass-green: #3996d3;
@@ -1339,9 +1339,9 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         .app-table thead th,
         table thead th
     ) {
-        background: #3996d3 !important;
+        background: #0f5f99 !important;
         background-image: none !important;
-        border-bottom: 1px solid #3996d3 !important;
+        border-bottom: 1px solid #0f5f99 !important;
         color: #ffffff !important;
     }
 
@@ -1523,10 +1523,10 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         .app-table thead th,
         table thead th
     ) {
-        background: #3996d3 !important;
+        background: #0f5f99 !important;
         background-image: none !important;
         color: #ffffff !important;
-        border-bottom-color: #3996d3 !important;
+        border-bottom-color: #0f5f99 !important;
     }
 
     html.dark body.admin-theme-scope.anbg-glass-theme :where(
@@ -2965,7 +2965,7 @@ body.admin-theme-scope.anbg-glass-theme {
     --anbg-ui-border: #d7e5ef;
     --anbg-ui-border-strong: #b9cfdf;
     --anbg-ui-text: #17263a;
-    --anbg-ui-muted: #7c8ca1;
+    --anbg-ui-muted: #526174;
     --anbg-ui-gold: #d6b426;
     --anbg-ui-success: #4f7d2e;
     --anbg-ui-danger: #b54444;
@@ -5042,6 +5042,14 @@ body.admin-theme-scope.anbg-glass-theme :where(
         visibility: hidden !important;
     }
 
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-section-title {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 1rem 0 0.4rem !important;
+        padding: 0 0.65rem !important;
+        white-space: nowrap !important;
+    }
+
     body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(.app-sidebar-link, .app-sidebar-logout) {
         justify-content: center !important;
         gap: 0 !important;
@@ -5655,8 +5663,8 @@ body.admin-theme-scope.anbg-glass-theme .app-sidebar-section-title {
         display: grid !important;
         width: 3.4rem !important;
         min-width: 3.4rem !important;
-        height: 3.4rem !important;
-        min-height: 3.4rem !important;
+        height: 4.6rem !important;
+        min-height: 4.6rem !important;
         margin-inline: auto !important;
         padding: 0.45rem !important;
         border: 1px solid rgb(255 255 255 / 52%) !important;

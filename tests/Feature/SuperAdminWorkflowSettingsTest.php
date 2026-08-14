@@ -52,20 +52,21 @@ class SuperAdminWorkflowSettingsTest extends TestCase
         ]);
 
         $summary = app(WorkflowSettings::class)->actionValidationSummary();
-        $this->assertSame('service', $summary['final_stage']);
+        $this->assertSame('planification', $summary['final_stage']);
         $this->assertFalse($summary['rejection_comment_required']);
         $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pas'));
         $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pao'));
         $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pta'));
     }
 
-    public function test_admin_cannot_access_or_update_workflow_settings(): void
+    public function test_admin_can_access_and_update_business_workflow_settings(): void
     {
         $admin = $this->createAdminUser();
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.workflow.edit'))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Workflow et validations');
 
         $this->actingAs($admin)
             ->put(route('workspace.super-admin.workflow.update'), [
@@ -76,6 +77,14 @@ class SuperAdminWorkflowSettingsTest extends TestCase
                 'pao_workflow_mode' => 'canonical',
                 'pta_workflow_mode' => 'canonical',
             ])
-            ->assertForbidden();
+            ->assertRedirect(route('workspace.super-admin.workflow.edit'));
+
+        $this->assertDatabaseHas('platform_settings', [
+            'group' => 'workflow',
+            'key' => 'actions_service_validation_enabled',
+            'value' => '1',
+            'updated_by' => $admin->id,
+        ]);
+        $this->assertFalse(app(WorkflowSettings::class)->rejectionCommentRequired());
     }
 }

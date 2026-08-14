@@ -75,13 +75,31 @@ class SecureJustificatifStorage
 
     public function download(Justificatif $justificatif): StreamedResponse
     {
-        $path = (string) $justificatif->chemin_stockage;
+        return $this->downloadStoredFile(
+            (string) $justificatif->chemin_stockage,
+            (string) $justificatif->nom_original,
+            (bool) $justificatif->est_chiffre,
+            $justificatif->mime_type,
+            (int) $justificatif->taille_octets
+        );
+    }
+
+    public function downloadStoredFile(
+        string $path,
+        string $originalName,
+        bool $isEncrypted,
+        ?string $mimeType = null,
+        ?int $size = null
+    ): StreamedResponse {
         if (! Storage::disk('local')->exists($path)) {
             abort(404, 'Fichier introuvable.');
         }
 
-        if (! $justificatif->est_chiffre) {
-            return Storage::disk('local')->download($path, (string) $justificatif->nom_original);
+        if (! $isEncrypted) {
+            return Storage::disk('local')->download($path, $originalName, array_filter([
+                'Content-Type' => $mimeType,
+                'X-Content-Type-Options' => 'nosniff',
+            ]));
         }
 
         try {
@@ -100,10 +118,11 @@ class SecureJustificatifStorage
             static function () use ($binary): void {
                 echo $binary;
             },
-            (string) $justificatif->nom_original,
+            $originalName,
             array_filter([
-                'Content-Type' => $justificatif->mime_type,
-                'Content-Length' => (string) $justificatif->taille_octets,
+                'Content-Type' => $mimeType,
+                'Content-Length' => $size !== null ? (string) $size : null,
+                'X-Content-Type-Options' => 'nosniff',
             ])
         );
     }

@@ -21,7 +21,7 @@
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Snapshots</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['snapshots_total'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Clefs configurees</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['settings_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Derniere restauration</p><p class="mt-2 text-xl font-bold text-slate-900">{{ $summary['last_restored_at'] ? \Illuminate\Support\Carbon::parse($summary['last_restored_at'])->format('Y-m-d H:i') : 'Aucune' }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Dernière restauration</p><p class="mt-2 text-xl font-bold text-slate-900">{{ $summary['last_restored_at'] ? \Illuminate\Support\Carbon::parse($summary['last_restored_at'])->format('d/m/Y H:i') : 'Aucune' }}</p></article>
     </section>
 
     <section class="showcase-panel mb-4">
@@ -137,7 +137,7 @@
                 <tbody>
                     @forelse ($rows as $row)
                         <tr>
-                            <td>{{ $row->created_at?->format('Y-m-d H:i') }}</td>
+                            <td>{{ $row->created_at?->format('d/m/Y H:i') }}</td>
                             <td>
                                 <strong class="text-slate-900">{{ $row->label }}</strong>
                                 @if ($row->description)
@@ -145,7 +145,7 @@
                                 @endif
                             </td>
                             <td>{{ $row->creator?->name ?? 'Système' }}</td>
-                            <td>{{ $row->last_restored_at?->format('Y-m-d H:i') ?? 'Jamais' }}</td>
+                            <td>{{ $row->last_restored_at?->format('d/m/Y H:i') ?? 'Jamais' }}</td>
                             <td>
                                 <div class="flex flex-wrap gap-2">
                                     <form method="POST" action="{{ route('workspace.super-admin.snapshots.restore', $row) }}">

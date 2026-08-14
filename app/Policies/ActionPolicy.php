@@ -208,7 +208,8 @@ class ActionPolicy
             return false;
         }
 
-        return $action->isResponsible($user);
+        return $action->isResponsible($user)
+            || ($user->isAgent() && $action->sousActions()->where('agent_id', $user->id)->exists());
     }
 
     public function reviewDeadlineExtensionByChef(User $user, Action $action): bool

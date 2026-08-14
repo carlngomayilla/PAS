@@ -19,7 +19,8 @@
             'value' => $validationCount,
             'meta' => 'Actions aux étapes chef et contrôle',
             'href' => route('workspace.actions.index', ['vue' => 'validations']),
-            'tone' => $validationCount > 0 ? '#a16207' : '#178f5f',
+            'tone' => $validationCount > 0 ? '#a16207' : '#0e7450',
+            'dark_tone' => $validationCount > 0 ? '#fbbf24' : '#58d3a4',
             'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
         ],
         [
@@ -28,7 +29,8 @@
             'value' => $actionableReports,
             'meta' => $myReports.' demande(s) déposée(s)',
             'href' => route('workspace.deadline-extension.index'),
-            'tone' => $actionableReports > 0 ? '#b45309' : '#3996d3',
+            'tone' => $actionableReports > 0 ? '#b45309' : '#0f5f99',
+            'dark_tone' => $actionableReports > 0 ? '#fdba74' : '#65caef',
             'icon' => '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
         ],
         [
@@ -37,7 +39,8 @@
             'value' => $criticalCount,
             'meta' => 'Alertes critiques et actions en retard',
             'href' => route('workspace.notifications.index', ['tab' => 'alertes']),
-            'tone' => $criticalCount > 0 ? '#b42318' : '#178f5f',
+            'tone' => $criticalCount > 0 ? '#b42318' : '#0e7450',
+            'dark_tone' => $criticalCount > 0 ? '#fca5a5' : '#58d3a4',
             'icon' => '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
         ],
     ];
@@ -109,18 +112,18 @@
                 <h2 class="text-sm font-bold text-[#17324a]">Flux à traiter</h2>
                 <p class="mt-0.5 text-xs text-[#667085]">Décisions et contrôles qui demandent une intervention.</p>
             </div>
-            <a href="{{ route('workspace.tasks.index') }}" class="text-xs font-bold text-[#2878a5] hover:text-[#17324a]">Mes tâches</a>
+            <a href="{{ route('workspace.tasks.index') }}" class="text-xs font-bold text-[#0f5f99] hover:text-[#17324a] dark:text-[#65caef] dark:hover:text-white">Mes tâches</a>
         </div>
         <div class="grid gap-2 lg:grid-cols-3">
             @foreach ($flowItems as $item)
                 <a href="{{ $item['href'] }}" class="flex min-h-20 items-center gap-3 rounded-lg border border-[#dce8ef] bg-white px-3 py-3 transition hover:border-[#3996d3] hover:bg-[#f7fbfd]" data-dashboard-flow="{{ $item['key'] }}" data-flow-count="{{ $item['value'] }}">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style="color: {{ $item['tone'] }}; background: color-mix(in srgb, {{ $item['tone'] }} 10%, white);">
+                    <span class="dashboard-flow-tone flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style="--flow-tone: {{ $item['tone'] }}; --flow-tone-dark: {{ $item['dark_tone'] }};">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $item['icon'] !!}</svg>
                     </span>
                     <span class="min-w-0 flex-1">
                         <span class="flex items-baseline justify-between gap-2">
                             <span class="truncate text-sm font-bold text-[#17324a]">{{ $item['label'] }}</span>
-                            <span class="text-lg font-bold" style="color: {{ $item['tone'] }}">{{ $item['value'] }}</span>
+                            <span class="dashboard-flow-value text-lg font-bold" style="--flow-tone: {{ $item['tone'] }}; --flow-tone-dark: {{ $item['dark_tone'] }};">{{ $item['value'] }}</span>
                         </span>
                         <span class="mt-1 block truncate text-xs text-[#667085]">{{ $item['meta'] }}</span>
                     </span>

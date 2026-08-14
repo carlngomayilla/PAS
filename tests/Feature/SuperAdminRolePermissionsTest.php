@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\DeletionRequest;
 use App\Models\User;
+use App\Services\DeletionRequestService;
 use App\Services\RolePermissionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesAdminUser;
@@ -19,7 +21,7 @@ class SuperAdminRolePermissionsTest extends TestCase
         $this->seed();
     }
 
-    public function test_super_admin_can_manage_role_permission_matrix_and_admin_cannot_access_it(): void
+    public function test_super_admin_can_request_a_role_permission_change_and_admin_cannot_access_the_matrix(): void
     {
         $superAdmin = $this->createSuperAdminUser();
         $admin = $this->createAdminUser();
@@ -40,15 +42,23 @@ class SuperAdminRolePermissionsTest extends TestCase
             ->put(route('workspace.super-admin.roles.update', ['simulate_role' => User::ROLE_CABINET]), [
                 'permissions' => $payload,
             ])
-            ->assertRedirect(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_CABINET]));
+            ->assertRedirect(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_CABINET]))
+            ->assertSessionHas('success');
 
-        $this->assertDatabaseHas('platform_settings', [
-            'group' => 'role_permissions',
-            'key' => 'role_permissions_'.User::ROLE_CABINET,
-        ]);
+        $governanceRequest = DeletionRequest::query()
+            ->where('module', 'access_control')
+            ->where('requested_action', 'role_permissions_update')
+            ->firstOrFail();
+
+        $this->assertSame(DeletionRequest::STATUS_PENDING, $governanceRequest->status);
+        $this->assertNotContains(
+            'audit.read',
+            (array) data_get($governanceRequest->impact_summary, 'governance_payload.permissions.'.User::ROLE_CABINET, [])
+        );
+        $this->assertContains('audit.read', app(RolePermissionSettings::class)->forRole(User::ROLE_CABINET));
         $this->assertDatabaseHas('journal_audit', [
-            'module' => 'super_admin',
-            'action' => 'role_permission_settings_update',
+            'module' => 'access_control',
+            'action' => 'role_permission_change_requested',
         ]);
     }
 
@@ -69,10 +79,13 @@ class SuperAdminRolePermissionsTest extends TestCase
             ])
             ->assertRedirect();
 
+        $this->approveAndApplyRolePermissionRequest($superAdmin);
+
         $this->actingAs($serviceUser)
             ->get('/workspace')
             ->assertOk()
-            ->assertDontSee('Reporting');
+            ->assertViewHas('modules', fn (array $modules): bool => collect($modules)
+                ->doesntContain(fn (array $module): bool => ($module['web_route'] ?? null) === route('workspace.reporting')));
 
         $this->actingAs($serviceUser)
             ->get(route('workspace.reporting'))
@@ -92,6 +105,8 @@ class SuperAdminRolePermissionsTest extends TestCase
             ])
             ->assertRedirect(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_CABINET]));
 
+        $this->approveAndApplyRolePermissionRequest($superAdmin);
+
         $settings->flush();
         $this->assertNotContains('audit.read', $settings->forRole(User::ROLE_CABINET));
 
@@ -106,7 +121,7 @@ class SuperAdminRolePermissionsTest extends TestCase
         );
     }
 
-    public function test_incompatible_chief_permissions_are_locked_and_reported(): void
+    public function test_incompatible_chief_permissions_are_locked_and_removed_during_governed_application(): void
     {
         $superAdmin = $this->createSuperAdminUser();
         $settings = app(RolePermissionSettings::class);
@@ -121,10 +136,9 @@ class SuperAdminRolePermissionsTest extends TestCase
                 'permissions' => $payload,
             ])
             ->assertRedirect(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_SERVICE]))
-            ->assertSessionHas('warning');
+            ->assertSessionHas('success');
 
-        $warning = (string) session('warning');
-        $this->assertStringContainsString('scope.global.read', $warning);
+        $this->approveAndApplyRolePermissionRequest($superAdmin);
 
         $settings->flush();
         $this->assertNotContains('scope.global.read', $settings->forRole(User::ROLE_SERVICE));
@@ -148,6 +162,8 @@ class SuperAdminRolePermissionsTest extends TestCase
             ->put(route('workspace.super-admin.roles.update'), [])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
+
+        $this->approveAndApplyRolePermissionRequest($superAdmin);
 
         $settings = app(RolePermissionSettings::class);
         $settings->flush();
@@ -183,6 +199,8 @@ class SuperAdminRolePermissionsTest extends TestCase
             ])
             ->assertRedirect();
 
+        $this->approveAndApplyRolePermissionRequest($superAdmin);
+
         $this->actingAs($directionUser)
             ->get(route('workspace.referentiel.utilisateurs.index'))
             ->assertOk()
@@ -211,8 +229,40 @@ class SuperAdminRolePermissionsTest extends TestCase
             ])
             ->assertRedirect();
 
+        $this->approveAndApplyRolePermissionRequest($superAdmin);
+
         $this->actingAs($admin)
             ->get(route('workspace.referentiel.utilisateurs.index'))
             ->assertForbidden();
+    }
+
+    private function approveAndApplyRolePermissionRequest(User $superAdmin): void
+    {
+        $governanceRequest = DeletionRequest::query()
+            ->where('module', 'access_control')
+            ->where('requested_action', 'role_permissions_update')
+            ->where('status', DeletionRequest::STATUS_PENDING)
+            ->latest('id')
+            ->firstOrFail();
+        $planningChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'password_changed_at' => now(),
+        ]);
+        $service = app(DeletionRequestService::class);
+        $approvedRequest = $service->approve(
+            $governanceRequest,
+            $planningChief,
+            DeletionRequest::DECISION_APPROVE,
+            'Matrice vérifiée par le Chef Planification.'
+        );
+
+        $service->execute(
+            $approvedRequest,
+            $superAdmin,
+            DeletionRequest::DECISION_APPLY,
+            'Application administrative de la matrice approuvée.'
+        );
+
+        app(RolePermissionSettings::class)->flush();
     }
 }

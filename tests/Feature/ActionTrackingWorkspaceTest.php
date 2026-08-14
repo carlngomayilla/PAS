@@ -15,6 +15,7 @@ use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Workflow\ActionWorkflowService;
+use App\Services\Workflow\DeadlineExtensionChangeSet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -418,6 +419,7 @@ class ActionTrackingWorkspaceTest extends TestCase
             ->assertDontSee('Sous-action autre agent</option>', false);
 
         $basePayload = [
+            'change_fields' => [DeadlineExtensionChangeSet::FIELD_DEADLINE],
             'requested_deadline' => now()->addMonths(3)->toDateString(),
             'motif' => 'Dependance externe confirmee',
             'justification' => 'Le fournisseur a transmis un calendrier revise et documente.',
@@ -426,6 +428,7 @@ class ActionTrackingWorkspaceTest extends TestCase
 
         $this->actingAs($assignedAgent)
             ->post(route('workspace.actions.deadline-extension.store', $fixture['action']), $basePayload)
+            ->assertRedirect()
             ->assertSessionHasErrors('sous_action_id');
 
         $this->actingAs($assignedAgent)
@@ -434,6 +437,7 @@ class ActionTrackingWorkspaceTest extends TestCase
                 'sous_action_id' => $otherSubAction->id,
                 'piece_justificative' => UploadedFile::fake()->create('preuve-autre.pdf', 100, 'application/pdf'),
             ])
+            ->assertRedirect()
             ->assertSessionHasErrors('sous_action_id');
 
         $this->actingAs($assignedAgent)

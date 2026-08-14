@@ -17,7 +17,12 @@
         $alertLevelLabels = is_array($alertLevelLabels ?? null) ? $alertLevelLabels : [];
         $validationLabel = $validationStatusLabels[$validationStatus] ?? $validationStatusLabel($validationStatus);
         $currentUser = auth()->user();
-        $deadlineRequestTargets = $action->sousActions;
+        $canRequestMainActionDeadlineChange = ! ($currentUser instanceof \App\Models\User
+            && $currentUser->isAgent()
+            && ! $action->isResponsible($currentUser));
+        $deadlineRequestTargets = $canRequestMainActionDeadlineChange
+            ? $action->sousActions
+            : $action->sousActions->where('agent_id', (int) $currentUser->id)->values();
         $isExecutorAgent = $currentUser instanceof \App\Models\User
             && $currentUser->isAgent()
             && (
@@ -45,12 +50,12 @@
             'service_enabled' => true,
             'direction_enabled' => false,
             'submission_target' => 'service',
-            'chain_label' => 'Agent -> Chef de service -> Controleur',
-            'submission_help_text' => "L'action est visee par le chef puis controlee par SCIQ ou Planification.",
+            'chain_label' => 'Agent -> Chef de service -> Controle SCIQ -> Planification',
+            'submission_help_text' => "L'action est visée par le chef, contrôlée par SCIQ, puis validée par Planification.",
             'submission_button_label' => 'Soumettre',
             'service_review_button_label' => 'Viser et transmettre',
             'service_review_success_text' => 'Visa chef enregistre.',
-            'final_statistics_hint' => 'Oui apres validation finale du controleur.',
+            'final_statistics_hint' => 'Oui après validation finale par Planification.',
             'rejection_comment_required' => true,
         ];
         $agentLocked = auth()->check()
@@ -1023,6 +1028,7 @@
                             :selected-sub-action-id="request('report_sous_action_id')"
                             :responsable-options="$deadlineResponsableOptions"
                             :show-target="true"
+                            :allow-main-action="$canRequestMainActionDeadlineChange"
                         />
                         <div>
                             <label for="deadline_motif">Motif</label>

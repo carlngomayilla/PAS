@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
 /**
  * Objectif de reunions defini par le SCIQ pour une structure et un mois.
@@ -35,6 +36,23 @@ class MeetingPlan extends Model
             'expected_count' => 'integer',
             'meeting_type' => MeetingType::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (MeetingPlan $plan): void {
+            $type = $plan->meeting_type instanceof MeetingType
+                ? $plan->meeting_type
+                : MeetingType::from((string) $plan->meeting_type);
+            $serviceId = $plan->service_id !== null ? (int) $plan->service_id : null;
+
+            if (! $type->requiresService()) {
+                $serviceId = null;
+                $plan->service_id = null;
+            }
+
+            $plan->scope_key = self::scopeKey($type, (int) $plan->direction_id, $serviceId);
+        });
     }
 
     public function direction(): BelongsTo
@@ -72,6 +90,21 @@ class MeetingPlan extends Model
     public static function quarterForMonth(int $month): int
     {
         return (int) ceil(max(1, min(12, $month)) / 3);
+    }
+
+    public static function scopeKey(MeetingType $type, int $directionId, ?int $serviceId): string
+    {
+        if ($directionId <= 0) {
+            throw new InvalidArgumentException('La direction du plan de réunions est obligatoire.');
+        }
+
+        if ($type->requiresService() && ($serviceId === null || $serviceId <= 0)) {
+            throw new InvalidArgumentException('Le service du plan de réunions est obligatoire.');
+        }
+
+        return $type->requiresService()
+            ? 'service:'.(int) $serviceId
+            : 'direction:'.$directionId;
     }
 
     /** @return list<int> */

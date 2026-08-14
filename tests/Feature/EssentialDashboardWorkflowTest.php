@@ -59,8 +59,8 @@ class EssentialDashboardWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Synth')
             ->assertSee('Graphiques')
-            ->assertSee('Vue detaillee')
-            ->assertSee('Vue synthetique des axes')
+            ->assertSee('Vue détaillée')
+            ->assertSee('Vue synthétique des axes')
             ->assertSee('Suivi PTA')
             ->assertSee('Axe dashboard sans action')
             ->assertSee('Objectif dashboard sans action');
@@ -83,11 +83,16 @@ class EssentialDashboardWorkflowTest extends TestCase
     {
         $fixture = $this->createPlanningFixture();
         $this->createAction($fixture);
+        $directionWithoutPta = Direction::query()->create([
+            'code' => 'DIR-SANS-PTA',
+            'libelle' => 'Direction sans PTA',
+            'actif' => true,
+        ]);
 
         Pao::query()->create([
             'pas_id' => $fixture['pas']->id,
             'pas_objectif_id' => $fixture['pas_objectif']->id,
-            'direction_id' => $fixture['direction']->id,
+            'direction_id' => $directionWithoutPta->id,
             'service_id' => null,
             'annee' => now()->year,
             'titre' => 'PAO sans PTA qualite',
@@ -137,7 +142,7 @@ class EssentialDashboardWorkflowTest extends TestCase
             'pas_objectif_id' => $fixture['pas_objectif']->id,
             'direction_id' => $fixture['direction']->id,
             'service_id' => null,
-            'annee' => now()->year,
+            'annee' => now()->year - 1,
             'titre' => 'PAO incoherent qualite',
             'objectif_operationnel' => 'Controle qualite avance',
             'statut' => Pao::STATUS_VALIDE,

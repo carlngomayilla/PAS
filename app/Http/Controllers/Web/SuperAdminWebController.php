@@ -106,7 +106,7 @@ class SuperAdminWebController extends Controller
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
-        return view('workspace.super_admin.index', $this->superAdminOverviewService->build());
+        return view('workspace.super_admin.index', $this->superAdminOverviewService->build($user));
     }
 
     public function settingsEdit(Request $request): View
@@ -820,7 +820,7 @@ class SuperAdminWebController extends Controller
             'editingUser' => $editingUser,
             'deletionRequests' => DeletionRequest::query()
                 ->with(['requester:id,name,email', 'reviewer:id,name,email'])
-                ->whereIn('status', [DeletionRequest::STATUS_PENDING, DeletionRequest::STATUS_COMPLEMENT_REQUESTED])
+                ->where('status', DeletionRequest::STATUS_APPROVED)
                 ->latest('id')
                 ->limit(20)
                 ->get(),
@@ -2443,6 +2443,7 @@ class SuperAdminWebController extends Controller
             'statusOptions' => ExportTemplate::statusOptions(),
             'moduleOptions' => $this->moduleOptions(),
             'profileOptions' => $this->profileOptions(),
+            'profileLabels' => $this->profileLabels(),
         ]);
     }
 
@@ -2648,6 +2649,7 @@ class SuperAdminWebController extends Controller
             ],
             'moduleOptions' => $this->moduleOptions(),
             'profileOptions' => $this->profileOptions(),
+            'profileLabels' => $this->profileLabels(),
             'readingLevelOptions' => $this->readingLevelOptions(),
             'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
@@ -3265,6 +3267,7 @@ class SuperAdminWebController extends Controller
             'statusOptions' => ExportTemplate::statusOptions(),
             'moduleOptions' => $this->moduleOptions(),
             'profileOptions' => $this->profileOptions(),
+            'profileLabels' => $this->profileLabels(),
             'readingLevelOptions' => $this->readingLevelOptions(),
             'dynamicVariableOptions' => ExportTemplate::allowedDynamicVariables(),
         ];

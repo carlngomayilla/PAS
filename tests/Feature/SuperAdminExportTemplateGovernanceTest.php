@@ -265,20 +265,29 @@ class SuperAdminExportTemplateGovernanceTest extends TestCase
         $this->assertSame(ExportTemplate::STATUS_PUBLISHED, $template->fresh()->status);
     }
 
-    public function test_non_super_admin_cannot_publish_or_manage_assignments(): void
+    public function test_admin_can_publish_and_manage_template_assignments(): void
     {
         $admin = $this->createAdminUser();
         $template = $this->createTemplate($admin);
 
         $this->actingAs($admin)
             ->post(route('workspace.super-admin.templates.publish', $template), [
-                'mark_as_default' => '1',
+                'mark_as_default' => '0',
             ])
-            ->assertForbidden();
+            ->assertRedirect(route('workspace.super-admin.templates.show', $template));
+
+        $this->assertSame(ExportTemplate::STATUS_PUBLISHED, $template->fresh()->status);
+
+        $assignment = ExportTemplateAssignment::query()
+            ->where('export_template_id', $template->id)
+            ->sole();
+        $this->assertTrue((bool) $assignment->is_active);
 
         $this->actingAs($admin)
-            ->post(route('workspace.super-admin.templates.assignments.store', $template), $this->assignmentPayload($template))
-            ->assertForbidden();
+            ->post(route('workspace.super-admin.templates.assignments.toggle', $assignment))
+            ->assertRedirect(route('workspace.super-admin.templates.show', $template));
+
+        $this->assertFalse((bool) $assignment->fresh()->is_active);
     }
 
     public function test_resolver_selects_most_specific_published_assignment_in_database(): void

@@ -11,7 +11,7 @@ class UserWorkspacePtaSuiviModuleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_tracking_and_deadline_features_do_not_create_duplicate_sidebar_modules(): void
+    public function test_tracking_has_no_duplicate_module_and_deadline_module_follows_the_profile_matrix(): void
     {
         $roles = [
             User::ROLE_SUPER_ADMIN,
@@ -30,6 +30,12 @@ class UserWorkspacePtaSuiviModuleTest extends TestCase
             User::ROLE_CABINET_SUPERVISION,
             User::ROLE_UCAS,
         ];
+        $rolesWithDeadlineModule = [
+            User::ROLE_DG,
+            User::ROLE_DIRECTION,
+            User::ROLE_SERVICE,
+            User::ROLE_AGENT,
+        ];
 
         foreach ($roles as $role) {
             $user = User::factory()->create();
@@ -41,7 +47,12 @@ class UserWorkspacePtaSuiviModuleTest extends TestCase
             $modules = collect(app(UserWorkspaceService::class)->modulesFor($user));
 
             $this->assertNull($modules->firstWhere('code', 'pta_suivi'));
-            $this->assertNull($modules->firstWhere('code', 'reports_echeance'));
+            $this->assertSame(
+                in_array($role, $rolesWithDeadlineModule, true),
+                $modules->contains('code', 'reports_echeance'),
+                'Visibilité du module Modifications pour le rôle '.$role
+            );
+            $this->assertLessThanOrEqual(1, $modules->where('code', 'reports_echeance')->count());
         }
     }
 
