@@ -164,7 +164,7 @@ class Phase3CRbacConsolidationTest extends TestCase
         ]);
         $pta = Pta::query()->create([
             'pao_id' => $pao->id, 'direction_id' => $direction->id,
-            'service_id' => $service->id, 'titre' => 'PTA 3C', 'statut' => 'valide',
+            'service_id' => $service->id, 'titre' => 'PTA 3C', 'statut' => 'en_cours',
         ]);
 
         return [$admin, $pta];

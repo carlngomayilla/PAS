@@ -197,7 +197,7 @@ class KpiExcludeRejectedActionsTest extends TestCase
             'direction_id' => $direction->id,
             'service_id' => $service->id,
             'titre' => 'PTA Filtre',
-            'statut' => 'valide',
+            'statut' => 'en_cours',
         ]);
 
         return [$admin, $pta];

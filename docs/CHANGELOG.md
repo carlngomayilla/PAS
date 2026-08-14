@@ -14,7 +14,7 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 - La contrainte `actions_type_cible_check` accepte désormais les cibles `mixte` et `sans_quantite`, toutes deux produites par les workflows de paramétrage.
 - La contrainte `deletion_requests_status_check` accepte l'état intermédiaire `approved` utilisé entre le visa Planification et l'exécution d'une demande gouvernée.
 - La contrainte `ptas_statut_check` accepte de nouveau le brouillon transitoire créé par l'import Excel jusqu'au paramétrage complet des actions.
-- Les fixtures PostgreSQL emploient les valeurs canoniques actuelles pour le paramétrage des actions et la périodicité des KPI.
+- Les fixtures PostgreSQL emploient les valeurs canoniques actuelles pour le statut PTA, le paramétrage des actions et la périodicité des KPI.
 - Les PV historiques dont le chemin se termine par `.enc` sont reclassés comme chiffrés ; les anciens PDF clairs restent servis sans déchiffrement.
 - Le rollback refuse explicitement de resserrer les contraintes lorsque des données utilisant les nouvelles valeurs existent, afin d'éviter toute normalisation destructive.
 

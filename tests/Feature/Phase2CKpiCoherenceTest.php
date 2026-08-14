@@ -247,7 +247,7 @@ class Phase2CKpiCoherenceTest extends TestCase
         ]);
         $pta = Pta::query()->create([
             'pao_id' => $pao->id, 'direction_id' => $direction->id,
-            'service_id' => $service->id, 'titre' => 'PTA 2C', 'statut' => 'valide',
+            'service_id' => $service->id, 'titre' => 'PTA 2C', 'statut' => 'en_cours',
         ]);
 
         return [$admin, $pta];
