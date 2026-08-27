@@ -177,7 +177,7 @@ function bindDashboardSynthesisFilters() {
   const serviceSelect = form.querySelector('[data-synthesis-service-select]');
   const rmoSelect = form.querySelector('[data-synthesis-rmo-select]');
   const servicesUrlTemplate = form.dataset.servicesUrlTemplate || '';
-  const usersUrl = form.dataset.usersUrl || '';
+  const responsiblesUrl = form.dataset.responsiblesUrl || '';
 
   if (!(directionSelect instanceof HTMLSelectElement) || !(serviceSelect instanceof HTMLSelectElement) || !servicesUrlTemplate) {
     return;
@@ -209,7 +209,7 @@ function bindDashboardSynthesisFilters() {
   // Cascade RMO : la liste des responsables depend de la direction (et du service
   // si precise). Rechargee a chaque changement de direction/service.
   const populateRmo = async (preselectId = 'all') => {
-    if (!(rmoSelect instanceof HTMLSelectElement) || !usersUrl) {
+    if (!(rmoSelect instanceof HTMLSelectElement) || !responsiblesUrl) {
       return;
     }
 
@@ -221,6 +221,10 @@ function bindDashboardSynthesisFilters() {
     }
 
     const params = new URLSearchParams();
+    const exerciseSelect = form.elements.namedItem('exercice');
+    if (exerciseSelect instanceof HTMLSelectElement && exerciseSelect.value && exerciseSelect.value !== 'all') {
+      params.set('exercice', exerciseSelect.value);
+    }
     params.set('direction_id', directionSelect.value);
     if (serviceSelect.value && serviceSelect.value !== 'all') {
       params.set('service_id', serviceSelect.value);
@@ -228,22 +232,34 @@ function bindDashboardSynthesisFilters() {
 
     rmoSelect.disabled = true;
     try {
-      const response = await fetch(`${usersUrl}?${params.toString()}`, {
+      const response = await fetch(`${responsiblesUrl}?${params.toString()}`, {
+        credentials: 'same-origin',
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       });
       if (!response.ok) {
         return;
       }
-      const users = await response.json();
-      users.forEach((entry) => {
+      const responsibles = await response.json();
+      if (!Array.isArray(responsibles)) {
+        return;
+      }
+      responsibles.forEach((entry) => {
+        const id = Number.parseInt(String(entry?.id || ''), 10);
+        if (!Number.isInteger(id) || id <= 0) {
+          return;
+        }
         const option = document.createElement('option');
-        option.value = String(entry.id || '');
-        option.textContent = entry.name || `RMO #${entry.id}`;
+        option.value = String(id);
+        option.textContent = typeof entry.label === 'string' && entry.label.trim()
+          ? entry.label
+          : `RMO #${id}`;
         rmoSelect.appendChild(option);
       });
       if (preselectId && preselectId !== 'all') {
         rmoSelect.value = String(preselectId);
       }
+    } catch (error) {
+      resetRmoSelect();
     } finally {
       rmoSelect.disabled = false;
     }
@@ -346,7 +362,7 @@ function bootDashboardRender(force = false) {
   const plotlyFigures = payload.plotly_figures || agentPerformance.plotly_figures || {};
   const reportingCharts = reporting.charts || {};
   const decisionCharts = payload.decision_charts || {};
-  const panelKeys = ['overview', 'charts', 'advanced'];
+  const panelKeys = ['overview', 'advanced', 'charts'];
   const panelAliases = {
     overview: 'overview',
     synthese: 'overview',
@@ -834,11 +850,14 @@ function bootDashboardRender(force = false) {
   }
 
   function destroyChart(id) {
-    if (chartInstances[id] && typeof chartInstances[id].destroy === 'function') {
-      chartInstances[id].destroy();
+    const chart = chartInstances[id];
+    delete chartInstances[id];
+
+    if (!chart || typeof chart.destroy !== 'function') {
+      return;
     }
 
-    delete chartInstances[id];
+    chart.destroy();
   }
 
   function prefersReducedMotion() {
@@ -1450,6 +1469,11 @@ function bootDashboardRender(force = false) {
   }
 
   function bindChartDisclosurePanels() {
+    if (window.AnBGChartDisclosure?.refresh) {
+      window.AnBGChartDisclosure.refresh();
+      return;
+    }
+
     const panels = new Set();
 
     document.querySelectorAll('.dashboard-chart-host').forEach((host) => {
@@ -1523,7 +1547,6 @@ function bootDashboardRender(force = false) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        resizeDelay: 90,
         normalized: true,
         layout: {
           padding: {

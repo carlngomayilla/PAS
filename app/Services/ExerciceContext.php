@@ -21,22 +21,25 @@ class ExerciceContext
         $request = request();
 
         if ($request->query->has('exercice')) {
-            $value = trim((string) $request->query('exercice'));
-            if ($value === '' || $value === 'all') {
-                if ($request->hasSession()) {
-                    $request->session()->forget(self::SESSION_KEY);
+            $rawValue = $request->query('exercice');
+            if (is_scalar($rawValue)) {
+                $value = trim((string) $rawValue);
+                if ($value === '' || $value === 'all') {
+                    if ($request->hasSession()) {
+                        $request->session()->forget(self::SESSION_KEY);
+                    }
+
+                    return null;
                 }
 
-                return null;
-            }
+                if (preg_match('/^\d{4}$/', $value) === 1) {
+                    $year = (int) $value;
+                    if ($request->hasSession()) {
+                        $request->session()->put(self::SESSION_KEY, $year);
+                    }
 
-            if (preg_match('/^\d{4}$/', $value) === 1) {
-                $year = (int) $value;
-                if ($request->hasSession()) {
-                    $request->session()->put(self::SESSION_KEY, $year);
+                    return $year;
                 }
-
-                return $year;
             }
         }
 
@@ -55,22 +58,25 @@ class ExerciceContext
         $request = request();
 
         if ($request->query->has('trimestre')) {
-            $value = trim((string) $request->query('trimestre'));
-            if ($value === '' || $value === 'all') {
-                if ($request->hasSession()) {
-                    $request->session()->forget(self::QUARTER_SESSION_KEY);
+            $rawValue = $request->query('trimestre');
+            if (is_scalar($rawValue)) {
+                $value = trim((string) $rawValue);
+                if ($value === '' || $value === 'all') {
+                    if ($request->hasSession()) {
+                        $request->session()->forget(self::QUARTER_SESSION_KEY);
+                    }
+
+                    return null;
                 }
 
-                return null;
-            }
+                if (preg_match('/^[1-4]$/', $value) === 1) {
+                    $quarter = (int) $value;
+                    if ($request->hasSession()) {
+                        $request->session()->put(self::QUARTER_SESSION_KEY, $quarter);
+                    }
 
-            if (preg_match('/^[1-4]$/', $value) === 1) {
-                $quarter = (int) $value;
-                if ($request->hasSession()) {
-                    $request->session()->put(self::QUARTER_SESSION_KEY, $quarter);
+                    return $quarter;
                 }
-
-                return $quarter;
             }
         }
 
@@ -361,16 +367,18 @@ class ExerciceContext
 
     private function activeExerciseYear(): ?int
     {
-        if (! SchemaIntrospectionCache::hasTable('exercices')) {
-            return null;
-        }
+        return once(function (): ?int {
+            if (! SchemaIntrospectionCache::hasTable('exercices')) {
+                return null;
+            }
 
-        $year = Exercice::query()
-            ->where('is_active', true)
-            ->orderByDesc('annee')
-            ->value('annee');
+            $year = Exercice::query()
+                ->where('is_active', true)
+                ->orderByDesc('annee')
+                ->value('annee');
 
-        return $year !== null ? (int) $year : null;
+            return $year !== null ? (int) $year : null;
+        });
     }
 
     /**

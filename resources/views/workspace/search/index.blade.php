@@ -27,7 +27,7 @@
         </section>
 
         <section class="showcase-toolbar app-screen-block">
-            <form method="GET" action="{{ route('workspace.search') }}" class="flex w-full flex-col gap-3 md:flex-row md:items-end">
+            <form method="GET" action="{{ route('workspace.search') }}" class="flex w-full flex-col gap-3 md:flex-row md:items-end" data-auto-filter-form>
                 <div class="flex-1">
                     <label for="search-page-query" class="mb-1 block text-sm font-semibold text-slate-700">Recherche</label>
                     <input
@@ -35,6 +35,7 @@
                         name="q"
                         type="search"
                         value="{{ $query }}"
+                        minlength="2"
                         class="w-full rounded-2xl border border-[#3996d3]/20 bg-white/90 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#3996d3] focus:ring-2 focus:ring-[#3996d3]/20"
                         placeholder="Action, direction, service, utilisateur, PAO..."
                         autofocus
@@ -42,7 +43,6 @@
                     <p class="mt-2 text-xs text-slate-500">Saisissez au moins 2 caractères pour lancer la recherche.</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button class="btn btn-primary rounded-2xl px-5 py-3" type="submit">Rechercher</button>
                     <a class="btn btn-secondary rounded-2xl px-5 py-3" href="{{ route('workspace.search') }}">Réinitialiser</a>
                 </div>
             </form>

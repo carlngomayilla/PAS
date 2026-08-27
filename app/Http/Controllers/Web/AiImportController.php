@@ -43,7 +43,7 @@ class AiImportController extends Controller
         );
 
         if (config('queue.default') !== 'sync') {
-            AnalyzePasPaoPtaWithAiJob::dispatch($session->id)->onQueue((string) config('ai_training.pta.import_queue', 'ai-imports'));
+            AnalyzePasPaoPtaWithAiJob::dispatch($session->id);
 
             return redirect()
                 ->route('workspace.ai-imports.review', $session)
@@ -75,7 +75,7 @@ class AiImportController extends Controller
         $this->authorizePermission($request, 'ai_pta_import.analyze');
 
         if (config('queue.default') !== 'sync') {
-            AnalyzePasPaoPtaWithAiJob::dispatch($session->id)->onQueue((string) config('ai_training.pta.import_queue', 'ai-imports'));
+            AnalyzePasPaoPtaWithAiJob::dispatch($session->id);
 
             return back()->with('status', 'Analyse relancee en arriere-plan.');
         }

@@ -86,7 +86,7 @@
 
     <section class="showcase-toolbar mb-4 app-screen-block">
         <div><h2 class="showcase-panel-title">Filtres</h2></div>
-        <form method="GET" action="{{ route('workspace.pta.index') }}" class="mt-4">
+        <form method="GET" action="{{ route('workspace.pta.index') }}" class="mt-4" data-auto-filter-form>
             <div class="showcase-filter-grid">
                 <div>
                     <label for="q">Recherche</label>
@@ -139,7 +139,6 @@
                 <input type="hidden" name="without_action" value="1">
             @endif
             <div class="showcase-filter-actions mt-4">
-                <button class="btn btn-primary" type="submit">Appliquer</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Réinitialiser</a>
             </div>
             @if ($filters['without_action'])

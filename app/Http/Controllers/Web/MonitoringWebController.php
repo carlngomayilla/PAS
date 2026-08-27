@@ -568,15 +568,20 @@ class MonitoringWebController extends Controller
         // A03 — Anti-fuite horizontale d exports :
         // 1) Authentification obligatoire (sinon une URL signee rejouee par un
         //    visiteur anonyme telechargerait n importe quel export).
-        // 2) Ownership : le chemin doit pointer dans le dossier de l utilisateur
+        // 2) Autorisation courante : les permissions peuvent etre revoquees
+        //    apres la generation du lien.
+        // 3) Ownership : le chemin doit pointer dans le dossier de l utilisateur
         //    courant. Les exports sont stockes sous exports/reporting/{user_id}/...
         //    (cf. GenerateReportJob::handle()), donc on verifie le prefixe.
-        // 3) Defense en profondeur path-traversal (le decryptString controle deja
+        // 4) Defense en profondeur path-traversal (le decryptString controle deja
         //    l integrite, mais on rejette explicitement les .. parasites).
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
+
+        $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessReportingReader($user);
 
         try {
             $path = Crypt::decryptString((string) $request->query('path'));

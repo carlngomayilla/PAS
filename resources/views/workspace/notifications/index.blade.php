@@ -150,7 +150,7 @@
                     @endforeach
                 </nav>
 
-                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,.65fr)_minmax(180px,.8fr)_minmax(140px,.6fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70">
+                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,.65fr)_minmax(180px,.8fr)_minmax(140px,.6fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
                     <input type="hidden" name="tab" value="alertes">
                     <input type="hidden" name="vue" value="{{ $alertView }}">
 
@@ -201,7 +201,6 @@
                         </select>
                     </label>
 
-                    <button type="submit" class="btn btn-primary min-h-10 self-end px-4">Filtrer</button>
                     <a href="{{ route('workspace.notifications.index', ['tab' => 'alertes', 'vue' => $alertView]) }}" class="btn btn-secondary min-h-10 self-end px-4">Réinitialiser</a>
                 </form>
 
@@ -288,7 +287,7 @@
             </section>
 
             <section class="app-screen-block mt-4" aria-labelledby="notification-center-title">
-                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,.65fr)_minmax(170px,.75fr)_minmax(140px,.6fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70">
+                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,.65fr)_minmax(170px,.75fr)_minmax(140px,.6fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
                     <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
                         Recherche
                         <input name="q" type="search" maxlength="100" value="{{ $notificationFilters['q'] ?? '' }}" placeholder="Titre, message, module..." class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 placeholder:text-slate-400 focus:border-[#3996D3] focus:outline-none focus:ring-2 focus:ring-[#3996D3]/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
@@ -332,7 +331,6 @@
                         </select>
                     </label>
 
-                    <button type="submit" class="btn btn-primary min-h-10 self-end px-4">Filtrer</button>
                     <a href="{{ route('workspace.notifications.index') }}" class="btn btn-secondary min-h-10 self-end px-4">Réinitialiser</a>
                 </form>
 

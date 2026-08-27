@@ -60,7 +60,7 @@
 
         <section class="showcase-toolbar app-screen-block">
             <div><h2 class="showcase-panel-title">Rechercher et filtrer</h2></div>
-            <form method="GET" action="{{ route('workspace.meetings.index') }}">
+            <form method="GET" action="{{ route('workspace.meetings.index') }}" data-auto-filter-form>
                 <input type="hidden" name="view" value="{{ $activeView }}">
                 <div class="showcase-filter-grid">
                     <div><label for="meeting_q">Recherche</label><input id="meeting_q" name="q" type="search" value="{{ $filters['q'] ?? '' }}" placeholder="Objet, lieu ou responsable"></div>
@@ -72,7 +72,7 @@
                     @if ($directionOptions->count() > 1)<div><label for="meeting_direction_filter">Direction</label><select id="meeting_direction_filter" name="direction_id"><option value="">Toutes</option>@foreach ($directionOptions as $direction)<option value="{{ $direction->id }}" @selected((string) ($filters['direction_id'] ?? '') === (string) $direction->id)>{{ $direction->code }} · {{ $direction->libelle }}</option>@endforeach</select></div>@endif
                     @if ($serviceOptions->isNotEmpty())<div><label for="meeting_service_filter">Service</label><select id="meeting_service_filter" name="service_id"><option value="">Tous</option>@foreach ($serviceOptions as $service)<option value="{{ $service->id }}" @selected((string) ($filters['service_id'] ?? '') === (string) $service->id)>{{ $service->code }} · {{ $service->libelle }}</option>@endforeach</select></div>@endif
                 </div>
-                <div class="showcase-filter-actions mt-4"><button class="btn btn-primary" type="submit">Appliquer</button><a class="btn btn-secondary" href="{{ route('workspace.meetings.index', ['view' => $activeView]) }}">Réinitialiser</a></div>
+                <div class="showcase-filter-actions mt-4"><a class="btn btn-secondary" href="{{ route('workspace.meetings.index', ['view' => $activeView]) }}">Réinitialiser</a></div>
             </form>
         </section>
 

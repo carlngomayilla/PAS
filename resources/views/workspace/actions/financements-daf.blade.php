@@ -56,7 +56,7 @@
         </section>
 
         <section class="showcase-panel mb-4 app-screen-block">
-            <form method="GET" class="form-shell">
+            <form method="GET" class="form-shell" data-auto-filter-form>
                 <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
                     <div>
                         <label for="q">Action</label>
@@ -117,7 +117,6 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button class="btn btn-primary" type="submit">Appliquer</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.daf.financements.index') }}">Réinitialiser</a>
                 </div>
             </form>

@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\Exercice;
 use App\Models\JournalAudit;
 use App\Services\ExerciceContext;
+use App\Services\PtaSuiviService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
 
@@ -90,5 +93,57 @@ class ExerciceContextWorkflowTest extends TestCase
             ->assertSessionHasErrors('statut');
 
         $this->assertFalse((bool) $exercise->fresh()->is_active);
+    }
+
+    public function test_active_exercise_year_is_resolved_once_per_context_instance(): void
+    {
+        Exercice::query()->create([
+            'annee' => 2034,
+            'libelle' => 'Exercice actif 2034',
+            'date_debut' => '2034-01-01',
+            'date_fin' => '2034-12-31',
+            'statut' => Exercice::STATUT_OUVERT,
+            'is_active' => true,
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $context = app(ExerciceContext::class);
+        $this->assertSame(2034, $context->selectedYear());
+        $this->assertSame(2034, $context->selectedYear());
+        $this->assertSame(2034, $context->selectedYear());
+
+        $activeExerciseQueries = collect(DB::getQueryLog())
+            ->filter(fn (array $query): bool => str_contains(strtolower($query['query']), 'exercices')
+                && str_contains(strtolower($query['query']), 'is_active'))
+            ->values();
+
+        DB::disableQueryLog();
+
+        $this->assertCount(1, $activeExerciseQueries);
+    }
+
+    public function test_array_query_values_are_ignored_without_array_to_string_warnings(): void
+    {
+        Exercice::query()->create([
+            'annee' => 2035,
+            'libelle' => 'Exercice actif 2035',
+            'date_debut' => '2035-01-01',
+            'date_fin' => '2035-12-31',
+            'statut' => Exercice::STATUT_OUVERT,
+            'is_active' => true,
+        ]);
+        $request = Request::create('/dashboard', 'GET', [
+            'exercice' => ['2031'],
+            'trimestre' => ['1'],
+        ]);
+        $this->app->instance('request', $request);
+
+        $context = app(ExerciceContext::class);
+
+        $this->assertSame(2035, $context->selectedYear());
+        $this->assertNull($context->selectedQuarter());
+        $this->assertSame('all', app(PtaSuiviService::class)->normalizePeriod(['q1']));
     }
 }

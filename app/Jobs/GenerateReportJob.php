@@ -8,6 +8,7 @@ use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Exports\ExportTemplateResolver;
 use App\Services\Exports\ReportingWorkbookExporter;
+use App\Services\Security\PasswordPolicyService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
 
 class GenerateReportJob implements ShouldQueue
 {
@@ -29,30 +32,40 @@ class GenerateReportJob implements ShouldQueue
 
     public int $timeout = 900;
 
+    public readonly string $exportId;
+
+    /**
+     * @var list<int>
+     */
+    public array $backoff = [10, 60];
+
     public function __construct(
         private readonly int $userId,
         private readonly string $format
     ) {
+        $this->exportId = (string) Str::uuid();
         $this->onQueue('exports');
     }
 
     public function handle(
         ReportingAnalyticsService $analyticsService,
         ExportTemplateResolver $templateResolver,
-        ReportingWorkbookExporter $workbookExporter
+        ReportingWorkbookExporter $workbookExporter,
+        PasswordPolicyService $passwordPolicy
     ): void {
         $user = User::query()->findOrFail($this->userId);
         $format = strtolower($this->format);
+        $passwordExpired = $passwordPolicy->isExpired($user);
 
         // A16 — Le job peut s executer apres revocation des droits ou
         // suspension du compte. On re-verifie les conditions d acces avant de
         // generer un export potentiellement sensible. En cas d echec, on logge
         // et on sort silencieusement (le job ne doit pas etre retry).
-        if (! $this->stillAuthorizedToExport($user)) {
+        if (! $this->stillAuthorizedToExport($user, $passwordExpired)) {
             Log::warning('Reporting export refused at job-time (A16).', [
                 'user_id' => $user->id,
                 'format' => $format,
-                'reason' => $this->disqualificationReason($user),
+                'reason' => $this->disqualificationReason($user, $passwordExpired),
             ]);
 
             return;
@@ -75,14 +88,21 @@ class GenerateReportJob implements ShouldQueue
         };
 
         $filename = $this->filename($payload, $extension, $template?->filenamePrefix() ?? 'reporting_anbg');
-        $path = 'exports/reporting/'.$user->id.'/'.Str::uuid().'.'.$extension;
-        Storage::disk('local')->put($path, $contents);
+        $path = 'exports/reporting/'.$user->id.'/'.$this->exportId.'.'.$extension;
+        if (! Storage::disk('local')->put($path, $contents)) {
+            throw new RuntimeException('Reporting export could not be stored.');
+        }
 
-        $url = URL::temporarySignedRoute('workspace.reporting.exports.download', now()->addDays(7), [
+        $retentionDays = max(1, (int) config('retention.reporting_exports_days', 7));
+        $url = URL::temporarySignedRoute('workspace.reporting.exports.download', now()->addDays($retentionDays), [
             'path' => Crypt::encryptString($path),
             'name' => $filename,
             'content_type' => $contentType,
         ]);
+
+        if ($this->hasExportNotification($user, 'reporting_export_ready')) {
+            return;
+        }
 
         $user->notify(new WorkspaceModuleNotification([
             'title' => 'Export reporting disponible',
@@ -96,12 +116,56 @@ class GenerateReportJob implements ShouldQueue
             'priority' => 'normal',
             'meta' => [
                 'event' => 'reporting_export_ready',
+                'export_id' => $this->exportId,
                 'format' => $format,
                 'path' => $path,
                 'filename' => $filename,
                 'generated_at' => now()->toIso8601String(),
             ],
         ]));
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        Log::error('Reporting export job failed.', [
+            'user_id' => $this->userId,
+            'format' => strtolower($this->format),
+            'export_id' => $this->exportId,
+            'exception_type' => get_debug_type($exception),
+        ]);
+
+        $user = User::query()->find($this->userId);
+        if ($user === null
+            || $this->hasExportNotification($user, 'reporting_export_ready')
+            || $this->hasExportNotification($user, 'reporting_export_failed')) {
+            return;
+        }
+
+        try {
+            $user->notify(new WorkspaceModuleNotification([
+                'title' => 'Echec de l export reporting',
+                'message' => 'Votre export n a pas pu etre genere. Vous pouvez relancer la demande.',
+                'module' => 'reporting',
+                'entity_type' => 'reporting_export',
+                'entity_id' => null,
+                'url' => route('workspace.reporting'),
+                'icon' => 'alert-triangle',
+                'status' => 'error',
+                'priority' => 'high',
+                'meta' => [
+                    'event' => 'reporting_export_failed',
+                    'export_id' => $this->exportId,
+                    'format' => strtolower($this->format),
+                    'failed_at' => now()->toIso8601String(),
+                ],
+            ]));
+        } catch (Throwable $notificationException) {
+            Log::error('Reporting export failure notification could not be stored.', [
+                'user_id' => $this->userId,
+                'export_id' => $this->exportId,
+                'exception_type' => $notificationException::class,
+            ]);
+        }
     }
 
     /**
@@ -111,7 +175,7 @@ class GenerateReportJob implements ShouldQueue
      *   - la permission planning.read ou reporting.read a ete revoquee,
      *   - le mot de passe est expire (force renewal).
      */
-    private function stillAuthorizedToExport(User $user): bool
+    private function stillAuthorizedToExport(User $user, bool $passwordExpired): bool
     {
         if (method_exists($user, 'isSuspended') && $user->isSuspended()) {
             return false;
@@ -125,10 +189,10 @@ class GenerateReportJob implements ShouldQueue
             return false;
         }
 
-        return true;
+        return ! $passwordExpired;
     }
 
-    private function disqualificationReason(User $user): string
+    private function disqualificationReason(User $user, bool $passwordExpired): string
     {
         if (! (bool) ($user->is_active ?? false)) {
             return 'account_inactive';
@@ -141,6 +205,9 @@ class GenerateReportJob implements ShouldQueue
         }
         if (! $user->hasPermission('reporting.read')) {
             return 'permission_revoked_reporting_read';
+        }
+        if ($passwordExpired) {
+            return 'password_expired';
         }
 
         return 'unknown';
@@ -170,10 +237,29 @@ class GenerateReportJob implements ShouldQueue
 
     private function readAndDelete(string $path): string
     {
-        $contents = (string) file_get_contents($path);
+        if (! is_file($path) || ! is_readable($path)) {
+            throw new RuntimeException('Temporary reporting workbook could not be read.');
+        }
+
+        $contents = @file_get_contents($path);
+        if ($contents === false) {
+            throw new RuntimeException('Temporary reporting workbook could not be read.');
+        }
+
         @unlink($path);
 
         return $contents;
+    }
+
+    private function hasExportNotification(User $user, string $event): bool
+    {
+        return $user->notifications()
+            ->where('type', WorkspaceModuleNotification::class)
+            ->latest('created_at')
+            ->limit(100)
+            ->get(['id', 'data'])
+            ->contains(fn ($notification): bool => data_get($notification->data, 'meta.event') === $event
+                && data_get($notification->data, 'meta.export_id') === $this->exportId);
     }
 
     private function filename(array $payload, string $extension, string $prefix): string

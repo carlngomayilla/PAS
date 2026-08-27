@@ -4,13 +4,14 @@ info:
   version: 1.0.0
   description: API REST pour le pilotage PAS, PAO, PTA, actions, reporting et alertes.
 servers:
-  - url: /api
+  - url: /api/v1
 tags:
   - name: Auth
   - name: PAS
   - name: PAO
   - name: PTA
   - name: Actions
+  - name: Dashboard
   - name: Reporting
   - name: Alertes
 paths:
@@ -51,6 +52,93 @@ paths:
       responses:
         '200':
           description: Profil utilisateur
+  /dashboard/overview:
+    get:
+      tags: [Dashboard]
+      summary: Retourner le contrat versionne du dashboard Pilotage
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      parameters:
+        - in: query
+          name: exercice
+          schema:
+            oneOf:
+              - type: string
+                const: all
+              - type: integer
+                minimum: 2000
+                maximum: 2100
+        - in: query
+          name: periode
+          schema:
+            type: string
+            enum: [all, q1, q2, q3, q4, s1, s2, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12]
+        - in: query
+          name: direction_id
+          schema:
+            oneOf:
+              - type: string
+                const: all
+              - type: integer
+        - in: query
+          name: service_id
+          schema:
+            oneOf:
+              - type: string
+                const: all
+              - type: integer
+        - in: query
+          name: responsable_id
+          schema:
+            oneOf:
+              - type: string
+                const: all
+              - type: integer
+        - in: query
+          name: statut_action
+          schema:
+            type: string
+            enum: [all, a_parametrer, non_demarre, en_cours, a_risque, en_avance, en_retard, a_corriger, suspendu, annule, acheve]
+        - in: query
+          name: statut_suivi
+          schema:
+            type: string
+            enum: [all, a_parametrer, non_demarre, en_cours, validation_chef, validation_controleur, validation_planification, cloture]
+        - in: query
+          name: statut_delai
+          schema:
+            type: string
+            enum: [all, dans_les_delais, hors_delai]
+        - in: query
+          name: alerte_echeance
+          schema:
+            type: string
+            enum: [all, aucune_alerte, echeance_proche, critique, en_retard, cloturee, a_parametrer]
+      responses:
+        '200':
+          description: Vue Pilotage privee, filtree selon le perimetre autorise
+          headers:
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardOverview'
+        '304':
+          description: Contrat inchange pour l ETag fourni
+        '401':
+          description: Authentification requise
+        '403':
+          description: Profil ou filtre organisationnel hors perimetre
+        '422':
+          description: Filtres invalides ou incoherents
+        '429':
+          description: Limite de requetes atteinte
   /pas:
     get:
       tags: [PAS]
@@ -309,6 +397,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: Sanctum
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pas-session
+      description: Session first-party Sanctum same-origin; adapter le nom avec SESSION_COOKIE si configure.
   parameters:
     ActionId:
       name: action
@@ -316,3 +409,312 @@ components:
       required: true
       schema:
         type: integer
+  schemas:
+    ValueLabelOption:
+      type: object
+      additionalProperties: false
+      required: [value, label]
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+    ResponsibleOption:
+      type: object
+      additionalProperties: false
+      required: [id, label]
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+    DashboardOverview:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generated_at, scope, direction_selector, filters, filter_options, exercise, metrics, synthesis_decision_summary, financial_summary, links]
+      properties:
+        schema_version:
+          type: string
+          const: '1.0'
+        generated_at:
+          type: string
+          format: date-time
+        scope:
+          type: object
+          additionalProperties: false
+          required: [mode, user_role, effective_role, cross_organization_filters, organization_filters_enabled, read_only, direction_id, service_id, selected_direction_id, selected_service_id]
+          properties:
+            mode:
+              type: string
+            user_role:
+              type: string
+            effective_role:
+              type: string
+            cross_organization_filters:
+              type: boolean
+            organization_filters_enabled:
+              type: boolean
+            read_only:
+              type: boolean
+            direction_id:
+              type: [integer, 'null']
+            service_id:
+              type: [integer, 'null']
+            selected_direction_id:
+              type: [integer, 'null']
+            selected_service_id:
+              type: [integer, 'null']
+        direction_selector:
+          type: object
+          additionalProperties: false
+          required: [enabled, selected_id, selected_label, service_selected_id, service_selected_label, options, service_options]
+          properties:
+            enabled:
+              type: boolean
+            selected_id:
+              type: [integer, 'null']
+            selected_label:
+              type: string
+            service_selected_id:
+              type: [integer, 'null']
+            service_selected_label:
+              type: string
+            options:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResponsibleOption'
+            service_options:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResponsibleOption'
+        filters:
+          type: object
+          additionalProperties: false
+          required: [periode, periode_label, statut_action, statut_suivi, statut_delai, alerte_echeance, responsable_id]
+          properties:
+            periode:
+              type: string
+            periode_label:
+              type: string
+            statut_action:
+              type: [string, 'null']
+            statut_suivi:
+              type: [string, 'null']
+            statut_delai:
+              type: [string, 'null']
+            alerte_echeance:
+              type: [string, 'null']
+            responsable_id:
+              type: [integer, 'null']
+        filter_options:
+          type: object
+          additionalProperties: false
+          required: [years, quarters, periods, action_statuses, tracking_statuses, delay_statuses, deadline_alerts, responsibles]
+          properties:
+            years:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValueLabelOption'
+            quarters:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValueLabelOption'
+            periods:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValueLabelOption'
+            action_statuses:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValueLabelOption'
+            tracking_statuses:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValueLabelOption'
+            delay_statuses:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValueLabelOption'
+            deadline_alerts:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValueLabelOption'
+            responsibles:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResponsibleOption'
+        exercise:
+          type: object
+          additionalProperties: false
+          required: [year, quarter]
+          properties:
+            year:
+              type: [integer, 'null']
+            quarter:
+              type: [string, 'null']
+        metrics:
+          type: object
+          additionalProperties: false
+          required: [totals, alerts, status_breakdown, action_scope]
+          properties:
+            totals:
+              $ref: '#/components/schemas/IntegerMap'
+            alerts:
+              $ref: '#/components/schemas/IntegerMap'
+            status_breakdown:
+              type: object
+              additionalProperties:
+                $ref: '#/components/schemas/IntegerMap'
+            action_scope:
+              type: object
+              additionalProperties: false
+              required: [mode, visible_actions_total, personal_actions_total, dashboard_actions_total]
+              properties:
+                mode:
+                  type: string
+                visible_actions_total:
+                  type: integer
+                personal_actions_total:
+                  type: integer
+                dashboard_actions_total:
+                  type: integer
+        synthesis_decision_summary:
+          type: object
+          additionalProperties: false
+          required: [total, taux_execution, performance_pta, workflow, delay, alerts]
+          properties:
+            total:
+              type: integer
+            taux_execution:
+              type: number
+            performance_pta:
+              type: number
+            workflow:
+              $ref: '#/components/schemas/IntegerMap'
+            delay:
+              $ref: '#/components/schemas/IntegerMap'
+            alerts:
+              $ref: '#/components/schemas/IntegerMap'
+        financial_summary:
+          type: [object, 'null']
+          additionalProperties: false
+          required: [budget, engaged, disbursed, remaining, engagement_rate, disbursement_rate, actions_total]
+          properties:
+            budget:
+              type: number
+            engaged:
+              type: number
+            disbursed:
+              type: number
+            remaining:
+              type: number
+            engagement_rate:
+              type: number
+            disbursement_rate:
+              type: number
+            actions_total:
+              type: integer
+        links:
+          type: object
+          additionalProperties: false
+          required: [blade_pilotage, tables, charts, actions, pas, paos, ptas, late_actions, kpi_below_threshold, reporting, alerts, pta_tracking, breakdowns]
+          properties:
+            blade_pilotage:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            tables:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            charts:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            actions:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            pas:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            paos:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            ptas:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            late_actions:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            kpi_below_threshold:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            reporting:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            alerts:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            pta_tracking:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            breakdowns:
+              $ref: '#/components/schemas/DashboardBreakdownLinks'
+    IntegerMap:
+      type: object
+      additionalProperties:
+        type: integer
+    DashboardRelativeLink:
+      type: [string, 'null']
+      pattern: '^/(?!/)'
+    DashboardBreakdownLinks:
+      type: object
+      additionalProperties: false
+      required: [actions, workflow, alerts]
+      properties:
+        actions:
+          type: object
+          additionalProperties: false
+          required: [a_parametrer, non_demarre, en_cours, a_risque, en_avance, en_retard, a_corriger, suspendu, annule, acheve]
+          properties:
+            a_parametrer:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            non_demarre:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            en_cours:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            a_risque:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            en_avance:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            en_retard:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            a_corriger:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            acheve:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            suspendu:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            annule:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+        workflow:
+          type: object
+          additionalProperties: false
+          required: [a_parametrer, non_demarre, en_cours, validation_chef, validation_controleur, validation_planification, cloture]
+          properties:
+            a_parametrer:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            non_demarre:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            en_cours:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            validation_chef:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            validation_controleur:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            validation_planification:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            cloture:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+        alerts:
+          type: object
+          additionalProperties: false
+          required: [aucune_alerte, echeance_proche, critique, en_retard, cloturee, a_parametrer]
+          properties:
+            aucune_alerte:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            echeance_proche:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            critique:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            en_retard:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            cloturee:
+              $ref: '#/components/schemas/DashboardRelativeLink'
+            a_parametrer:
+              $ref: '#/components/schemas/DashboardRelativeLink'

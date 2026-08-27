@@ -1,16 +1,14 @@
 @props([
     'notificationCounts' => [],
     'unreadTotal' => 0,
+    'workspaceModules' => [],
+    'isDafFinanceReviewer' => false,
+    'isSuperAdmin' => false,
 ])
 
 @php
-    $user = auth()->user();
     $moduleBadges = is_array($notificationCounts) ? $notificationCounts : [];
-    $workspaceModules = collect($user?->workspaceModules() ?? [])->keyBy('code');
-    $isDafFinanceReviewer = $user
-        && $user->hasRole(\App\Models\User::ROLE_DIRECTION)
-        && $user->direction_id !== null
-        && (string) ($user->direction?->code ?? '') === 'DAF';
+    $workspaceModules = collect($workspaceModules)->keyBy('code');
     $canSeeModule = static fn (string $code): bool => $workspaceModules->has($code);
     $moduleLabel = static fn (string $code, string $fallback): string => (string) (($workspaceModules->get($code)['label'] ?? null) ?: $fallback);
     $moduleOrder = static fn (string $code, int $fallback = 999): int => (int) ($workspaceModules->get($code)['display_order'] ?? $fallback);
@@ -248,7 +246,7 @@
             'display_order' => $moduleOrder('delegations', 90),
         ];
     }
-    if ($canSeeModule('referentiel') || $canSeeModule('delegations') || $user?->isSuperAdmin()) {
+    if ($canSeeModule('referentiel') || $canSeeModule('delegations') || $isSuperAdmin) {
         $toolItems[] = [
             'code' => 'deletion_requests',
             'label' => 'Demandes de suppression',

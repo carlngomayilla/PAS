@@ -45,7 +45,11 @@ class EssentialDashboardService
 
     private function profileFor(User $user): string
     {
-        if ($user->hasRole(User::ROLE_DG, User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL)) {
+        if ($user->hasRole(User::ROLE_DG)) {
+            return 'suivi_evaluation';
+        }
+
+        if ($user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL)) {
             return 'dg';
         }
 
@@ -79,7 +83,7 @@ class EssentialDashboardService
             'service' => 'Vue service',
             'agent' => 'Vue agent',
             'planification' => 'Vue planification',
-            'suivi_evaluation' => 'Vue suivi-evaluation',
+            'suivi_evaluation' => 'Vue contrôle et suivi',
             default => 'Vue essentielle',
         };
     }

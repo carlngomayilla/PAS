@@ -150,7 +150,7 @@
                 @endforeach
                 <p>Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | À paramétrer : {{ $summary['a_parametrer'] ?? 0 }}</p>
             </div>
-            <form method="GET" action="{{ route('pta.suivi.index') }}" class="pta-suivi-toolbar no-print">
+            <form method="GET" action="{{ route('pta.suivi.index') }}" class="pta-suivi-toolbar no-print" data-auto-filter-form>
                 <div>
                     <label for="direction_id">Direction</label>
                     <select id="direction_id" name="direction_id">
@@ -212,7 +212,6 @@
                         @endforeach
                     </select>
                 </div>
-                <button class="btn btn-primary rounded-xl px-4 py-2 text-sm" type="submit">Filtrer</button>
             </form>
         </div>
 

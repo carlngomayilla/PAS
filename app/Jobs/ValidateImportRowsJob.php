@@ -21,7 +21,9 @@ class ValidateImportRowsJob implements ShouldQueue
 
     public function __construct(
         public int $sessionId
-    ) {}
+    ) {
+        $this->onQueue((string) config('ai_training.pta.import_queue', 'ai-imports'));
+    }
 
     public function handle(ImportValidationService $validation, ExcelMappingService $excel): void
     {

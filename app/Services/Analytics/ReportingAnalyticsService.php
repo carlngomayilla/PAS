@@ -20,6 +20,7 @@ use App\Services\ExerciceContext;
 use App\Services\ManagedKpiSettings;
 use App\Support\SafeSql;
 use App\Support\SchemaIntrospectionCache;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Carbon;
@@ -27,6 +28,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use LogicException;
+use Throwable;
 
 class ReportingAnalyticsService
 {
@@ -85,11 +88,63 @@ class ReportingAnalyticsService
      */
     public function buildPayload(User $user, bool $withDetails = false, bool $withCharts = true): array
     {
-        return Cache::remember(
-            $this->cacheKey($user, $withDetails, $withCharts),
-            now()->addSeconds(self::CACHE_TTL_SECONDS),
-            fn (): array => $this->buildPayloadFresh($user, $withDetails, $withCharts)
-        );
+        if ($withDetails) {
+            return $this->buildPayloadFresh($user, true, $withCharts);
+        }
+
+        try {
+            return Cache::remember(
+                $this->cacheKey($user, false, $withCharts),
+                now()->addSeconds(self::CACHE_TTL_SECONDS),
+                fn (): array => $this->cacheablePayload(
+                    $this->buildPayloadFresh($user, false, $withCharts)
+                )
+            );
+        } catch (Throwable) {
+            return $this->buildPayloadFresh($user, false, $withCharts);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function cacheablePayload(array $payload): array
+    {
+        $normalized = $this->cacheableValue($payload);
+
+        if (! is_array($normalized)) {
+            throw new LogicException('The reporting cache payload must be an array.');
+        }
+
+        return $normalized;
+    }
+
+    private function cacheableValue(mixed $value): mixed
+    {
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->toISOString();
+        }
+
+        if ($value instanceof Collection) {
+            return $value
+                ->map(fn (mixed $item): mixed => $this->cacheableValue($item))
+                ->all();
+        }
+
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $value[$key] = $this->cacheableValue($item);
+            }
+
+            return $value;
+        }
+
+        if (is_object($value) || is_resource($value)) {
+            throw new LogicException('The reporting cache payload contains an unsupported value.');
+        }
+
+        return $value;
     }
 
     private function buildPayloadFresh(User $user, bool $withDetails = false, bool $withCharts = true): array
@@ -1406,7 +1461,7 @@ class ReportingAnalyticsService
             'with_details' => $withDetails,
             'with_charts' => $withCharts,
             'version' => $this->cacheVersionService->reportingVersion(),
-            'alert_version' => (int) Cache::get('alert-center:version', 1),
+            'alert_version' => $this->cacheVersionService->alertsVersion(),
             'statistical_scope' => $this->actionCalculationSettings->statisticalScope(),
             'exercice' => $this->exerciceContext->selectedYear(),
             'trimestre' => $this->exerciceContext->selectedQuarter(),

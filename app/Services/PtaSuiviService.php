@@ -2119,6 +2119,10 @@ class PtaSuiviService
 
     public function normalizePeriod(mixed $value): string
     {
+        if (! is_scalar($value)) {
+            return 'all';
+        }
+
         $period = Str::lower(trim((string) $value));
         $period = str_replace([' ', '_'], '', $period);
 

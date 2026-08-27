@@ -59,8 +59,8 @@ return [
         'api_verify_ssl' => filter_var(env('BREVO_API_VERIFY_SSL', true), FILTER_VALIDATE_BOOLEAN),
         'mailer' => env('BREVO_MAILER', 'brevo'),
         'queue' => [
-            'connection' => env('BREVO_QUEUE_CONNECTION', env('QUEUE_CONNECTION', 'database')),
-            'name' => env('BREVO_QUEUE', env('DB_QUEUE', 'default')),
+            'connection' => env('BREVO_QUEUE_CONNECTION'),
+            'name' => env('BREVO_QUEUE', 'notifications'),
         ],
         'from' => [
             'address' => env('BREVO_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'no-reply@anbg.ga')),

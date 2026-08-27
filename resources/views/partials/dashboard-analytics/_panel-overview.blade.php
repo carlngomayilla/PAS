@@ -1,6 +1,36 @@
 <section class="dashboard-tab-panel active" data-dashboard-panel="overview">
     {{-- ── KPI STAT CARDS ──────────────────────────────────────────────── --}}
     @php
+        $baseSynthesisQuery = [
+            'dashboardTab' => 'overview',
+            'direction_id' => ! in_array((string) $selectedSynthesisDirection, ['', 'all'], true) ? $selectedSynthesisDirection : null,
+            'service_id' => ! in_array((string) $selectedSynthesisService, ['', 'all'], true) ? $selectedSynthesisService : null,
+            'responsable_id' => ($selectedSynthesisRmo ?? request('responsable_id')) ?: null,
+            'exercice' => ! in_array((string) $selectedSynthesisYear, ['', 'all'], true) ? $selectedSynthesisYear : null,
+            'periode' => $selectedSynthesisPeriod ?: 'all',
+            'statut_action' => $synthesisFilters['statut_action'] ?? null,
+            'statut_suivi' => $synthesisFilters['statut_suivi'] ?? null,
+            'statut_delai' => $synthesisFilters['statut_delai'] ?? null,
+            'alerte_echeance' => $synthesisFilters['alerte_echeance'] ?? null,
+        ];
+        $baseSynthesisQuery = array_filter(
+            $baseSynthesisQuery,
+            static fn (mixed $value): bool => $value !== null && $value !== ''
+        );
+        $actionDetailUrl = static function (array $filters = []) use ($baseSynthesisQuery): string {
+            $status = (string) ($filters['statut'] ?? '');
+            unset($filters['statut'], $filters['sort']);
+
+            if ($status !== '') {
+                $filters['statut_action'] = $status === 'achevees' ? 'acheve' : $status;
+            }
+
+            return route('dashboard', array_merge(
+                $baseSynthesisQuery,
+                ['dashboardTab' => 'advanced'],
+                $filters,
+            ));
+        };
         $kpiStatCards = [
             [
                 'label'   => 'Actions totales',
@@ -8,7 +38,7 @@
                 'accent'  => '#1c203d',
                 'icon'    => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
                 'trend'   => null,
-                'href'    => route('workspace.actions.index'),
+                'href'    => $actionDetailUrl(),
             ],
             [
                 'label'   => 'Actions en cours',
@@ -16,7 +46,7 @@
                 'accent'  => '#3996d3',
                 'icon'    => '<path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/>',
                 'tone'    => 'info',
-                'href'    => route('workspace.actions.index', ['statut' => 'en_cours']),
+                'href'    => $actionDetailUrl(['statut' => 'en_cours']),
             ],
             [
                 'label'   => 'Indicateur global',
@@ -25,7 +55,7 @@
                 'icon'    => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
                 'trend'   => (float) ($globalScores['global'] ?? 0) >= 80 ? 'up' : ((float) ($globalScores['global'] ?? 0) >= 60 ? 'neutral' : 'down'),
                 'trendLabel' => (float) ($globalScores['global'] ?? 0) >= 80 ? 'Bon' : ((float) ($globalScores['global'] ?? 0) >= 60 ? 'À surveiller' : 'Critique'),
-                'href'    => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
+                'href'    => $actionDetailUrl(['sort' => 'kpi_global_desc']),
             ],
             [
                 'label'   => 'En retard',
@@ -34,7 +64,7 @@
                 'icon'    => '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
                 'trend'   => ((int)($metrics['alerts']['actions_en_retard'] ?? 0)) > 0 ? 'down' : 'up',
                 'trendLabel' => ((int)($metrics['alerts']['actions_en_retard'] ?? 0)) > 0 ? 'Alerte' : 'OK',
-                'href'    => route('workspace.actions.index', ['statut' => 'en_retard']),
+                'href'    => $actionDetailUrl(['statut' => 'en_retard']),
             ],
             [
                 'label'   => 'Non démarrées',
@@ -43,7 +73,7 @@
                 'icon'    => '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
                 'trend'   => 'neutral',
                 'trendLabel' => 'À lancer',
-                'href'    => route('workspace.actions.index', ['statut' => 'non_demarre']),
+                'href'    => $actionDetailUrl(['statut' => 'non_demarre']),
             ],
             [
                 'label'   => 'Achevées',
@@ -52,7 +82,7 @@
                 'icon'    => '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
                 'trend'   => 'up',
                 'trendLabel' => 'Terminées',
-                'href'    => route('workspace.actions.index', ['statut' => 'achevees']),
+                'href'    => $actionDetailUrl(['statut' => 'achevees']),
             ],
         ];
 
@@ -73,21 +103,10 @@
                 'icon'       => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="10" y1="8" x2="14" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
                 'trend'      => 'neutral',
                 'trendLabel' => 'À configurer',
-                'href'       => route('workspace.actions.index', ['statut' => 'a_parametrer']),
+                'href'       => $actionDetailUrl(['statut' => 'a_parametrer']),
             ];
         }
 
-        $baseSynthesisQuery = [
-            'dashboardTab' => 'overview',
-            'direction_id' => $selectedSynthesisDirection ?: 'all',
-            'service_id' => $selectedSynthesisService ?: 'all',
-            'responsable_id' => ($selectedSynthesisRmo ?? request('responsable_id')) ?: 'all',
-            'exercice' => $selectedSynthesisYear ?: 'all',
-            'periode' => $selectedSynthesisPeriod ?: 'all',
-            'statut_suivi' => $synthesisFilters['statut_suivi'] ?? 'all',
-            'statut_delai' => $synthesisFilters['statut_delai'] ?? 'all',
-            'alerte_echeance' => $synthesisFilters['alerte_echeance'] ?? 'all',
-        ];
         $synthesisCardUrl = static fn (array $filters = []): string => route('synthese.index', array_merge($baseSynthesisQuery, $filters));
         $summaryCount = static fn (array $rows, string $key): int => (int) ($rows[$key] ?? 0);
         $workflowCounts = is_array($synthesisWorkflowCounts ?? null) ? $synthesisWorkflowCounts : [];
@@ -529,14 +548,14 @@
                 <h2 class="showcase-panel-title">Tableaux</h2>
                 <span class="showcase-chip">Performance et alertes</span>
             </div>
-            <div class="space-y-2">
+            <div class="space-y-2" data-progressive-accordion-group>
                 @foreach ($directionSynthesisTables as $synthesisTable)
                     @php
                         $synthesisTableId = 'dashboard-synthesis-table-'.$loop->index;
                         $synthesisExportName = \Illuminate\Support\Str::slug((string) ($synthesisTable['title'] ?? 'tableau')).'-'.now()->format('Ymd-His');
                         $synthesisRowCount = is_array($synthesisTable['rows'] ?? null) ? count($synthesisTable['rows']) : 0;
                     @endphp
-                    <details class="showcase-panel dashboard-synthesis-card w-full overflow-hidden p-0" {{ $loop->first ? 'open' : '' }}>
+                    <details class="showcase-panel dashboard-synthesis-card w-full overflow-hidden p-0" data-progressive-accordion-item {{ $loop->first ? 'open' : '' }}>
                         <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 px-3 py-2 list-none">
                             <h3 class="text-sm font-black text-[#17324a]">
                                 <span class="inline-block w-3 text-[#3996d3]">▸</span>

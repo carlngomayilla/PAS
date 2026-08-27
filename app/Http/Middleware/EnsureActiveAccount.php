@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Security\CurrentAuthenticationRevoker;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -11,6 +12,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureActiveAccount
 {
+    public function __construct(
+        private readonly CurrentAuthenticationRevoker $authenticationRevoker
+    ) {}
+
     public function handle(Request $request, Closure $next): Response|RedirectResponse|JsonResponse
     {
         $user = $request->user();
@@ -30,7 +35,7 @@ class EnsureActiveAccount
         }
 
         if ($request->expectsJson() || $request->is('api/*')) {
-            $request->user()?->currentAccessToken()?->delete();
+            $this->authenticationRevoker->revoke($request);
 
             return response()->json([
                 'message' => $message,

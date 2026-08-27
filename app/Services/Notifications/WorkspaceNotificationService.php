@@ -2411,7 +2411,7 @@ class WorkspaceNotificationService
             // FAIL-SAFE : un échec du canal email ne doit jamais casser le métier.
             Log::warning('Brevo email channel dispatch failed (non-blocking).', [
                 'event' => $event,
-                'exception' => $exception->getMessage(),
+                'exception_type' => get_debug_type($exception),
             ]);
         }
     }

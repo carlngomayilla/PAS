@@ -27,182 +27,11 @@
     <title>@yield('title', 'Dashboard') - {{ $platformSettings->get('app_short_name', 'ANBG') }}</title>
     @stack('head')
     @include('partials.vite-assets')
-    <style>
-        :root { --app-sidebar-width: 232px; --app-sidebar-collapsed-width: 72px; }
-
-        /* ── Fond de page ── */
-        .admin-page-root { background: var(--app-bg, #f6fbff); }
-
-        /* ── Shell frame — carte flottante ── */
-        .admin-shell-frame { background: transparent; border-radius: 0; }
-
-        /* ── Header ── */
-        .admin-page-header {
-            background: var(--app-surface, #ffffff);
-            border-bottom: 1px solid var(--app-border, #d8ecf8);
-            backdrop-filter: none;
-        }
-
-        /* ── Contenu principal ── */
-        .admin-content-shell {
-            padding-left: 0;
-            min-height: 100vh;
-        }
-        @media (min-width: 1024px) {
-            .admin-content-shell {
-                padding-left: var(--app-sidebar-collapsed-width);
-            }
-        }
-
-        body.admin-theme-scope::before { display: none !important; }
-    </style>
 </head>
 
 @php
     $routeName = request()->route()?->getName() ?? '';
-    $layoutUser = auth()->user();
-    $headerActivePeriodLabel = app(\App\Services\ExerciceContext::class)->activeLabel();
-    $headerNotifications = collect();
-    $headerUnreadCount = 0;
-    $headerNotificationUnreadCount = 0;
-    $headerUnreadByModule = [];
-    $headerSidebarBadges = [];
-    $headerAlertSummary = [
-        'total' => 0,
-        'unread' => 0,
-        'urgence' => 0,
-        'critical' => 0,
-        'warning' => 0,
-        'info' => 0,
-    ];
-    $headerAlertUnreadCount = 0;
-    if ($layoutUser) {
-        $headerNotifications = $layoutUser->notifications()
-            ->latest()
-            ->limit(24)
-            ->get()
-            ->reject(static fn ($notification): bool => strtolower((string) ($notification->data['module'] ?? '')) === 'alertes')
-            ->take(12)
-            ->values();
-
-        $unreadNotifications = $layoutUser->unreadNotifications()
-            ->latest()
-            ->get();
-
-        $headerUnreadCount = $unreadNotifications->count();
-        $headerUnreadByModule = $unreadNotifications
-            ->groupBy(static fn ($notification): string => strtolower((string) ($notification->data['module'] ?? 'autres')))
-            ->map(static fn ($rows): int => $rows->count())
-            ->toArray();
-        $headerNotificationUnreadCount = (int) $unreadNotifications
-            ->reject(static fn ($notification): bool => strtolower((string) ($notification->data['module'] ?? '')) === 'alertes')
-            ->count();
-        $headerSidebarBadges = $headerUnreadByModule;
-        $headerSidebarBadges['notifications'] = $headerNotificationUnreadCount;
-
-        if ($layoutUser->hasPermission('alerts.read')) {
-            $alertReadService = app(\App\Services\Alerting\AlertReadService::class);
-            $alertCenterService = app(\App\Services\Alerting\AlertCenterService::class);
-            $headerAlertSummary = $alertCenterService->summaryForUser(
-                $layoutUser,
-                $alertReadService->readFingerprintsForUser($layoutUser)
-            );
-            $headerAlertUnreadCount = (int) ($headerAlertSummary['unread'] ?? 0);
-            $headerSidebarBadges['notifications'] = $headerNotificationUnreadCount + $headerAlertUnreadCount;
-        }
-
-        // Count actions pending validation (for managers) and returned actions (for agents)
-        // Perf : ces 2 comptages whereHas sont mis en cache 120s par utilisateur.
-        // La cle integre dashboardVersion(), bumpee des qu'un statut_validation
-        // d'action change (ActionObserver) → invalidation immediate et correcte.
-        $validationBadgeCount = 0;
-        if (\App\Support\SchemaIntrospectionCache::hasTable('actions')) {
-            $dashboardVersion = app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->dashboardVersion();
-            $validationBadgeCount = (int) \Illuminate\Support\Facades\Cache::remember(
-                'header-validation-badge:'.$dashboardVersion.':'.(int) $layoutUser->id,
-                now()->addSeconds(120),
-                function () use ($layoutUser): int {
-                    $isFinalControlUser = app(\App\Services\PlanningModificationLockService::class)->canGivePlanifAvis($layoutUser)
-                        || $layoutUser->isSuperAdmin()
-                        || $layoutUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL);
-                    $isGlobalReader = $layoutUser->hasGlobalReadAccess()
-                        || $layoutUser->hasRole(\App\Models\User::ROLE_SUPER_ADMIN)
-                        || $layoutUser->hasRole(\App\Models\User::ROLE_DG)
-                        || $layoutUser->hasRole(\App\Models\User::ROLE_PLANIFICATION)
-                        || $layoutUser->hasRole(\App\Models\User::ROLE_CABINET);
-                    $pendingQ = \App\Models\Action::query()
-                        ->whereIn('statut_validation', $isFinalControlUser
-                            ? [
-                                \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                                \App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
-                            ]
-                            : [\App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CHEF]);
-                    if (! $isGlobalReader) {
-                        if ($layoutUser->hasRole(\App\Models\User::ROLE_DIRECTION) && $layoutUser->direction_id) {
-                            $pendingQ->whereHas('pta', fn ($q) => $q->where('direction_id', $layoutUser->direction_id));
-                        } elseif ($layoutUser->hasRole(\App\Models\User::ROLE_SERVICE) && $layoutUser->service_id) {
-                            $pendingQ->whereHas('pta', fn ($q) => $q->where('service_id', $layoutUser->service_id));
-                        } else {
-                            $pendingQ->whereRaw('0 = 1');
-                        }
-                    }
-                    $count = (int) $pendingQ->count();
-                    $count += (int) \App\Models\Action::query()
-                        ->whereIn('statut_validation', [
-                            \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_CHEF,
-                            \App\Services\Actions\ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
-                            \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
-                        ])
-                        ->where(static fn ($q) => $q
-                            ->where('responsable_id', $layoutUser->id)
-                            ->orWhereHas('responsables', fn ($q2) => $q2->where('users.id', $layoutUser->id))
-                        )
-                        ->count();
-
-                    return $count;
-                }
-            );
-            if ($validationBadgeCount > 0) {
-                $headerSidebarBadges['actions'] = (int) ($headerSidebarBadges['actions'] ?? 0) + $validationBadgeCount;
-            }
-        }
-
-        // A43 — Badge "Mes taches" : nombre de taches ouvertes a traiter pour
-        // l'utilisateur (execution, validations, financements, alertes...).
-        $openTasksCount = (int) app(\App\Services\PersonalTaskService::class)->openTaskCount($layoutUser);
-        if ($openTasksCount > 0) {
-            $headerSidebarBadges['mes_taches'] = $openTasksCount;
-        }
-        $controlTasksCount = (int) app(\App\Services\PersonalTaskService::class)->controlTaskCount($layoutUser);
-        if ($controlTasksCount > 0) {
-            $headerSidebarBadges['controle'] = $controlTasksCount;
-        }
-
-        if (\App\Support\SchemaIntrospectionCache::hasTable('deadline_extension_requests')) {
-            $deadlineExtensionTaskCount = app(\App\Services\DeadlineExtensionQueueService::class)
-                ->actionableCount($layoutUser);
-            if ($deadlineExtensionTaskCount > 0) {
-                $headerSidebarBadges['reports_echeance'] = $deadlineExtensionTaskCount;
-            }
-        }
-
-    }
-
-    $headerBellUnreadCount = $headerNotificationUnreadCount + $headerAlertUnreadCount;
-    $headerBellBadgeKind = match (true) {
-        $headerNotificationUnreadCount > 0 && $headerAlertUnreadCount > 0 => 'both',
-        $headerAlertUnreadCount > 0 => 'alert',
-        $headerNotificationUnreadCount > 0 => 'notification',
-        default => 'none',
-    };
-    $headerBellBadgeClass = match ($headerBellBadgeKind) {
-        'both' => 'bg-[#6d28d9]',
-        'alert' => 'bg-[#92400e]',
-        'notification' => 'bg-[#0f5f99]',
-        default => 'bg-[#0f5f99]',
-    };
-
-    $layoutModuleCodes = collect($layoutUser?->workspaceModules() ?? [])
+    $layoutModuleCodes = collect($layoutWorkspaceModules)
         ->pluck('code')
         ->map(fn (mixed $code): string => (string) $code);
     $moduleFamilyTabsLabel = null;
@@ -243,12 +72,18 @@
     }
 @endphp
 
-<body class="admin-theme-scope anbg-glass-theme h-full" data-auto-refresh="0" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}">
+<body class="admin-theme-scope anbg-glass-theme h-full" data-ui-version="institutional-v2" data-auto-refresh="0" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}">
     <a href="#admin-main-content" class="skip-to-content">Aller au contenu principal</a>
     <div class="admin-page-root app-shell min-h-screen">
-        <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-white/70 backdrop-blur-sm lg:hidden"></div>
+        <div id="admin-overlay" class="admin-sidebar-overlay fixed inset-0 z-40 hidden backdrop-blur-sm lg:hidden"></div>
 
-        <x-admin.sidebar :notification-counts="$headerSidebarBadges" :unread-total="$headerUnreadCount" />
+        <x-admin.sidebar
+            :notification-counts="$headerSidebarBadges"
+            :unread-total="$headerUnreadCount"
+            :workspace-modules="$layoutWorkspaceModules"
+            :is-daf-finance-reviewer="$sidebarIsDafFinanceReviewer"
+            :is-super-admin="$sidebarIsSuperAdmin"
+        />
 
         <div class="admin-content-shell app-main min-h-screen">
             <div class="admin-shell-frame flex min-h-screen flex-col overflow-hidden">
@@ -293,26 +128,23 @@
                         </div>
 
                         <div class="admin-navbar-actions flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
+                            <button
+                                type="button"
+                                id="admin-spotlight-open"
+                                class="admin-navbar-search-trigger hidden min-w-0 items-center gap-2 md:inline-flex"
+                                aria-label="Ouvrir la recherche globale"
+                                aria-haspopup="dialog"
+                                aria-controls="spotlight-backdrop"
+                            >
+                                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="7" stroke-width="1.8" />
+                                    <path stroke-linecap="round" stroke-width="1.8" d="m20 20-3.2-3.2" />
+                                </svg>
+                                <span class="truncate">Rechercher</span>
+                                <kbd>Ctrl K</kbd>
+                            </button>
+
                             @if ($layoutUser)
-                                @php
-                                    $navbarScope = $layoutUser->accessScope();
-                                    $navbarScopeType = (string) ($navbarScope['scope_type'] ?? 'limited');
-                                    $navbarScopeLabel = match ($navbarScopeType) {
-                                        'global' => 'Vue globale',
-                                        'direction' => 'Direction : '.($layoutUser->direction?->libelle ?? '—'),
-                                        'service' => 'Service : '.($layoutUser->service?->libelle ?? '—'),
-                                        'unite' => 'Unité : '.($layoutUser->uniteDg?->libelle ?? '—'),
-                                        'agent' => 'Mes actions',
-                                        default => 'Accès limité',
-                                    };
-                                    $navbarScopeTone = match ($navbarScopeType) {
-                                        'global' => 'border-emerald-300 bg-emerald-50 text-emerald-700',
-                                        'direction', 'unite' => 'border-sky-300 bg-sky-50 text-sky-700',
-                                        'service' => 'border-amber-300 bg-amber-50 text-amber-700',
-                                        'agent' => 'border-violet-300 bg-violet-50 text-violet-700',
-                                        default => 'border-slate-300 bg-slate-50 text-slate-700',
-                                    };
-                                @endphp
                                 <span
                                     class="admin-navbar-scope-chip hidden xl:inline-flex shrink-0 items-center gap-1.5 border px-3 py-1 text-[11px] font-semibold {{ $navbarScopeTone }}"
                                     title="Périmètre d'accès : {{ $navbarScopeLabel }}"
@@ -343,6 +175,7 @@
                                 class="admin-navbar-icon-button admin-navbar-action-button inline-flex items-center justify-center"
                                 title="Changer le thème"
                                 aria-label="Changer le thème"
+                                aria-pressed="false"
                             >
                                 <svg class="h-5 w-5 dark:hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6c0-1.33.266-2.597.748-3.752A9.753 9.753 0 1 0 21.752 15.002Z" />
@@ -489,7 +322,7 @@
                             <div class="admin-navbar-user admin-navbar-profile flex items-center gap-3 px-3 py-2">
                                 <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-user-copy min-w-0 text-left transition-opacity hover:opacity-75" data-navbar-user-copy>
                                     <p class="truncate text-sm font-semibold text-[#17324a]" title="{{ $layoutUser?->name ?? 'Utilisateur' }}">{{ $layoutUser?->name ?? 'Utilisateur' }}</p>
-                                    <p class="truncate text-xs text-[#667085]" title="{{ $layoutUser?->roleLabel() ?? 'Compte' }}">{{ $layoutUser?->roleLabel() ?? 'Compte' }}</p>
+                                    <p class="truncate text-xs text-[#667085]" title="{{ $layoutUserRoleLabel }}">{{ $layoutUserRoleLabel }}</p>
                                 </a>
                                 <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-avatar inline-flex items-center justify-center transition-opacity hover:opacity-75">
                                     @if ($layoutUser?->profile_photo_url)
@@ -533,7 +366,7 @@
                     @endif
                     @stack('breadcrumb')
                     @yield('content')
-                    <footer class="mt-8 border-t border-[#d8ecf8] pt-4 text-xs text-[#667085]">
+                    <footer class="app-footer mt-8">
                         {{ $platformSettings->get('footer_text', 'ANBG | Système institutionnel de pilotage PAS / PAO / PTA') }}
                     </footer>
                 </main>

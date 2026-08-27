@@ -30,12 +30,12 @@
         </div>
 
         <x-dashboard.section-card title="Arborescence">
-            <div class="space-y-3">
+            <div class="space-y-3" data-progressive-accordion-group>
                 @forelse ($tree as $pasNode)
                     @php
                         $pas = $pasNode['pas'];
                     @endphp
-                    <details class="rounded-[var(--dashboard-card-radius)] border border-[var(--dashboard-border)] bg-[var(--dashboard-surface-muted)] p-3" open>
+                    <details class="rounded-[var(--dashboard-card-radius)] border border-[var(--dashboard-border)] bg-[var(--dashboard-surface-muted)] p-3" data-progressive-accordion-item {{ $loop->first ? 'open' : '' }}>
                         <summary class="cursor-pointer list-none">
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>

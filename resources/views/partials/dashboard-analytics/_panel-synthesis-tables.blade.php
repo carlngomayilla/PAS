@@ -1,17 +1,17 @@
 @if (($directionSynthesisTables ?? []) !== [])
     <section class="mb-3">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 class="showcase-panel-title">Tableaux de synthèse</h2>
-            <span class="showcase-chip">Vue detaillee</span>
+            <h2 class="showcase-panel-title">Tableaux de pilotage</h2>
+            <span class="showcase-chip">Tableaux</span>
         </div>
-        <div class="space-y-2">
+        <div class="space-y-2" data-progressive-accordion-group>
             @foreach ($directionSynthesisTables as $synthesisTable)
                 @php
                     $synthesisTableId = 'dashboard-synthesis-table-'.$loop->index;
                     $synthesisExportName = \Illuminate\Support\Str::slug((string) ($synthesisTable['title'] ?? 'tableau')).'-'.now()->format('Ymd-His');
                     $synthesisRowCount = is_array($synthesisTable['rows'] ?? null) ? count($synthesisTable['rows']) : 0;
                 @endphp
-                <details class="showcase-panel dashboard-synthesis-card w-full overflow-hidden p-0" {{ $loop->first ? 'open' : '' }}>
+                <details class="showcase-panel dashboard-synthesis-card w-full overflow-hidden p-0" data-progressive-accordion-item {{ $loop->first ? 'open' : '' }}>
                     <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 px-3 py-2 list-none">
                         <h3 class="text-sm font-black text-[#17324a]">
                             <span class="inline-block w-3 text-[#3996d3]">&gt;</span>

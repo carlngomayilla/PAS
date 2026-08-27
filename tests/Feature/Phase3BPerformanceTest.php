@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Models\Action;
 use App\Services\Actions\ActionStatusService;
 use App\Services\Analytics\ReportingAnalyticsService;
+use App\Services\Dashboard\DashboardOverviewReadModel;
 use App\Support\SchemaIntrospectionCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -112,11 +113,11 @@ class Phase3BPerformanceTest extends TestCase
         $this->assertSame('en_cours', $dashboardStatus->invoke($controller, $action));
         $this->assertSame('en_cours', $dashboardStatus->invoke($controller, $action));
 
-        $controllerCode = file_get_contents(app_path('Http/Controllers/DashboardController.php'));
+        $readModelCode = file_get_contents((new \ReflectionClass(DashboardOverviewReadModel::class))->getFileName());
 
         $this->assertStringContainsString(
             "'actionLogs:id,action_id,type_evenement'",
-            $controllerCode,
+            $readModelCode,
             'Le tableau de bord doit charger les journaux en une requete groupee pour eviter un N+1.'
         );
     }

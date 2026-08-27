@@ -32,7 +32,7 @@
 
     <section class="showcase-panel mb-4">
         <h2>Filtrer les comptes</h2>
-        <form method="GET" action="{{ route('workspace.super-admin.organization.index') }}">
+        <form method="GET" action="{{ route('workspace.super-admin.organization.index') }}" data-auto-filter-form>
             <div class="form-grid-compact mb-2">
                 <div>
                     <label for="q">Recherche</label>
@@ -99,7 +99,6 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
-                <button class="btn btn-primary" type="submit">Appliquer</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.index') }}">Réinitialiser</a>
             </div>
         </form>

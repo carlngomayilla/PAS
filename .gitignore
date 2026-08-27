@@ -8,6 +8,7 @@
 !.env.e2e.example
 !.env.example
 !.env.production.example
+!/frontend/dashboard-pilot/.env.example
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -21,6 +22,10 @@
 /node_modules
 /public/build
 /public/hot
+/frontend/dashboard-pilot/.next
+/frontend/dashboard-pilot/coverage
+/frontend/dashboard-pilot/node_modules
+/frontend/dashboard-pilot/tsconfig.tsbuildinfo
 /playwright-report
 /test-results
 /blob-report

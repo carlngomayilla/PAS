@@ -144,7 +144,7 @@
                 @endforeach
             </nav>
 
-            <form method="GET" action="{{ route('workspace.tasks.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,.75fr)_minmax(155px,.65fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70">
+            <form method="GET" action="{{ route('workspace.tasks.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,.75fr)_minmax(155px,.65fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
                 <input type="hidden" name="vue" value="{{ $filters['vue'] ?? 'toutes' }}">
 
                 <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
@@ -182,7 +182,6 @@
                     </select>
                 </label>
 
-                <button type="submit" class="btn btn-primary min-h-10 self-end px-4">Filtrer</button>
                 <a href="{{ route('workspace.tasks.index') }}" class="btn btn-secondary min-h-10 self-end px-4">Réinitialiser</a>
             </form>
 

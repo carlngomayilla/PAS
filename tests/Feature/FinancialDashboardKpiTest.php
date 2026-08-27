@@ -51,14 +51,56 @@ class FinancialDashboardKpiTest extends TestCase
             $this->assertNotNull($finance->dashboardSummary($fixture[$profile]));
         }
 
-        $controller = file_get_contents(app_path('Http/Controllers/DashboardController.php'));
         $dashboardPanel = file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-overview.blade.php'));
 
-        $this->assertIsString($controller);
         $this->assertIsString($dashboardPanel);
-        $this->assertStringContainsString("['financial_summary']", $controller);
         $this->assertStringContainsString('Suivi budgétaire', $dashboardPanel);
         $this->assertStringContainsString('Solde à décaisser', $dashboardPanel);
+    }
+
+    public function test_filtered_dashboard_summary_uses_only_the_supplied_actions(): void
+    {
+        $fixture = $this->createFixture();
+        FinancialTransaction::query()->create([
+            'action_id' => $fixture['action']->id,
+            'operation_type' => FinancialTransaction::TYPE_DISBURSEMENT,
+            'amount' => 25000,
+            'operated_on' => '2026-08-01',
+            'recorded_by' => $fixture['serviceChief']->id,
+        ]);
+        $outsideFilter = $fixture['action']->replicate();
+        $outsideFilter->forceFill([
+            'libelle' => 'Action hors filtre financier',
+            'montant_estime' => 900000,
+        ])->save();
+        FinancialTransaction::query()->create([
+            'action_id' => $outsideFilter->id,
+            'operation_type' => FinancialTransaction::TYPE_DISBURSEMENT,
+            'amount' => 500000,
+            'operated_on' => '2026-08-02',
+            'recorded_by' => $fixture['serviceChief']->id,
+        ]);
+
+        $finance = app(FinancialMonitoringService::class);
+        $globalSummary = $finance->dashboardSummary($fixture['planning']);
+        $filteredSummary = $finance->dashboardSummaryForActions(
+            $fixture['planning'],
+            collect([$fixture['action'], $fixture['action']]),
+        );
+        $emptySummary = $finance->dashboardSummaryForActions($fixture['planning'], collect());
+
+        $this->assertSame(1000000.0, $globalSummary['budget']);
+        $this->assertSame(525000.0, $globalSummary['disbursed']);
+        $this->assertSame(2, $globalSummary['actions_total']);
+        $this->assertSame(100000.0, $filteredSummary['budget']);
+        $this->assertSame(25000.0, $filteredSummary['disbursed']);
+        $this->assertSame(1, $filteredSummary['actions_total']);
+        $this->assertSame(0.0, $emptySummary['budget']);
+        $this->assertSame(0.0, $emptySummary['disbursed']);
+        $this->assertSame(0, $emptySummary['actions_total']);
+        $this->assertNull(
+            $finance->dashboardSummaryForActions($fixture['agent'], collect([$fixture['action']]))
+        );
     }
 
     /** @return array{action:Action,serviceChief:User,agent:User,director:User,planning:User,planningChief:User,sciq:User,sciqChief:User,dg:User} */

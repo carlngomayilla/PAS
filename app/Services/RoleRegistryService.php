@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -11,6 +12,10 @@ use Illuminate\Support\Str;
 class RoleRegistryService
 {
     private const VERSION_LIMIT = 20;
+
+    public function __construct(
+        private readonly AnalyticsCacheVersionService $analyticsCacheVersionService,
+    ) {}
 
     /**
      * @var array<string, array<string, mixed>>|null
@@ -326,6 +331,7 @@ class RoleRegistryService
         );
 
         $this->flush();
+        $this->analyticsCacheVersionService->bumpDashboard();
     }
 
     /**

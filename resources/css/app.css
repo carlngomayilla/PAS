@@ -604,6 +604,18 @@ body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-synthesis-
     background: linear-gradient(135deg, var(--synthesis-operational), #eef6fc) !important;
 }
 
+html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-strategic-objective > .dashboard-synthesis-node-summary {
+    background: linear-gradient(135deg, #17345a, #12243a) !important;
+}
+
+html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-operational-objective > .dashboard-synthesis-node-summary {
+    background: linear-gradient(135deg, #18304b, #111c2f) !important;
+}
+
+html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card :where(.dashboard-synthesis-node-strategic-objective, .dashboard-synthesis-node-operational-objective) > .dashboard-synthesis-node-summary .text-\[\#667085\] {
+    color: #cbd5e1 !important;
+}
+
 body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-pta {
     background: linear-gradient(135deg, var(--synthesis-pta), #ffffff) !important;
 }

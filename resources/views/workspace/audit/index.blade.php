@@ -82,7 +82,7 @@
                 @endforeach
             </nav>
 
-            <form method="GET" action="{{ route('workspace.audit.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-4 dark:border-slate-700 dark:bg-slate-900/70">
+            <form method="GET" action="{{ route('workspace.audit.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-4 dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
                 @if ($activeScope !== '')
                     <input type="hidden" name="operation_scope" value="{{ $activeScope }}">
                 @endif
@@ -165,7 +165,6 @@
                 </label>
 
                 <div class="flex flex-wrap items-end gap-2 md:col-span-2">
-                    <button type="submit" class="btn btn-primary min-h-10 px-4">Filtrer</button>
                     <a href="{{ route('workspace.audit.index', $activeScope !== '' ? ['operation_scope' => $activeScope] : []) }}" class="btn btn-secondary min-h-10 px-4">Réinitialiser</a>
                 </div>
             </form>

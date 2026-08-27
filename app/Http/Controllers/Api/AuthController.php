@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Security\CurrentAuthenticationRevoker;
 use App\Services\Security\PasswordPolicyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,8 @@ use Illuminate\Support\Facades\Hash;
 class AuthController extends Controller
 {
     public function __construct(
-        private readonly PasswordPolicyService $passwordPolicy
+        private readonly PasswordPolicyService $passwordPolicy,
+        private readonly CurrentAuthenticationRevoker $authenticationRevoker,
     ) {}
 
     public function login(Request $request): JsonResponse
@@ -90,11 +92,7 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $token = $request->user()?->currentAccessToken();
-
-        if ($token !== null) {
-            $token->delete();
-        }
+        $this->authenticationRevoker->revoke($request);
 
         return response()->json([
             'message' => 'Déconnexion réussie.',

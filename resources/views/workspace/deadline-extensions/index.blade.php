@@ -66,11 +66,10 @@
                     </a>
                 </nav>
 
-                <form method="GET" action="{{ route('workspace.deadline-extension.index') }}" class="flex w-full max-w-xl gap-2">
+                <form method="GET" action="{{ route('workspace.deadline-extension.index') }}" class="flex w-full max-w-xl gap-2" data-auto-filter-form>
                     <input type="hidden" name="vue" value="{{ $view }}">
                     <label class="sr-only" for="deadline-search">Rechercher un report</label>
                     <input id="deadline-search" name="recherche" type="search" value="{{ $search }}" placeholder="Action, demandeur, motif ou statut" class="min-w-0 flex-1">
-                    <button class="btn btn-secondary" type="submit">Rechercher</button>
                 </form>
             </div>
         </section>

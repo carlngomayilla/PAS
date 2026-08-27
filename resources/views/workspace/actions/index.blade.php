@@ -266,7 +266,7 @@
                 Réinitialiser
             </a>
         </div>
-        <form method="GET" action="{{ route('workspace.actions.index') }}">
+        <form method="GET" action="{{ route('workspace.actions.index') }}" data-auto-filter-form>
             @if ($filters['vue'] !== '')
                 <input type="hidden" name="vue" value="{{ $filters['vue'] }}">
             @endif
@@ -354,11 +354,6 @@
             @if ($filters['without_kpi'])
                 <input type="hidden" name="without_kpi" value="1">
             @endif
-            <div class="showcase-filter-actions mt-4">
-                <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
-                    Appliquer les filtres
-                </button>
-            </div>
             @php
                 $activeChips = array_filter([
                     $filters['without_kpi'] ? ['label' => 'Sans indicateur',       'color' => '#F9B13C', 'remove' => 'without_kpi'] : null,

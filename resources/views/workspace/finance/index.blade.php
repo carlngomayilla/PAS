@@ -76,7 +76,7 @@
         </section>
 
         <section class="showcase-panel app-screen-block">
-            <form method="GET" action="{{ route('workspace.daf.financements.index') }}" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(175px,.8fr)_minmax(175px,.8fr)_auto_auto] dark:border-slate-700 dark:bg-slate-900/70">
+            <form method="GET" action="{{ route('workspace.daf.financements.index') }}" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(175px,.8fr)_minmax(175px,.8fr)_auto_auto] dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
                 <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
                     Rechercher une action
                     <input name="q" type="search" value="{{ $filters['q'] ?? '' }}" maxlength="100" placeholder="Action, PTA..." class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 placeholder:text-slate-400 focus:border-[#3996D3] focus:outline-none focus:ring-2 focus:ring-[#3996D3]/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
@@ -99,7 +99,6 @@
                         @endforeach
                     </select>
                 </label>
-                <button class="btn btn-primary self-end" type="submit">Appliquer</button>
                 <a class="btn btn-secondary self-end" href="{{ route('workspace.daf.financements.index') }}">Réinitialiser</a>
             </form>
         </section>

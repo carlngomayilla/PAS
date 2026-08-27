@@ -10,6 +10,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class NotifyImportedParametreActionsJob implements ShouldQueue
 {
@@ -20,13 +22,17 @@ class NotifyImportedParametreActionsJob implements ShouldQueue
     public int $timeout = 600;
 
     /**
+     * @var list<int>
+     */
+    public array $backoff = [10, 60];
+
+    /**
      * @param  list<int>  $actionIds
      */
     public function __construct(
         public readonly array $actionIds,
         public readonly int $actorId
     ) {
-        $this->onConnection('database');
         $this->onQueue('notifications');
     }
 
@@ -58,5 +64,20 @@ class NotifyImportedParametreActionsJob implements ShouldQueue
                     }
                 }
             });
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $actionCount = collect($this->actionIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->count();
+
+        Log::error('Imported parameter action notification job failed.', [
+            'actor_id' => $this->actorId,
+            'action_count' => $actionCount,
+            'exception_type' => get_debug_type($exception),
+        ]);
     }
 }

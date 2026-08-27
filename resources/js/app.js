@@ -1,6 +1,7 @@
 import './bootstrap';
 import './admin-shell';
 import './visual-polish';
+import './auto-filter-forms';
 import './dashboard-charts-init';
 import './dashboard-render';
 import './analytics-explorer';

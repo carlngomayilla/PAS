@@ -22,9 +22,10 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertSee($user->name);
         $response->assertSee($user->roleLabel());
         $response->assertDontSee('Interactions disponibles pour ce profil');
-        $response->assertSee('Synth');
+        $response->assertSee('Pilotage');
+        $response->assertSee('Tableaux');
         $response->assertSee('Graphiques');
-        $response->assertSee('Vue détaillée');
+        $response->assertDontSee('Vue détaillée');
         $response->assertSee('Pilotage du service');
         $response->assertSee('Flux à traiter');
         $response->assertSee("Reports d'échéance");
@@ -52,7 +53,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
         $tables->assertSee('Agents');
-        $tables->assertSee('Synthèse');
+        $tables->assertSee('Tableaux');
     }
 
     public function test_seeded_agent_user_sees_agent_dashboard_sections(): void
@@ -108,7 +109,9 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $overview = $this->actingAs($user)->get('/dashboard');
         $overview->assertOk();
-        $overview->assertSee('Controle et suivi-evaluation');
+        $overview->assertSee('Contrôle et suivi');
+        $overview->assertDontSee('Contrôle et évaluation');
+        $overview->assertDontSee('Controle et evaluation');
         $overview->assertSee('Actions suivies');
         $overview->assertSee('Avancement global');
         $overview->assertSee('Pilotage administratif');
@@ -143,7 +146,9 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $overview = $this->actingAs($user)->get('/dashboard');
         $overview->assertOk();
-        $overview->assertSee('Controle et suivi-evaluation');
+        $overview->assertSee('Contrôle et suivi');
+        $overview->assertDontSee('Contrôle et évaluation');
+        $overview->assertDontSee('Controle et evaluation');
         $overview->assertSee('Actions suivies');
         $overview->assertSee('Avancement global');
 
@@ -182,7 +187,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $this->assertLessThanOrEqual(6, substr_count($content, 'data-dashboard-primary-kpi'));
     }
 
-    public function test_seeded_dg_user_sees_dg_dashboard_sections(): void
+    public function test_seeded_dg_user_sees_the_same_dashboard_as_planning_chief(): void
     {
         $this->seed();
 
@@ -190,26 +195,63 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $overview = $this->actingAs($user)->get('/dashboard');
         $overview->assertOk();
-        $overview->assertSee('Lecture');
-        $overview->assertSee('institutionnelle');
-        $overview->assertSee('Pilotage exécutif');
-        $overview->assertSee('Flux à traiter');
-        $overview->assertSee('Actions');
-        $overview->assertSee('Taux validation');
-        $overview->assertSee('globale');
+        $overview->assertSee('Contrôle et suivi');
+        $overview->assertSee('Actions suivies');
+        $overview->assertSee('Avancement global');
+        $overview->assertSee('Pilotage administratif');
+        $overview->assertSee('En attente validation contrôleur');
+        $overview->assertDontSee('Lecture stratégique institutionnelle');
+        $overview->assertDontSee('Contrôle et évaluation');
+        $overview->assertDontSee('Controle et evaluation');
+
+        $planningChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'password_changed_at' => now(),
+        ]);
+        $chiefOverview = $this->actingAs($planningChief)->get('/dashboard');
+        $chiefOverview->assertOk();
+        $chiefOverview->assertSee('Contrôle et suivi');
+        $chiefOverview->assertDontSee('Contrôle et évaluation');
+        $chiefOverview->assertDontSee('Controle et evaluation');
+
+        $dgDashboard = $overview->viewData('dashboardData');
+        $chiefDashboard = $chiefOverview->viewData('dashboardData');
+        $this->assertIsArray($dgDashboard);
+        $this->assertIsArray($chiefDashboard);
+        $this->assertSame('suivi_evaluation', data_get($dgDashboard, 'dashboard_role'));
+        $this->assertSame('suivi_evaluation', data_get($chiefDashboard, 'dashboard_role'));
+        $this->assertSame(
+            data_get($chiefDashboard, 'role_dashboard.summary_cards'),
+            data_get($dgDashboard, 'role_dashboard.summary_cards'),
+        );
+
+        $dgCardLinks = collect(data_get($dgDashboard, 'role_dashboard.summary_cards', []))
+            ->pluck('href', 'label')
+            ->all();
+        $chiefCardLinks = collect(data_get($chiefDashboard, 'role_dashboard.summary_cards', []))
+            ->pluck('href', 'label')
+            ->all();
+        $this->assertNotEmpty($dgCardLinks);
+        $this->assertSame($chiefCardLinks, $dgCardLinks);
+        $this->assertNotContains('', array_values($dgCardLinks));
+
+        $dgPrimaryCards = $this->primaryDashboardCards($overview->getContent());
+        $chiefPrimaryCards = $this->primaryDashboardCards($chiefOverview->getContent());
+        $this->assertCount(6, $dgPrimaryCards);
+        $this->assertSame($chiefPrimaryCards, $dgPrimaryCards);
+        $overview->assertSee('href="'.route('workspace.actions.index'), false);
+
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
         $charts->assertSee('avancement du PAS');
-        $charts->assertSee('objectifs opérationnels');
-        $charts->assertSee('actions par statut');
-        $charts->assertSee('niveaux de pilotage');
-        $charts->assertDontSee('dashboard-direction-performance-chart', false);
-        $charts->assertDontSee('dashboard-service-performance-chart', false);
-        $charts->assertSee('dashboard-role-support-chart', false);
+        $charts->assertSee('Graphiques du PTA trimestriel');
+        $charts->assertSee('dashboard-pta-axis-progression-chart-charts', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
-        $tables->assertSee('Directions en');
+        $tables->assertSee('Directions');
+        $tables->assertDontSee('Directions sous vigilance');
     }
 
     public function test_seeded_cabinet_user_sees_cabinet_dashboard_sections(): void
@@ -274,7 +316,7 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response = $this->actingAs($user)->get('/dashboard');
         $response->assertOk();
-        $response->assertSee('institutionnelle');
+        $response->assertSee('Contrôle et suivi');
         $response->assertSee('Actions');
 
         $response->assertDontSee('Lecture DG : operationnel vs consolide');
@@ -294,5 +336,22 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertSee('Actions');
         $response->assertDontSee('Provisoire');
         $response->assertDontSee('Officiel');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function primaryDashboardCards(string $content): array
+    {
+        preg_match_all(
+            '/<a\b(?=[^>]*data-dashboard-primary-kpi)[^>]*>.*?<\/a>/s',
+            $content,
+            $matches,
+        );
+
+        return collect($matches[0] ?? [])
+            ->map(static fn (string $card): string => preg_replace('/\s+/', ' ', trim($card)) ?? '')
+            ->values()
+            ->all();
     }
 }

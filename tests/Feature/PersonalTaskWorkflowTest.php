@@ -576,6 +576,28 @@ class PersonalTaskWorkflowTest extends TestCase
             ->assertSee('Qualité Tres bon');
     }
 
+    public function test_reassigning_an_action_immediately_invalidates_cached_personal_tasks(): void
+    {
+        $fixture = $this->planningFixture();
+        $replacement = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'password_changed_at' => now(),
+        ]);
+        $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action a reaffecter');
+        $service = app(PersonalTaskService::class);
+        $taskKey = 'action-execution:'.$action->id;
+
+        $this->assertTrue(collect($service->forUser($fixture['agent'], 20)['items'])->contains('key', $taskKey));
+        $this->assertFalse(collect($service->forUser($replacement, 20)['items'])->contains('key', $taskKey));
+
+        $action->update(['responsable_id' => $replacement->id]);
+
+        $this->assertFalse(collect($service->forUser($fixture['agent'], 20)['items'])->contains('key', $taskKey));
+        $this->assertTrue(collect($service->forUser($replacement, 20)['items'])->contains('key', $taskKey));
+    }
+
     public function test_personal_score_quality_labels_follow_canonical_scale(): void
     {
         $fixture = $this->planningFixture();

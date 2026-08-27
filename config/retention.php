@@ -5,4 +5,5 @@ return [
     'justificatifs_days' => (int) env('RETENTION_JUSTIFICATIFS_ARCHIVE_AFTER_DAYS', 1825),
     'action_logs_days' => (int) env('RETENTION_ACTION_LOGS_ARCHIVE_AFTER_DAYS', 1095),
     'notifications_days' => (int) env('RETENTION_NOTIFICATIONS_ARCHIVE_AFTER_DAYS', 365),
+    'reporting_exports_days' => (int) env('RETENTION_REPORTING_EXPORTS_DAYS', 7),
 ];

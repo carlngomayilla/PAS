@@ -29,7 +29,7 @@ class ExtractDocumentJob implements ShouldQueue
     {
         $session = AiImportSession::query()->findOrFail($this->sessionId);
         $documents->extract($session);
-        AnalyzePasPaoPtaWithAiJob::dispatch($session->id)->onQueue((string) config('ai_training.pta.import_queue', 'ai-imports'));
+        AnalyzePasPaoPtaWithAiJob::dispatch($session->id);
     }
 
     public function failed(?Throwable $exception): void

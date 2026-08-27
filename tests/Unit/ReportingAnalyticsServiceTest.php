@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class ReportingAnalyticsServiceTest extends TestCase
@@ -93,6 +94,39 @@ class ReportingAnalyticsServiceTest extends TestCase
 
         $this->assertSame(1, $payload['global']['objectifs_operationnels_total']);
         $this->assertSame(1, $payload['statuts']['objectifs_operationnels']['en_cours']);
+    }
+
+    public function test_cached_reporting_payload_contains_only_serializable_primitives(): void
+    {
+        [$admin] = $this->createPlanningFixture();
+        config()->set('cache.default', 'database');
+        config()->set('cache.serializable_classes', false);
+        app('cache')->forgetDriver('database');
+        Cache::store('database')->flush();
+
+        $service = app(ReportingAnalyticsService::class);
+        $first = $service->buildPayload($admin, false, false);
+        $second = $service->buildPayload($admin, false, false);
+
+        $this->assertSame($first, $second);
+        $this->assertIsString($second['generatedAt']);
+        $this->assertContainsOnlyPrimitiveCacheValues($second);
+    }
+
+    private function assertContainsOnlyPrimitiveCacheValues(mixed $value): void
+    {
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                $this->assertContainsOnlyPrimitiveCacheValues($item);
+            }
+
+            return;
+        }
+
+        $this->assertTrue(
+            $value === null || is_scalar($value),
+            'Une charge utile cachee ne doit contenir ni objet ni ressource.'
+        );
     }
 
     /**

@@ -27,15 +27,15 @@ class EnsurePasswordIsFresh
             return $next($request);
         }
 
-        if ($request->expectsJson()) {
+        if ($request->routeIs('workspace.profile.edit', 'workspace.profile.update', 'logout', 'v1.api.logout')) {
+            return $next($request);
+        }
+
+        if ($request->expectsJson() || $request->is('api/*')) {
             return new JsonResponse([
                 'message' => $this->passwordPolicy->expirationMessage(),
                 'code' => 'password_expired',
             ], 403);
-        }
-
-        if ($request->routeIs('workspace.profile.edit', 'workspace.profile.update', 'logout')) {
-            return $next($request);
         }
 
         return redirect()

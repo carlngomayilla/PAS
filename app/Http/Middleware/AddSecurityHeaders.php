@@ -13,6 +13,12 @@ class AddSecurityHeaders
     {
         Vite::useCspNonce();
         $nonce = Vite::cspNonce();
+        $styleSources = ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'];
+
+        if (app()->environment('local')) {
+            $styleSources[] = 'http://127.0.0.1:5173';
+        }
+
         /** @var Response $response */
         $response = $next($request);
 
@@ -28,7 +34,7 @@ class AddSecurityHeaders
             "img-src 'self' data: blob:",
             "media-src 'self' data: blob:",
             "script-src 'self' 'nonce-{$nonce}'",
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            'style-src '.implode(' ', $styleSources),
             "font-src 'self' data: https://fonts.gstatic.com",
             "connect-src 'self' ws: wss:",
         ]);

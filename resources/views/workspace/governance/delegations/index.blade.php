@@ -61,7 +61,7 @@
         </section>
 
         <section class="ui-card app-screen-block">
-            <form method="GET" action="{{ route('workspace.delegations.index') }}" class="grid gap-3 lg:grid-cols-[minmax(15rem,1fr)_repeat(4,minmax(9rem,auto))_auto] lg:items-end">
+            <form method="GET" action="{{ route('workspace.delegations.index') }}" class="grid gap-3 lg:grid-cols-[minmax(15rem,1fr)_repeat(4,minmax(9rem,auto))_auto] lg:items-end" data-auto-filter-form>
                 <label class="grid gap-1 text-xs font-bold uppercase text-slate-500">
                     Recherche
                     <input name="q" type="search" value="{{ $filters['q'] ?? '' }}" placeholder="Nom, email, périmètre, motif">
@@ -100,7 +100,6 @@
                     </select>
                 </label>
                 <div class="flex gap-2">
-                    <button class="btn btn-primary" type="submit">Filtrer</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.delegations.index') }}" title="Réinitialiser les filtres" aria-label="Réinitialiser les filtres">×</a>
                 </div>
             </form>

@@ -2,7 +2,8 @@
 
 namespace App\Services\Analytics;
 
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Cache\Repository;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
 
 class AnalyticsCacheVersionService
 {
@@ -15,19 +16,23 @@ class AnalyticsCacheVersionService
     // l etat des alertes (statut action, kpi_mesure, action_log, justificatif).
     private const ALERTS_VERSION_KEY = 'analytics-cache:alerts-version';
 
+    public function __construct(
+        private readonly CacheFactory $cache
+    ) {}
+
     public function reportingVersion(): int
     {
-        return (int) Cache::get(self::REPORTING_VERSION_KEY, 1);
+        return (int) $this->store()->get(self::REPORTING_VERSION_KEY, 1);
     }
 
     public function dashboardVersion(): int
     {
-        return (int) Cache::get(self::DASHBOARD_VERSION_KEY, 1);
+        return (int) $this->store()->get(self::DASHBOARD_VERSION_KEY, 1);
     }
 
     public function alertsVersion(): int
     {
-        return (int) Cache::get(self::ALERTS_VERSION_KEY, 1);
+        return (int) $this->store()->get(self::ALERTS_VERSION_KEY, 1);
     }
 
     public function bumpReporting(): void
@@ -54,10 +59,13 @@ class AnalyticsCacheVersionService
 
     private function bump(string $key): void
     {
-        if (! Cache::has($key)) {
-            Cache::forever($key, 1);
-        }
+        $store = $this->store();
+        $store->add($key, 1, now()->addYears(10));
+        $store->increment($key);
+    }
 
-        Cache::increment($key);
+    private function store(): Repository
+    {
+        return $this->cache->store((string) config('cache.version_store', 'database'));
     }
 }

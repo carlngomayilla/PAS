@@ -30,6 +30,7 @@ class UiPageAuditTest extends TestCase
             ->map(fn ($route): ?string => $route->getName())
             ->filter()
             ->reject(fn (string $name): bool => in_array($name, $skip, true))
+            ->reject(fn (string $name): bool => str_starts_with($name, 'horizon.'))
             ->reject(fn (string $name): bool => (bool) preg_match('/(export|download|spec|dropdown|ajax|^v1\.|api)/', $name))
             ->filter(function (string $name): bool {
                 $route = Route::getRoutes()->getByName($name);

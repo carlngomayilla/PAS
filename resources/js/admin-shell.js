@@ -4,19 +4,35 @@
     var localClock = document.getElementById('admin-local-clock');
     var globalSearchInput = document.getElementById('dashboard-tabs-search');
     var themeToggle = document.getElementById('admin-theme-toggle');
+    var themeColor = document.querySelector('meta[name="theme-color"]');
+
+    function syncThemeControls(theme) {
+        var isDark = theme === 'dark';
+
+        root.classList.toggle('dark', isDark);
+        root.setAttribute('data-theme', theme);
+
+        if (themeToggle) {
+            var nextThemeLabel = isDark ? 'Activer le thème clair' : 'Activer le thème sombre';
+            themeToggle.setAttribute('aria-label', nextThemeLabel);
+            themeToggle.setAttribute('title', nextThemeLabel);
+            themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+        }
+
+        if (themeColor) {
+            themeColor.setAttribute('content', isDark ? '#081725' : '#f2f7fb');
+        }
+    }
 
     window.anbgToggleTheme = function () {
-        var isDark = root.classList.contains('dark');
-        if (isDark) {
-            root.classList.remove('dark');
-            root.setAttribute('data-theme', 'light');
-            try { window.localStorage.setItem('theme', 'light'); } catch (e) {}
-        } else {
-            root.classList.add('dark');
-            root.setAttribute('data-theme', 'dark');
-            try { window.localStorage.setItem('theme', 'dark'); } catch (e) {}
-        }
+        var nextTheme = root.classList.contains('dark') ? 'light' : 'dark';
+
+        syncThemeControls(nextTheme);
+        try { window.localStorage.setItem('theme', nextTheme); } catch (e) {}
+        window.dispatchEvent(new CustomEvent('anbg:theme-changed', { detail: { theme: nextTheme } }));
     };
+
+    syncThemeControls(root.classList.contains('dark') ? 'dark' : 'light');
 
     if (themeToggle) {
         themeToggle.addEventListener('click', window.anbgToggleTheme);

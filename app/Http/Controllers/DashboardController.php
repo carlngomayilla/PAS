@@ -5,10 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Models\Action;
 use App\Models\ActionKpi;
-use App\Models\ActionLog;
-use App\Models\Direction;
-use App\Models\Kpi;
-use App\Models\KpiMesure;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
@@ -21,17 +17,16 @@ use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Ai\ActionReportMetricsBuilder;
 use App\Services\Analytics\AnalyticsCacheVersionService;
-use App\Services\Analytics\ReportingAnalyticsService;
-use App\Services\Dashboard\DashboardPythonChartService;
+use App\Services\Dashboard\DashboardAccessService;
+use App\Services\Dashboard\DashboardFilterContext;
+use App\Services\Dashboard\DashboardOverviewReadModel;
+use App\Services\Dashboard\DashboardTabPayloadService;
 use App\Services\DashboardProfileSettings;
 use App\Services\DeadlineExtensionQueueService;
 use App\Services\ExerciceContext;
-use App\Services\FinancialMonitoringService;
-use App\Services\PersonalTaskService;
 use App\Services\PtaOfficialCalculationService;
 use App\Services\PtaSuiviService;
 use App\Services\WorkflowSettings;
-use App\Support\SafeSql;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -48,43 +43,44 @@ class DashboardController extends Controller
 
     public const DASHBOARD_CACHE_TTL_MINUTES = 60;
 
-    private bool $dashboardDirectionResolved = false;
-
-    private ?int $dashboardDirectionId = null;
-
-    private bool $dashboardServiceResolved = false;
-
-    private ?int $dashboardServiceId = null;
-
     /**
      * @var array<int, string>
      */
     private array $dashboardStatusCache = [];
 
+    /**
+     * @var array<string, string>
+     */
+    private array $dashboardUrlCache = [];
+
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings,
-        private readonly ReportingAnalyticsService $reportingAnalyticsService,
-        private readonly DashboardPythonChartService $dashboardPythonChartService,
+        private readonly DashboardAccessService $dashboardAccessService,
+        private readonly DashboardFilterContext $dashboardFilterContext,
+        private readonly DashboardOverviewReadModel $dashboardOverviewReadModel,
+        private readonly DashboardTabPayloadService $dashboardTabPayloadService,
         private readonly DashboardProfileSettings $dashboardProfileSettings,
         private readonly WorkflowSettings $workflowSettings,
         private readonly AnalyticsCacheVersionService $cacheVersionService,
         private readonly ExerciceContext $exerciceContext,
         private readonly ActionStatusService $actionStatusService,
-        private readonly PersonalTaskService $personalTaskService,
         private readonly PtaSuiviService $ptaSuiviService,
         private readonly PtaOfficialCalculationService $officialCalculation,
         private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService,
-        private readonly FinancialMonitoringService $financialMonitoringService
     ) {}
 
     public function index(Request $request): View
     {
+        $this->dashboardFilterContext->useRequest($request);
+        $this->dashboardOverviewReadModel->useRequest($request);
+        $this->dashboardTabPayloadService->useRequest($request);
+
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
 
-        if (! $this->canReadDashboard($user)) {
+        if (! $this->dashboardAccessService->canReadDashboard($user)) {
             abort(403, 'Accès non autorisé.');
         }
         $user->loadMissing([
@@ -93,8 +89,16 @@ class DashboardController extends Controller
         ]);
 
         $view = $request->routeIs('admin.*') ? 'admin.dashboard' : 'dashboard';
+        $dashboardTab = $this->dashboardTabPayloadService->current();
         $payload = $this->dashboardPagePayload($user);
-        $payload['dashboardData']['deadline_extension_summary'] = $this->deadlineExtensionQueueService->summaryFor($user);
+        $payload['dashboardData']['deadline_extension_summary'] = $dashboardTab === 'overview'
+            ? $this->deadlineExtensionQueueService->summaryFor($user)
+            : ['actionable_count' => 0, 'mine_count' => 0];
+        $viewOptions = is_array($payload['viewOptions'] ?? null) ? $payload['viewOptions'] : [];
+        $layoutNotifications = $user->notifications()
+            ->latest()
+            ->limit(24)
+            ->get();
 
         return view($view, [
             'user' => $user,
@@ -108,7 +112,13 @@ class DashboardController extends Controller
             'reportingClientAnalytics' => $payload['reportingClientAnalytics'],
             'dgPayload' => $payload['dgPayload'],
             'chartPayload' => $payload['chartPayload'],
-            'personalTasks' => $this->personalTaskService->forUser($user, 5),
+            'currentDashboardTab' => $dashboardTab,
+            'layoutNotifications' => $layoutNotifications,
+            'headerActivePeriodLabel' => $viewOptions['active_label'] ?? $this->exerciceContext->activeLabel(),
+            'synthesisExerciseOptions' => $viewOptions['exercise_options'] ?? [],
+            'synthesisPeriodOptions' => $viewOptions['period_options'] ?? [],
+            'selectedSynthesisPeriod' => $viewOptions['selected_period'] ?? 'all',
+            'selectedSynthesisRmoLabel' => $viewOptions['selected_rmo_label'] ?? null,
         ]);
     }
 
@@ -123,7 +133,7 @@ class DashboardController extends Controller
             $key = $this->dashboardCacheKey($user, 'page');
             $cached = Cache::get($key);
             if (is_array($cached)) {
-                return $cached;
+                return $this->dashboardTabPayloadService->finalize($cached);
             }
         } catch (Throwable) {
             // Fresh dashboard data is safer than failing when the cache store is unavailable.
@@ -131,7 +141,7 @@ class DashboardController extends Controller
 
         $payload = $this->buildDashboardPagePayload($user);
 
-        if ($key !== null) {
+        if ($key !== null && $this->isPrimitiveCacheValue($payload)) {
             try {
                 Cache::put($key, $payload, now()->addMinutes(self::DASHBOARD_CACHE_TTL_MINUTES));
             } catch (Throwable) {
@@ -139,7 +149,22 @@ class DashboardController extends Controller
             }
         }
 
-        return $payload;
+        return $this->dashboardTabPayloadService->finalize($payload);
+    }
+
+    private function isPrimitiveCacheValue(mixed $value): bool
+    {
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (! $this->isPrimitiveCacheValue($item)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return $value === null || is_scalar($value);
     }
 
     /**
@@ -147,111 +172,31 @@ class DashboardController extends Controller
      */
     private function buildDashboardPagePayload(User $user): array
     {
-        $today = Carbon::today()->toDateString();
+        $includeFinancialSummary = $this->dashboardTabPayloadService->is('overview');
+        $snapshot = $this->dashboardOverviewReadModel->read($user, $includeFinancialSummary);
+        $allDashboardActions = $snapshot->allDashboardActions;
+        $scopedActions = $snapshot->scopedActions;
+        $dashboardActions = $snapshot->dashboardActions;
+        $totals = $snapshot->totals;
+        $statusBreakdown = $snapshot->statusBreakdown;
+        $alerts = $snapshot->alerts;
 
-        $pas = $this->buildPasScopedQuery($user);
-        $paos = Pao::query();
-        $ptas = Pta::query();
-        $actions = Action::query();
-        $kpis = Kpi::query();
-        $mesures = KpiMesure::query();
-
-        $this->scopePao($paos, $user);
-        $this->scopePta($ptas, $user);
-        $this->scopeAction($actions, $user);
-        $this->scopeKpi($kpis, $user);
-        $this->scopeMesure($mesures, $user);
-        $scopedActions = (clone $actions)
-            ->with([
-                'pta:id,pao_id,objectif_operationnel_id,titre,direction_id,service_id',
-                'pta.pao:id,pas_id,pas_objectif_id,direction_id,annee,titre,statut',
-                'pta.pao.pas:id,titre,periode_debut,periode_fin,statut',
-                'pta.pao.pasObjectif:id,pas_axe_id,code,libelle,ordre',
-                'pta.pao.pasObjectif.pasAxe:id,pas_id,code,libelle,ordre',
-                'objectifOperationnel:id,pao_id,pas_objectif_id,service_id,libelle,echeance,statut',
-                'pta.objectifOperationnel:id,pao_id,pas_objectif_id,service_id,libelle,echeance,statut',
-                'pta.direction:id,code,libelle',
-                'pta.service:id,code,libelle',
-                'responsable:id,name',
-                'responsables:id,name,service_id',
-                // directionValidePar supprime avec la migration de purge direction.
-                'justificatifs:id,justifiable_type,justifiable_id,sous_action_id,nom_original,description,ajoute_par,created_at',
-                'justificatifs.ajoutePar:id,name',
-                'sousActions:id,action_id,agent_id,libelle,statut,est_effectuee,taux_execution,date_fin',
-                'sousActions.agent:id,name,service_id',
-                'sousActions.justificatifs:id,sous_action_id,nom_original,description,ajoute_par,created_at',
-                'sousActions.justificatifs.ajoutePar:id,name',
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_global,progression_reelle,progression_theorique',
-                'actionLogs:id,action_id,type_evenement',
-            ])
-            ->orderByDesc('date_echeance')
-            ->get();
-        $scopedActions = $this->applyDashboardSynthesisActionFilters($scopedActions);
-
-        $actionSets = $this->splitDashboardActionCollections($user, $scopedActions);
-        $dashboardActions = $actionSets['dashboard'];
-        $dashboardValidatedActions = $this->validatedActions($dashboardActions);
-        $actionStatusBreakdown = $this->statusCounts($dashboardActions);
-        $actionValidationBreakdown = $this->countActionsByAttribute($dashboardActions, 'statut_validation');
-
-        // Perf : chaque paire total/actifs est calculee en UNE requete via
-        // SUM(CASE...) au lieu de deux count() separes (3 round-trips economises,
-        // gain reseau sur DB distante). Resultat arithmetiquement identique a
-        // count(*) + count(*) where statut=... — compatible pgsql et sqlite.
-        $pasAgg = (clone $pas)
-            ->selectRaw("count(*) as total, sum(case when statut = 'actif' then 1 else 0 end) as actifs")
-            ->first();
-        $paoAgg = (clone $paos)
-            ->selectRaw("count(*) as total, sum(case when statut in ('en_cours', 'valide') then 1 else 0 end) as actifs")
-            ->first();
-        $ptaAgg = (clone $ptas)
-            ->selectRaw("count(*) as total, sum(case when statut = 'en_cours' then 1 else 0 end) as actifs")
-            ->first();
-
-        $totals = [
-            'pas_total' => (int) ($pasAgg->total ?? 0),
-            'pas_actifs' => (int) ($pasAgg->actifs ?? 0),
-            'paos_total' => (int) ($paoAgg->total ?? 0),
-            'paos_actifs' => (int) ($paoAgg->actifs ?? 0),
-            'ptas_total' => (int) ($ptaAgg->total ?? 0),
-            'ptas_actifs' => (int) ($ptaAgg->actifs ?? 0),
-            'actions_total' => $dashboardActions->count(),
-            'actions_validees' => $dashboardValidatedActions->count(),
-            'kpis_total' => (clone $kpis)->count(),
-            'kpi_mesures_total' => (clone $mesures)->count(),
-        ];
-
-        $statusBreakdown = [
-            'paos' => $this->countByStatus($paos, 'statut'),
-            'ptas' => $this->countByStatus($ptas, 'statut'),
-            'actions' => $actionStatusBreakdown,
-            'actions_validation' => $actionValidationBreakdown,
-        ];
-
-        $actionsRetard = $dashboardActions
-            ->filter(fn (Action $action): bool => $this->isLateForDashboard($action, $today))
-            ->count();
-
-        $kpiSousSeuilQuery = KpiMesure::query()
-            ->join('kpis', 'kpis.id', '=', 'kpi_mesures.kpi_id')
-            ->join('actions', 'actions.id', '=', 'kpis.action_id')
-            ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
-            ->whereNotNull('kpis.seuil_alerte')
-            ->whereColumn('kpi_mesures.valeur', '<', 'kpis.seuil_alerte');
-        $this->scopeJoinedPta($kpiSousSeuilQuery, $user, 'ptas.direction_id', 'ptas.service_id');
-        $this->applyDashboardActionContextFilter($kpiSousSeuilQuery, $user, 'actions.contexte_action');
-
-        $alerts = [
-            'actions_en_retard' => $actionsRetard,
-            'mesures_kpi_sous_seuil' => $kpiSousSeuilQuery->count(),
-            'alertes_action_actives' => $this->activeActionAlertLogsCount($user),
-        ];
-
-        $dashboardData = $this->buildDashboardData($user, $scopedActions);
-        $dashboardData['financial_summary'] = $this->financialMonitoringService->dashboardSummary($user);
-        $reportingAnalytics = $this->buildDashboardReportingPayload($user, $totals, $alerts, $statusBreakdown, $dashboardData);
-        $dashboardClientData = $this->buildDashboardClientPayload($dashboardData);
-        $reportingClientAnalytics = $this->buildReportingClientPayload($reportingAnalytics);
+        $dashboardData = $this->buildDashboardData($user, $scopedActions, $allDashboardActions);
+        $dashboardData['synthesis_decision_summary'] = $snapshot->synthesisDecisionSummary;
+        $dashboardData['financial_summary'] = $includeFinancialSummary
+            ? $snapshot->financialSummary
+            : [];
+        $reportingAnalytics = $this->buildDashboardReportingPayload(
+            $user,
+            $totals,
+            $alerts,
+            $statusBreakdown,
+            $dashboardData,
+            $dashboardActions,
+            $allDashboardActions
+        );
+        $dashboardClientData = $this->dashboardTabPayloadService->dashboardClientData($dashboardData);
+        $reportingClientAnalytics = $this->dashboardTabPayloadService->reportingClientData($reportingAnalytics);
         $dgPayload = [
             'global_scores' => $dashboardData['global_scores'] ?? [],
             'alert_rows' => $dashboardData['alert_rows'] ?? [],
@@ -259,23 +204,36 @@ class DashboardController extends Controller
         ];
 
         return [
-            'metrics' => [
-                'totals' => $totals,
-                'alerts' => $alerts,
-                'status_breakdown' => $statusBreakdown,
-                'action_scope' => [
-                    'mode' => $user->isAgent() ? 'personnel' : 'pilotage',
-                    'visible_actions_total' => $actionSets['visible']->count(),
-                    'personal_actions_total' => $actionSets['personal']->count(),
-                    'dashboard_actions_total' => $dashboardActions->count(),
-                ],
-            ],
+            'metrics' => $snapshot->metrics(),
             'dashboardData' => $dashboardData,
             'dashboardClientData' => $dashboardClientData,
             'reportingAnalytics' => $reportingAnalytics,
             'reportingClientAnalytics' => $reportingClientAnalytics,
             'dgPayload' => $dgPayload,
             'chartPayload' => $this->buildChartPayload($totals, $alerts, $statusBreakdown),
+            'viewOptions' => $this->buildDashboardViewOptions($snapshot->filterOptions),
+        ];
+    }
+
+    /**
+     * @param  array<string, list<array<string, int|string>>>  $filterOptions
+     * @return array{active_label: string, exercise_options: array<int, array<string, mixed>>, period_options: array<int, array<string, mixed>>, selected_period: string, selected_rmo_label: string|null}
+     */
+    private function buildDashboardViewOptions(array $filterOptions): array
+    {
+        $filters = $this->selectedDashboardSynthesisFilters();
+        $responsableId = $filters['responsable_id'] ?? null;
+        $responsableLabel = $responsableId !== null
+            ? collect($filterOptions['responsibles'] ?? [])
+                ->first(fn (array $responsable): bool => (int) ($responsable['id'] ?? 0) === (int) $responsableId)['label'] ?? null
+            : null;
+
+        return [
+            'active_label' => $this->exerciceContext->activeLabel(),
+            'exercise_options' => $filterOptions['years'] ?? [],
+            'period_options' => $filterOptions['periods'] ?? [],
+            'selected_period' => (string) ($filters['periode'] ?? 'all'),
+            'selected_rmo_label' => $responsableLabel !== null ? (string) $responsableLabel : null,
         ];
     }
 
@@ -297,6 +255,8 @@ class DashboardController extends Controller
      * @param  array<string, int>  $alerts
      * @param  array<string, array<string, int>>  $statusBreakdown
      * @param  array<string, mixed>  $dashboardData
+     * @param  Collection<int, Action>  $dashboardActions
+     * @param  Collection<int, Action>  $allDashboardActions
      * @return array<string, mixed>
      */
     private function buildDashboardReportingPayload(
@@ -304,7 +264,9 @@ class DashboardController extends Controller
         array $totals,
         array $alerts,
         array $statusBreakdown,
-        array $dashboardData
+        array $dashboardData,
+        Collection $dashboardActions,
+        Collection $allDashboardActions
     ): array {
         $monthly = collect($dashboardData['monthly'] ?? []);
         $unitRows = collect($dashboardData['unit_rows'] ?? []);
@@ -315,7 +277,10 @@ class DashboardController extends Controller
         $interannual = collect($dashboardData['interannual'] ?? []);
         $alertRows = collect($dashboardData['alert_rows'] ?? []);
         $actionRows = collect($dashboardData['action_rows'] ?? []);
-        $ptaQuarterlyAnalysis = $this->buildDashboardPtaQuarterlyAnalysis($user);
+        $dashboardTab = $this->dashboardTabPayloadService->current();
+        $ptaQuarterlyAnalysis = in_array($dashboardTab, ['advanced', 'charts'], true)
+            ? $this->buildDashboardPtaQuarterlyAnalysis($dashboardActions)
+            : [];
         $globalScores = is_array($dashboardData['global_scores'] ?? null) ? $dashboardData['global_scores'] : [];
         $qualityThreshold = (float) ($dashboardData['quality_threshold'] ?? $globalScores['quality_threshold'] ?? 60);
         $policy = [
@@ -326,7 +291,7 @@ class DashboardController extends Controller
         ];
 
         return [
-            'generatedAt' => now(),
+            'generatedAt' => now()->toISOString(),
             'scope' => [
                 'role' => $user->role,
                 'direction_id' => $user->direction_id,
@@ -367,7 +332,9 @@ class DashboardController extends Controller
             'managedKpis' => [],
             'statuts' => $statusBreakdown,
             'alertes' => $alerts,
-            'pasConsolidation' => $this->buildDashboardPasConsolidation($user),
+            'pasConsolidation' => $dashboardTab === 'advanced'
+                ? $this->buildDashboardPasConsolidation($user, $allDashboardActions)
+                : [],
             'interannualComparison' => $interannual->values()->all(),
             'ptaQuarterlyAnalysis' => $ptaQuarterlyAnalysis,
             'charts' => [
@@ -435,10 +402,10 @@ class DashboardController extends Controller
                 'pta_quarterly' => $ptaQuarterlyAnalysis['charts'] ?? [],
             ],
             'details' => [
-                'actions_retard' => collect(),
-                'kpi_sous_seuil' => collect(),
-                'structure_rapports' => collect(),
-                'direction_service_report' => collect(),
+                'actions_retard' => [],
+                'kpi_sous_seuil' => [],
+                'structure_rapports' => [],
+                'direction_service_report' => [],
             ],
         ];
     }
@@ -446,32 +413,11 @@ class DashboardController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function buildDashboardPtaQuarterlyAnalysis(User $user): array
+    private function buildDashboardPtaQuarterlyAnalysis(Collection $actions): array
     {
-        $query = Action::query()
-            ->whereNotNull('pta_id')
-            ->with([
-                'actionKpi:id,action_id,kpi_global,kpi_performance,progression_reelle,progression_theorique',
-                'objectifOperationnel:id,pas_axe_id,pas_objectif_id,libelle',
-                'objectifOperationnel.pasAxe:id,code,libelle',
-                'objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
-                'pta:id,pao_id,objectif_operationnel_id,titre,direction_id,service_id',
-                'pta.direction:id,code,libelle',
-                'pta.service:id,code,libelle',
-                'pta.objectifOperationnel:id,pas_axe_id,pas_objectif_id,libelle',
-                'pta.objectifOperationnel.pasAxe:id,code,libelle',
-                'pta.objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
-                'pta.pao:id,pas_objectif_id,titre,objectif_operationnel',
-                'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
-                'pta.pao.pasObjectif.pasAxe:id,code,libelle',
-                'responsable:id,name,email',
-            ]);
-
-        $this->scopeAction($query, $user);
-        $this->applyDashboardActionContextFilter($query, $user, 'contexte_action');
-
-        /** @var Collection<int, Action> $actions */
-        $actions = $this->applyDashboardSynthesisActionFilters($query->get());
+        $actions = $actions
+            ->filter(fn (Action $action): bool => $action->pta_id !== null)
+            ->values();
         $filters = $this->selectedDashboardSynthesisFilters();
         $periodRange = $this->ptaSuiviService->periodRange(
             $this->exerciceContext->selectedYear(),
@@ -486,73 +432,6 @@ class DashboardController extends Controller
         ]);
 
         return $this->dashboardPtaCanonicalPayload($canonical, $filters);
-
-        /* Legacy implementation retained below temporarily for a safe rollback. */
-
-        $axes = $this->dashboardPtaAxisRows($user, $actions, $periodEnd);
-
-        $services = $actions
-            ->groupBy(fn (Action $action): string => $this->dashboardPtaServiceKey($action))
-            ->map(fn (Collection $rows): array => $this->dashboardPtaAnalysisRow($rows, $periodEnd) + [
-                'direction' => (string) ($rows->first()?->pta?->direction?->libelle ?? 'Non renseignée'),
-                'libelle' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigné'),
-                'url' => $rows->first()?->pta?->service_id !== null
-                    ? $this->actionIndexRoute(['service_id' => (int) $rows->first()->pta->service_id])
-                    : $this->actionIndexRoute(),
-            ])
-            ->sortBy('libelle')
-            ->values()
-            ->all();
-
-        $monthly = $this->dashboardPtaMonthlyEvolution($actions, $periodStart, $periodEnd);
-        $dueUnrealized = $this->dashboardPtaDueActions($actions, $periodEnd)
-            ->reject(fn (Action $action): bool => $this->actionStatusService->isCompleted($action))
-            ->values();
-        $partial = $dueUnrealized
-            ->filter(fn (Action $action): bool => $this->dashboardPtaProgressRate($action) > 0)
-            ->values();
-        $postponed = $actions
-            ->filter(function (Action $action) use ($periodEnd): bool {
-                $date = $this->actionReferenceDate($action);
-
-                return $date instanceof Carbon && $date->gt($periodEnd);
-            })
-            ->values();
-
-        return [
-            'period' => [
-                'start' => $periodStart->toDateString(),
-                'end' => $periodEnd->toDateString(),
-                'label' => (string) ($filters['periode_label'] ?? $this->ptaSuiviService->periodLabel((string) ($filters['periode'] ?? 'all'))),
-            ],
-            'summary' => $this->dashboardPtaAnalysisRow($actions, $periodEnd),
-            'axes' => $axes,
-            'services' => $services,
-            'monthly' => $monthly,
-            'gaps' => [
-                'unrealized' => $dueUnrealized->take(12)->map(fn (Action $action): array => $this->dashboardPtaActionLine($action))->all(),
-                'partial' => $partial->take(12)->map(fn (Action $action): array => $this->dashboardPtaActionLine($action))->all(),
-                'postponed' => $postponed->take(12)->map(fn (Action $action): array => $this->dashboardPtaActionLine($action))->all(),
-            ],
-            'corrective_measures' => $this->dashboardPtaCorrectiveMeasures($dueUnrealized, $partial, $postponed),
-            'charts' => [
-                'axis_rates' => [
-                    'labels' => collect($axes)->pluck('libelle')->values()->all(),
-                    'values' => collect($axes)->pluck('realization_rate')->values()->all(),
-                    'urls' => collect($axes)->map(fn (): string => $this->actionIndexRoute())->values()->all(),
-                ],
-                'service_rates' => [
-                    'labels' => collect($services)->pluck('libelle')->values()->all(),
-                    'values' => collect($services)->pluck('realization_rate')->values()->all(),
-                    'urls' => collect($services)->pluck('url')->values()->all(),
-                ],
-                'monthly_rates' => [
-                    'labels' => collect($monthly)->pluck('label')->values()->all(),
-                    'values' => collect($monthly)->pluck('realization_rate')->values()->all(),
-                    'urls' => collect($monthly)->map(fn (): string => $this->actionIndexRoute())->values()->all(),
-                ],
-            ],
-        ];
     }
 
     /**
@@ -910,10 +789,14 @@ class DashboardController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildDashboardPasConsolidation(User $user): array
+    private function buildDashboardPasConsolidation(User $user, Collection $actions): array
     {
         $pasRows = $this->buildPasScopedQuery($user)
-            ->with(['axes.objectifs'])
+            ->select(['id', 'titre', 'periode_debut', 'periode_fin', 'statut'])
+            ->with([
+                'axes:id,pas_id',
+                'axes.objectifs:id,pas_axe_id',
+            ])
             ->orderByDesc('periode_fin')
             ->get();
 
@@ -921,26 +804,30 @@ class DashboardController extends Controller
             return [];
         }
 
+        $paoQuery = Pao::query()
+            ->whereIn('pas_id', $pasRows->modelKeys());
+        $this->scopePao($paoQuery, $user);
+        $paosByPas = $paoQuery
+            ->select(['id', 'pas_id', 'annee'])
+            ->with([
+                'ptas' => function ($query) use ($user): void {
+                    $this->scopePta($query, $user);
+                    $query->select(['id', 'pao_id']);
+                },
+            ])
+            ->get()
+            ->groupBy(fn (Pao $pao): int => (int) $pao->pas_id);
+        $actionsByPta = $actions
+            ->filter(fn (Action $action): bool => $action->pta_id !== null)
+            ->groupBy(fn (Action $action): int => (int) $action->pta_id);
+
         return $pasRows
-            ->map(function (Pas $pas) use ($user): array {
-                $paoQuery = Pao::query()->where('pas_id', (int) $pas->id);
-                $this->scopePao($paoQuery, $user);
-
-                $paos = $paoQuery
-                    ->with([
-                        'ptas' => function ($query) use ($user): void {
-                            $this->scopePta($query, $user);
-                            $query->with([
-                                'actions' => function ($actionQuery) use ($user): void {
-                                    $this->scopeAction($actionQuery, $user);
-                                },
-                            ]);
-                        },
-                    ])
-                    ->get();
-
+            ->map(function (Pas $pas) use ($actionsByPta, $paosByPas): array {
+                $paos = $paosByPas->get((int) $pas->id, collect());
                 $ptas = $paos->flatMap->ptas;
-                $actions = $ptas->flatMap->actions;
+                $actions = $ptas->flatMap(
+                    fn (Pta $pta): Collection => $actionsByPta->get((int) $pta->id, collect())
+                );
                 $validatedActions = $this->validatedActions($actions);
                 $actionsTotal = $actions->count();
                 $actionsValidees = $validatedActions->count();
@@ -969,214 +856,47 @@ class DashboardController extends Controller
 
     private function dashboardCacheKey(User $user, string $segment): string
     {
+        $filterDimensions = $this->dashboardFilterContext->cacheDimensions($user);
+        $readModelDimensions = $this->dashboardOverviewReadModel->cacheDimensions($user);
+
         return 'dashboard:'.$this->cacheVersionService->dashboardVersion().':'.$segment.':'.sha1(json_encode([
             'user_id' => (int) $user->id,
             'role' => (string) $user->role,
             'direction_id' => $user->direction_id !== null ? (int) $user->direction_id : null,
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
             'statistical_scope' => $this->actionCalculationSettings->statisticalScope(),
-            'alert_version' => (int) Cache::get('alert-center:version', 1),
+            'alert_version' => $this->cacheVersionService->alertsVersion(),
             'exercice' => $this->exerciceContext->selectedYear(),
             'trimestre' => $this->exerciceContext->selectedQuarter(),
-            'periode' => $this->selectedDashboardSynthesisPeriod(),
-            'direction_filter' => $this->selectedDashboardDirectionId($user),
-            'service_filter' => $this->selectedDashboardServiceId($user),
-            // `responsable_id` manquait : deux filtres RMO differents partageaient
-            // la meme entree de cache et se renvoyaient mutuellement leurs donnees.
-            'responsable_filter' => $this->selectedDashboardSynthesisFilters()['responsable_id'],
-            'statut_suivi' => $this->selectedDashboardSynthesisFilters()['statut_suivi'],
-            'statut_delai' => $this->selectedDashboardSynthesisFilters()['statut_delai'],
-            'alerte_echeance' => $this->selectedDashboardSynthesisFilters()['alerte_echeance'],
+            ...$filterDimensions,
+            ...$readModelDimensions,
+            'tab' => $this->dashboardTabPayloadService->current(),
         ], JSON_THROW_ON_ERROR));
-    }
-
-    /**
-     * Keep the embedded dashboard JSON small. The Blade view still receives the
-     * full server payload for tables, but the browser only needs chart-ready rows.
-     *
-     * @return array<string, mixed>
-     */
-    private function buildDashboardClientPayload(array $dashboardData): array
-    {
-        $keys = [
-            'dashboard_role',
-            'direction_selector',
-            'exercise',
-            'actions_index_url',
-            'personal_actions_summary',
-            'official_action_filters',
-            'unit_mode_label',
-            'global_scores',
-            'quality_threshold',
-            'status_cards',
-            'monthly',
-            'unit_rows',
-            'synthesis_service_rows',
-            'synthesis_agent_rows',
-            'agent_performance',
-            'plotly_figures',
-            'direction_performance_rows',
-            'decision_counts',
-            'decision_charts',
-            'decision_service_rows',
-            'decision_agent_rows',
-            'decision_quarter_rows',
-            'interannual',
-            'action_rows',
-            'gantt_rows',
-            'bullet_rows',
-            'scatter_points',
-            'radar_datasets',
-            'top_action_bars',
-            'role_dashboard',
-            'synthesis_filters',
-            'synthesis_decision_summary',
-        ];
-
-        return array_intersect_key($dashboardData, array_flip($keys));
-    }
-
-    /**
-     * Reporting details may contain Eloquent collections used by the Blade tables.
-     * They must not be mirrored into the JSON block, otherwise /dashboard can spend
-     * seconds serializing data that the JavaScript never reads.
-     *
-     * @return array<string, mixed>
-     */
-    private function buildReportingClientPayload(array $reportingAnalytics): array
-    {
-        return [
-            'charts' => is_array($reportingAnalytics['charts'] ?? null)
-                ? $reportingAnalytics['charts']
-                : [],
-        ];
     }
 
     private function scopePao(Builder|Relation $query, User $user): void
     {
-        $this->scopeByUserDirection($query, $user, 'direction_id');
-        $this->exerciceContext->applyToPao($query);
-        $this->applySelectedDashboardDirectionToDirectColumn($query, $user, 'direction_id');
-        if (($serviceId = $this->selectedDashboardServiceId($user)) !== null) {
-            $query->where(function (Builder $paoQuery) use ($serviceId): void {
-                $paoQuery->where('service_id', $serviceId)
-                    ->orWhereHas('objectifsOperationnels', fn (Builder $objectifQuery) => $objectifQuery->where('service_id', $serviceId))
-                    ->orWhereHas('ptas', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
-            });
-        }
+        $this->dashboardOverviewReadModel->scopePao($query, $user);
     }
 
     private function scopePta(Builder|Relation $query, User $user): void
     {
-        $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
-        $this->exerciceContext->applyToPta($query);
-        $this->applySelectedDashboardDirectionToDirectColumn($query, $user, 'direction_id');
-        $this->applySelectedDashboardServiceToDirectColumn($query, $user, 'service_id');
+        $this->dashboardOverviewReadModel->scopePta($query, $user);
     }
 
     private function scopeAction(Builder|Relation $query, User $user): void
     {
-        $this->exerciceContext->applyToAction($query);
-        $this->applySelectedDashboardDirectionToPtaRelation($query, $user);
-        $this->applySelectedDashboardServiceToPtaRelation($query, $user);
-
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->isAgent()) {
-            $query->where(function (Builder $agentQuery) use ($user): void {
-                $agentQuery->where('responsable_id', (int) $user->id)
-                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
-                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
-            });
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
-
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
+        $this->dashboardOverviewReadModel->scopeAction($query, $user);
     }
 
     private function scopeKpi(Builder|Relation $query, User $user): void
     {
-        $this->exerciceContext->applyToKpi($query);
-        $this->applySelectedDashboardDirectionToActionRelation($query, $user);
-        $this->applySelectedDashboardServiceToActionRelation($query, $user);
-
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->isAgent()) {
-            $query->whereHas('action', function (Builder $actionQuery) use ($user): void {
-                $actionQuery->where('responsable_id', (int) $user->id)
-                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
-                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
-            });
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
-
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
+        $this->dashboardOverviewReadModel->scopeKpi($query, $user);
     }
 
     private function scopeMesure(Builder|Relation $query, User $user): void
     {
-        $this->exerciceContext->applyToMesure($query);
-        $this->applySelectedDashboardDirectionToMeasureRelation($query, $user);
-        $this->applySelectedDashboardServiceToMeasureRelation($query, $user);
-
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->isAgent()) {
-            $query->whereHas('kpi.action', function (Builder $actionQuery) use ($user): void {
-                $actionQuery->where('responsable_id', (int) $user->id)
-                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
-                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
-            });
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
-
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
+        $this->dashboardOverviewReadModel->scopeMesure($query, $user);
     }
 
     private function scopeJoinedPta(
@@ -1185,395 +905,54 @@ class DashboardController extends Controller
         string $directionColumn,
         string $serviceColumn
     ): void {
-        $this->exerciceContext->applyToJoinedPta($query);
-        if (($directionId = $this->selectedDashboardDirectionId($user)) !== null) {
-            $query->where($directionColumn, $directionId);
-        }
-        if (($serviceId = $this->selectedDashboardServiceId($user)) !== null) {
-            $query->where($serviceColumn, $serviceId);
-        }
-
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->isAgent()) {
-            $query->where('actions.responsable_id', (int) $user->id);
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->where($directionColumn, (int) $user->direction_id);
-
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->where($serviceColumn, (int) $user->service_id);
-
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
+        $this->dashboardOverviewReadModel->scopeJoinedPta(
+            $query,
+            $user,
+            $directionColumn,
+            $serviceColumn,
+        );
     }
 
     private function buildPasScopedQuery(User $user): Builder
     {
-        $query = Pas::query();
-
-        if ($user->isAgent()) {
-            $query->whereHas('paos.ptas.actions', fn (Builder $q) => $q->where('responsable_id', (int) $user->id));
-            $this->exerciceContext->applyToPas($query);
-
-            return $query;
-        }
-
-        $this->scopePasByUser($query, $user);
-        $this->exerciceContext->applyToPas($query);
-        if (($directionId = $this->selectedDashboardDirectionId($user)) !== null) {
-            $query->where(function (Builder $pasQuery) use ($directionId): void {
-                $pasQuery->whereHas('paos', fn (Builder $paoQuery) => $paoQuery->where('direction_id', $directionId))
-                    ->orWhereHas('directions', fn (Builder $directionQuery) => $directionQuery->whereKey($directionId));
-            });
-        }
-        if (($serviceId = $this->selectedDashboardServiceId($user)) !== null) {
-            $query->where(function (Builder $pasQuery) use ($serviceId): void {
-                $pasQuery->whereHas('paos.objectifsOperationnels', fn (Builder $objectifQuery) => $objectifQuery->where('service_id', $serviceId))
-                    ->orWhereHas('paos.ptas', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
-            });
-        }
-
-        return $query;
+        return $this->dashboardOverviewReadModel->buildPasScopedQuery($user);
     }
 
     private function selectedDashboardDirectionId(User $user): ?int
     {
-        if ($this->dashboardDirectionResolved) {
-            return $this->dashboardDirectionId;
-        }
-
-        $this->dashboardDirectionResolved = true;
-        $this->dashboardDirectionId = null;
-
-        if (! $user->hasGlobalReadAccess()) {
-            return null;
-        }
-
-        $rawValue = trim((string) request()->query('direction_id', ''));
-        if ($rawValue === '' || $rawValue === 'all' || ! is_numeric($rawValue)) {
-            return null;
-        }
-
-        $directionId = (int) $rawValue;
-        if ($directionId <= 0) {
-            return null;
-        }
-
-        $this->dashboardDirectionId = Direction::query()
-            ->whereKey($directionId)
-            ->where('actif', true)
-            ->exists()
-                ? $directionId
-                : null;
-
-        return $this->dashboardDirectionId;
+        return $this->dashboardFilterContext->directionId($user);
     }
 
     private function selectedDashboardServiceId(User $user): ?int
     {
-        if ($this->dashboardServiceResolved) {
-            return $this->dashboardServiceId;
-        }
-
-        $this->dashboardServiceResolved = true;
-        $this->dashboardServiceId = null;
-
-        if (! $user->hasGlobalReadAccess()) {
-            return null;
-        }
-
-        $directionId = $this->selectedDashboardDirectionId($user);
-        if ($directionId === null) {
-            return null;
-        }
-
-        $rawValue = trim((string) request()->query('service_id', ''));
-        if ($rawValue === '' || $rawValue === 'all' || ! is_numeric($rawValue)) {
-            return null;
-        }
-
-        $serviceId = (int) $rawValue;
-        if ($serviceId <= 0) {
-            return null;
-        }
-
-        $this->dashboardServiceId = Service::query()
-            ->whereKey($serviceId)
-            ->where('direction_id', $directionId)
-            ->where('actif', true)
-            ->exists()
-                ? $serviceId
-                : null;
-
-        return $this->dashboardServiceId;
+        return $this->dashboardFilterContext->serviceId($user);
     }
 
     private function dashboardDirectionContext(User $user): array
     {
-        // L'acces en lecture globale est le bon discriminant : il est faux pour
-        // un chef de service, un directeur ou un agent, et vrai pour les profils
-        // qui pilotent tout le PTA. L'ancienne exclusion par role privait le
-        // chef de planification des filtres, son role etant alias de `service`.
-        $enabled = $user->hasGlobalReadAccess();
-
-        $selectedId = $this->selectedDashboardDirectionId($user);
-        $selectedServiceId = $this->selectedDashboardServiceId($user);
-        $directions = $enabled
-            ? Direction::query()
-                ->where('actif', true)
-                ->orderBy('code')
-                ->orderBy('libelle')
-                ->get(['id', 'code', 'libelle'])
-            : collect();
-
-        $selected = $selectedId !== null
-            ? $directions->firstWhere('id', $selectedId)
-            : null;
-        $services = ($enabled && $selectedId !== null)
-            ? Service::query()
-                ->where('direction_id', $selectedId)
-                ->where('actif', true)
-                ->orderBy('code')
-                ->orderBy('libelle')
-                ->get(['id', 'code', 'libelle'])
-            : collect();
-        $selectedService = $selectedServiceId !== null
-            ? $services->firstWhere('id', $selectedServiceId)
-            : null;
-
-        return [
-            'enabled' => $enabled,
-            'selected_id' => $selectedId,
-            'selected_label' => $selected instanceof Direction
-                ? trim((string) ($selected->code ?: '').' - '.(string) $selected->libelle, ' -')
-                : 'Synthèse globale',
-            'service_selected_id' => $selectedServiceId,
-            'service_selected_label' => $selectedService instanceof Service
-                ? trim((string) ($selectedService->code ?: '').' - '.(string) $selectedService->libelle, ' -')
-                : 'Tous les services',
-            'options' => $directions
-                ->map(fn (Direction $direction): array => [
-                    'id' => (int) $direction->id,
-                    'label' => trim((string) ($direction->code ?: '').' - '.(string) $direction->libelle, ' -'),
-                ])
-                ->values()
-                ->all(),
-            'service_options' => $services
-                ->map(fn (Service $service): array => [
-                    'id' => (int) $service->id,
-                    'label' => trim((string) ($service->code ?: '').' - '.(string) $service->libelle, ' -'),
-                ])
-                ->values()
-                ->all(),
-        ];
-    }
-
-    private function applySelectedDashboardDirectionToDirectColumn(Builder|Relation $query, User $user, string $column): void
-    {
-        if (($directionId = $this->selectedDashboardDirectionId($user)) === null) {
-            return;
-        }
-
-        $query->where($column, $directionId);
-    }
-
-    private function applySelectedDashboardDirectionToPtaRelation(Builder|Relation $query, User $user): void
-    {
-        if (($directionId = $this->selectedDashboardDirectionId($user)) === null) {
-            return;
-        }
-
-        $query->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
-    }
-
-    private function applySelectedDashboardDirectionToActionRelation(Builder|Relation $query, User $user): void
-    {
-        if (($directionId = $this->selectedDashboardDirectionId($user)) === null) {
-            return;
-        }
-
-        $query->whereHas('action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
-    }
-
-    private function applySelectedDashboardDirectionToMeasureRelation(Builder|Relation $query, User $user): void
-    {
-        if (($directionId = $this->selectedDashboardDirectionId($user)) === null) {
-            return;
-        }
-
-        $query->whereHas('kpi.action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
-    }
-
-    private function applySelectedDashboardServiceToDirectColumn(Builder|Relation $query, User $user, string $column): void
-    {
-        if (($serviceId = $this->selectedDashboardServiceId($user)) === null) {
-            return;
-        }
-
-        $query->where($column, $serviceId);
-    }
-
-    private function applySelectedDashboardServiceToPtaRelation(Builder|Relation $query, User $user): void
-    {
-        if (($serviceId = $this->selectedDashboardServiceId($user)) === null) {
-            return;
-        }
-
-        $query->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
-    }
-
-    private function applySelectedDashboardServiceToActionRelation(Builder|Relation $query, User $user): void
-    {
-        if (($serviceId = $this->selectedDashboardServiceId($user)) === null) {
-            return;
-        }
-
-        $query->whereHas('action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
-    }
-
-    private function applySelectedDashboardServiceToMeasureRelation(Builder|Relation $query, User $user): void
-    {
-        if (($serviceId = $this->selectedDashboardServiceId($user)) === null) {
-            return;
-        }
-
-        $query->whereHas('kpi.action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function countByStatus(Builder $query, string $statusColumn): array
-    {
-        $statusColumn = SafeSql::identifier($statusColumn, [
-            'statut',
-            'statut_dynamique',
-            'statut_validation',
-            'statut_realisation',
-        ]);
-
-        /** @var array<string, int> $result */
-        $result = (clone $query)
-            ->selectRaw("{$statusColumn} as status_label, COUNT(*) as total")
-            ->groupBy($statusColumn)
-            ->pluck('total', 'status_label')
-            ->map(fn ($value): int => (int) $value)
-            ->toArray();
-
-        return $result;
+        return $this->dashboardFilterContext->directionContext($user);
     }
 
     /**
      * @param  Collection<int, Action>  $actions
-     * @return array{visible:Collection<int, Action>, dashboard:Collection<int, Action>, personal:Collection<int, Action>}
+     * @return array{visible: Collection<int, Action>, dashboard: Collection<int, Action>, personal: Collection<int, Action>}
      */
     private function splitDashboardActionCollections(User $user, Collection $actions): array
     {
-        $visibleActions = $actions->values();
-        $personalActions = $visibleActions
-            ->filter(fn (Action $action): bool => (int) ($action->responsable_id ?? 0) === (int) $user->id)
-            ->values();
-
-        $dashboardActions = $user->isAgent()
-            ? $visibleActions
-            : $visibleActions
-                ->filter(fn (Action $action): bool => $this->isPilotageDashboardAction($action, $user))
-                ->values();
-
-        return [
-            'visible' => $visibleActions,
-            'dashboard' => $dashboardActions,
-            'personal' => $personalActions,
-        ];
-    }
-
-    private function isPilotageDashboardAction(Action $action, User $user): bool
-    {
-        $context = (string) ($action->contexte_action ?: Action::CONTEXT_PILOTAGE);
-
-        return $context === Action::CONTEXT_PILOTAGE;
-    }
-
-    private function applyDashboardActionContextFilter(
-        Builder $query,
-        User $user,
-        string $contextColumn
-    ): void {
-        if ($user->isAgent()) {
-            return;
-        }
-
-        $query->where(function (Builder $contextQuery) use ($contextColumn): void {
-            $contextQuery->whereNull($contextColumn)
-                ->orWhere($contextColumn, Action::CONTEXT_PILOTAGE);
-        });
-
+        return $this->dashboardOverviewReadModel->splitActionCollections($user, $actions);
     }
 
     /**
-     * @return array{periode: string, periode_label: string, statut_suivi: string|null, statut_delai: string|null, alerte_echeance: string|null, responsable_id: int|null}
+     * @return array{periode: string, periode_label: string, statut_action: string|null, statut_suivi: string|null, statut_delai: string|null, alerte_echeance: string|null, responsable_id: int|null}
      */
     private function selectedDashboardSynthesisFilters(): array
     {
-        $pick = static function (string $key, array $allowed): ?string {
-            $value = trim((string) request()->query($key, ''));
-
-            return $value !== '' && $value !== 'all' && in_array($value, $allowed, true)
-                ? $value
-                : null;
-        };
-
-        $period = $this->selectedDashboardSynthesisPeriod();
-
-        $responsableRaw = trim((string) request()->query('responsable_id', ''));
-        $responsableId = ($responsableRaw !== '' && $responsableRaw !== 'all' && ctype_digit($responsableRaw) && (int) $responsableRaw > 0)
-            ? (int) $responsableRaw
-            : null;
-
-        return [
-            'periode' => $period,
-            'periode_label' => $this->ptaSuiviService->periodLabel($period),
-            'responsable_id' => $responsableId,
-            'statut_suivi' => $pick('statut_suivi', [
-                'a_parametrer',
-                'non_demarre',
-                'en_cours',
-                'validation_chef',
-                'validation_controleur',
-                'validation_planification',
-                'cloture',
-            ]),
-            'statut_delai' => $pick('statut_delai', [
-                'dans_les_delais',
-                'hors_delai',
-            ]),
-            'alerte_echeance' => $pick('alerte_echeance', [
-                'aucune_alerte',
-                'echeance_proche',
-                'critique',
-                'en_retard',
-                'cloturee',
-                'a_parametrer',
-            ]),
-        ];
+        return $this->dashboardFilterContext->synthesisFilters();
     }
 
     private function selectedDashboardSynthesisPeriod(): string
     {
-        return $this->ptaSuiviService->normalizePeriod(
-            request()->query('periode', request()->query('trimestre', $this->exerciceContext->selectedQuarter() ?: 'all'))
-        );
+        return $this->dashboardFilterContext->period();
     }
 
     /**
@@ -1582,255 +961,34 @@ class DashboardController extends Controller
      */
     private function applyDashboardSynthesisActionFilters(Collection $actions): Collection
     {
-        $filters = $this->selectedDashboardSynthesisFilters();
-        $periodRange = $this->ptaSuiviService->periodRange(
-            $this->exerciceContext->selectedYear(),
-            (string) ($filters['periode'] ?? 'all')
-        );
-
-        if ($periodRange === null && ! $filters['statut_suivi'] && ! $filters['statut_delai'] && ! $filters['alerte_echeance'] && ! $filters['responsable_id']) {
-            return $actions->values();
-        }
-
-        return $actions
-            ->filter(function (Action $action) use ($filters, $periodRange): bool {
-                if ($periodRange !== null) {
-                    $date = $this->actionReferenceDate($action);
-                    if (! $date instanceof Carbon || ! $date->betweenIncluded($periodRange[0], $periodRange[1])) {
-                        return false;
-                    }
-                }
-
-                if ($filters['responsable_id'] !== null) {
-                    $responsableId = (int) $filters['responsable_id'];
-                    $matchesResponsable = (int) ($action->responsable_id ?? 0) === $responsableId
-                        || ($action->relationLoaded('responsables')
-                            && $action->responsables->contains(fn ($responsable): bool => (int) $responsable->getKey() === $responsableId));
-                    if (! $matchesResponsable) {
-                        return false;
-                    }
-                }
-
-                if ($filters['statut_suivi'] !== null && $this->synthesisWorkflowStatus($action) !== $filters['statut_suivi']) {
-                    return false;
-                }
-
-                if ($filters['statut_delai'] !== null && $this->synthesisDelayStatus($action) !== $filters['statut_delai']) {
-                    return false;
-                }
-
-                if ($filters['alerte_echeance'] !== null && $this->synthesisAlertStatus($action) !== $filters['alerte_echeance']) {
-                    return false;
-                }
-
-                return true;
-            })
-            ->values();
+        return $this->dashboardOverviewReadModel->applySynthesisActionFilters($actions);
     }
 
-    /**
-     * @param  Collection<int, Action>  $actions
-     * @return array<string, mixed>
-     */
     private function buildSynthesisDecisionSummary(Collection $actions): array
     {
-        $workflowCounts = [
-            'a_parametrer' => 0,
-            'non_demarre' => 0,
-            'en_cours' => 0,
-            'validation_chef' => 0,
-            'validation_controleur' => 0,
-            'cloture' => 0,
-        ];
-        $delayCounts = [
-            'dans_les_delais' => 0,
-            'hors_delai' => 0,
-        ];
-        $alertCounts = [
-            'aucune_alerte' => 0,
-            'echeance_proche' => 0,
-            'critique' => 0,
-            'en_retard' => 0,
-            'cloturee' => 0,
-            'a_parametrer' => 0,
-        ];
-
-        foreach ($actions as $action) {
-            $workflow = $this->synthesisWorkflowStatus($action);
-            $delay = $this->synthesisDelayStatus($action);
-            $alert = $this->synthesisAlertStatus($action);
-
-            $workflowCounts[$workflow] = ($workflowCounts[$workflow] ?? 0) + 1;
-            $delayCounts[$delay] = ($delayCounts[$delay] ?? 0) + 1;
-            $alertCounts[$alert] = ($alertCounts[$alert] ?? 0) + 1;
-        }
-
-        $total = $actions->count();
-        $progress = $total > 0
-            ? round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2)
-            : 0.0;
-        $performance = $total > 0
-            ? round((float) $actions->avg(function (Action $action): float {
-                $score = (float) ($action->actionKpi?->kpi_global ?? 0);
-
-                return $score > 0 ? $score : $this->actionQuantitativeRate($action);
-            }), 2)
-            : 0.0;
-
-        return [
-            'total' => $total,
-            'taux_execution' => $progress,
-            'performance_pta' => $performance,
-            'workflow' => $workflowCounts,
-            'delay' => $delayCounts,
-            'alerts' => $alertCounts,
-        ];
+        return $this->dashboardOverviewReadModel->buildSynthesisDecisionSummary($actions);
     }
 
     private function synthesisWorkflowStatus(Action $action): string
     {
-        if ($this->actionStatusService->isPendingSetup($action)) {
-            return 'a_parametrer';
-        }
-
-        $dynamic = strtolower(trim((string) ($action->statut_dynamique ?? $action->statut ?? '')));
-        $validation = strtolower(trim((string) ($action->statut_validation ?? '')));
-
-        if ($dynamic === ActionTrackingService::STATUS_CLOTUREE || $action->cloture_le !== null) {
-            return 'cloture';
-        }
-
-        if (in_array($validation, [
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
-        ], true)) {
-            return 'validation_controleur';
-        }
-
-        // 3e visa : en attente de la validation finale de la planification.
-        if (in_array($validation, [
-            ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
-            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
-        ], true)) {
-            return 'validation_planification';
-        }
-
-        if (in_array($validation, [
-            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
-            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
-            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
-            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-        ], true)) {
-            return 'cloture';
-        }
-
-        if ($validation === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
-            return 'validation_chef';
-        }
-
-        if ($this->actionStatusService->isNotStarted($action)) {
-            return 'non_demarre';
-        }
-
-        return 'en_cours';
+        return $this->dashboardOverviewReadModel->synthesisWorkflowStatus($action);
     }
 
     private function synthesisDelayStatus(Action $action): string
     {
-        $deadline = $this->actionDeadline($action);
-        if (! $deadline instanceof Carbon) {
-            return 'dans_les_delais';
-        }
-
-        $deadlineDay = $deadline->copy()->endOfDay();
-        $completedAt = $this->synthesisCompletedAt($action);
-        if ($completedAt instanceof Carbon) {
-            return $completedAt->copy()->startOfDay()->gt($deadlineDay) ? 'hors_delai' : 'dans_les_delais';
-        }
-
-        return Carbon::today()->gt($deadlineDay) ? 'hors_delai' : 'dans_les_delais';
+        return $this->dashboardOverviewReadModel->synthesisDelayStatus($action);
     }
 
     private function synthesisAlertStatus(Action $action): string
     {
-        if ($this->synthesisWorkflowStatus($action) === 'cloture' || $this->synthesisCompletedAt($action) instanceof Carbon) {
-            return 'cloturee';
-        }
-
-        $deadline = $this->actionDeadline($action);
-        if (! $deadline instanceof Carbon) {
-            return 'a_parametrer';
-        }
-
-        $today = Carbon::today();
-        $deadlineDay = $deadline->copy()->startOfDay();
-        if ($today->gt($deadlineDay)) {
-            return 'en_retard';
-        }
-
-        $days = $today->diffInDays($deadlineDay, false);
-        if ($days <= 3) {
-            return 'critique';
-        }
-
-        if ($days <= 7) {
-            return 'echeance_proche';
-        }
-
-        return 'aucune_alerte';
+        return $this->dashboardOverviewReadModel->synthesisAlertStatus($action);
     }
 
     private function synthesisCompletedAt(Action $action): ?Carbon
     {
-        foreach (['date_fin_reelle', 'cloture_le', 'evalue_le'] as $field) {
-            $date = $action->{$field} ?? null;
-            if ($date instanceof Carbon) {
-                return $date;
-            }
-        }
-
-        return null;
+        return $this->dashboardOverviewReadModel->synthesisCompletedAt($action);
     }
 
-    /**
-     * @param  Collection<int, Action>  $actions
-     * @return array<string, int>
-     */
-    private function countActionsByAttribute(Collection $actions, string $attribute): array
-    {
-        /** @var array<string, int> $counts */
-        $counts = $actions
-            ->groupBy(fn (Action $action): string => (string) ($action->{$attribute} ?? 'non_renseigne'))
-            ->map(fn (Collection $rows): int => $rows->count())
-            ->toArray();
-
-        return $counts;
-    }
-
-    private function isLateForDashboard(Action $action, string $today): bool
-    {
-        if (! $action->date_echeance instanceof Carbon) {
-            return false;
-        }
-
-        if ($action->date_echeance->toDateString() >= $today) {
-            return false;
-        }
-
-        return ! in_array((string) ($action->statut_dynamique ?? ''), [
-            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
-            ActionTrackingService::STATUS_SUSPENDU,
-            ActionTrackingService::STATUS_ANNULE,
-        ], true);
-    }
-
-    /**
-     * @param  array<string, int>  $totals
-     * @param  array<string, int>  $alerts
-     * @param  array<string, array<string, int>>  $statusBreakdown
-     * @return array<string, mixed>
-     */
     private function buildChartPayload(array $totals, array $alerts, array $statusBreakdown): array
     {
         $statusModules = [
@@ -1892,8 +1050,12 @@ class DashboardController extends Controller
      * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
-    private function buildDashboardData(User $user, Collection $actions): array
+    private function buildDashboardData(User $user, Collection $actions, Collection $allDashboardActions): array
     {
+        $dashboardTab = $this->dashboardTabPayloadService->current();
+        $buildOverviewData = $dashboardTab === 'overview';
+        $buildTableData = $dashboardTab === 'advanced';
+        $buildChartData = $dashboardTab === 'charts';
         $actionSets = $this->splitDashboardActionCollections($user, $actions);
         $personalActions = $actionSets['personal'];
         $actions = $actionSets['dashboard'];
@@ -1902,37 +1064,43 @@ class DashboardController extends Controller
         $dashboardRole = $this->resolveDashboardRole($user);
         $currentYear = (int) ($this->exerciceContext->selectedYear() ?? now()->year);
         $unitMeta = $this->resolveUnitMeta($user);
-        $unitRows = $this->buildUnitRows($actions, (string) $unitMeta['mode']);
-        $synthesisObjectiveRows = $this->buildSynthesisObjectiveRows($actions);
-        $synthesisPaoRows = $this->buildSynthesisPaoRows($actions);
-        $synthesisPtaRows = $this->buildSynthesisPtaRows($actions);
-        $synthesisServiceRows = $this->buildUnitRows($actions, 'service');
-        $synthesisAgentRows = $this->buildServiceAgentPerformanceRows($actions);
-        $synthesisLateRows = $this->buildLateActionRows($actions);
+        $unitRows = ($buildTableData || $buildChartData)
+            ? $this->buildUnitRows($actions, (string) $unitMeta['mode'])
+            : [];
+        $synthesisObjectiveRows = $buildChartData ? $this->buildSynthesisObjectiveRows($actions) : [];
+        $synthesisPaoRows = $buildChartData ? $this->buildSynthesisPaoRows($actions) : [];
+        $synthesisPtaRows = ($buildOverviewData || $buildChartData) ? $this->buildSynthesisPtaRows($actions) : [];
+        $synthesisServiceRows = $buildTableData ? $this->buildUnitRows($actions, 'service') : [];
+        $synthesisAgentRows = $buildTableData ? $this->buildServiceAgentPerformanceRows($actions) : [];
+        $synthesisLateRows = $buildTableData ? $this->buildLateActionRows($actions) : [];
         $decisionCounts = $this->buildDecisionCounts($actions);
-        $decisionChainRows = $this->buildDecisionChainRows($actions);
-        $decisionServiceRows = $this->buildDecisionServiceRows($actions);
-        $decisionAgentRows = $this->buildDecisionAgentRows($actions);
-        $decisionPriorityRows = $this->buildDecisionPriorityRows($actions);
-        $decisionLateRows = $this->buildDecisionLateRows($actions);
-        $decisionPendingValidationRows = $this->buildDecisionPendingValidationRows($actions);
-        $decisionProofRows = $this->buildDecisionProofRows($actions);
-        $decisionAnomalyRows = $this->buildDecisionAnomalyRows($actions);
-        $decisionQuarterRows = $this->buildDecisionQuarterRows($actions, $currentYear);
-        $directionPerformanceRows = $this->buildDirectionPerformanceRows($actions);
-        $pasDirectionRows = $this->buildPasDirectionRows($actions);
-        $paoDirectionRows = $this->buildPaoDirectionRows($actions);
-        $ptaServiceActionRows = $this->buildPtaServiceActionRows($actions);
-        $agentActionRows = $this->buildAgentActionRows($actions);
-        $subActionRows = $this->buildSubActionRows($actions);
+        $decisionChainRows = $buildTableData ? $this->buildDecisionChainRows($actions) : [];
+        $decisionServiceRows = $buildTableData ? $this->buildDecisionServiceRows($actions) : [];
+        $decisionAgentRows = $buildTableData ? $this->buildDecisionAgentRows($actions) : [];
+        $decisionPriorityRows = ($buildTableData || $buildChartData) ? $this->buildDecisionPriorityRows($actions) : [];
+        $decisionLateRows = $buildTableData ? $this->buildDecisionLateRows($actions) : [];
+        $decisionPendingValidationRows = $buildTableData ? $this->buildDecisionPendingValidationRows($actions) : [];
+        $decisionProofRows = $buildTableData ? $this->buildDecisionProofRows($actions) : [];
+        $decisionAnomalyRows = $buildTableData ? $this->buildDecisionAnomalyRows($actions) : [];
+        $decisionQuarterRows = ($buildTableData || $buildChartData)
+            ? $this->buildDecisionQuarterRows($actions, $currentYear)
+            : [];
+        $directionPerformanceRows = $buildTableData ? $this->buildDirectionPerformanceRows($actions) : [];
+        $pasDirectionRows = $buildTableData ? $this->buildPasDirectionRows($actions) : [];
+        $paoDirectionRows = $buildTableData ? $this->buildPaoDirectionRows($actions) : [];
+        $ptaServiceActionRows = $buildTableData ? $this->buildPtaServiceActionRows($actions) : [];
+        $agentActionRows = $buildTableData ? $this->buildAgentActionRows($actions) : [];
+        $subActionRows = $buildTableData ? $this->buildSubActionRows($actions) : [];
         $performanceGaugeMeta = $this->resolvePerformanceGaugeMeta($user);
-        $performanceGaugeRows = $this->buildPerformanceGaugeRows($user, $actions);
-        $interannual = $this->buildInterannualComparison($user);
+        $performanceGaugeRows = $buildChartData ? $this->buildPerformanceGaugeRows($user, $actions) : [];
+        $interannual = ($buildTableData || $buildChartData)
+            ? $this->buildInterannualComparison($user, $allDashboardActions)
+            : [];
         $statusCards = $this->buildStatusCards($actions);
         $officialStatusCards = $this->buildStatusCards($officialActions);
         $synthesisDecisionSummary = $this->buildSynthesisDecisionSummary($actions);
-        $synthesisHierarchy = $this->buildSynthesisHierarchy($user, $actions);
-        $alerts = $this->buildDashboardAlertRows($actions);
+        $synthesisHierarchy = $buildOverviewData ? $this->buildSynthesisHierarchy($user, $actions) : [];
+        $alerts = ($buildTableData || $buildChartData) ? $this->buildDashboardAlertRows($actions) : [];
         $roleDashboard = $this->buildRoleDashboard($user, $actions, $validatedActions);
 
         $avg = static function (Collection $items, callable $callback): float {
@@ -1946,32 +1114,41 @@ class DashboardController extends Controller
         $operationalGlobalScores = $this->buildGlobalScoreSummary($actions, $avg);
         $globalScores = $this->buildGlobalScoreSummary($officialActions, $avg);
         $qualityThreshold = $this->averageActionQualityThreshold($actions);
-        $agentPerformance = $this->buildAgentPerformancePayload($actions, 77.0);
-        $agentPerformance['context'] = [
-            'tenant_id' => 'default',
-            'year' => $currentYear,
-            'period' => $this->selectedDashboardSynthesisPeriod(),
-            'direction_id' => $this->selectedDashboardDirectionId($user) ?? 'all',
-            'service_id' => $this->selectedDashboardServiceId($user) ?? 'all',
-            'role' => $dashboardRole,
-        ];
-        $plotlyFigures = $this->dashboardPythonChartService->generate($agentPerformance);
-        $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false, $qualityThreshold);
-        $monthly = $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true, $qualityThreshold);
-        $decisionCharts = $this->buildDecisionChartPayload(
-            $actions,
-            $decisionCounts,
-            $synthesisObjectiveRows,
-            $synthesisPaoRows,
-            $synthesisPtaRows,
-            $decisionPriorityRows,
-            $decisionQuarterRows,
-            $statusCards,
-            $monthly,
-            $qualityThreshold
-        );
+        $agentPerformance = [];
+        if ($buildChartData) {
+            $agentPerformance = $this->buildAgentPerformancePayload($actions, 77.0);
+            $agentPerformance['context'] = [
+                'tenant_id' => 'default',
+                'year' => $currentYear,
+                'period' => $this->selectedDashboardSynthesisPeriod(),
+                'direction_id' => $this->selectedDashboardDirectionId($user) ?? 'all',
+                'service_id' => $this->selectedDashboardServiceId($user) ?? 'all',
+                'role' => $dashboardRole,
+            ];
+        }
+        $plotlyFigures = [];
+        $operationalMonthly = $buildChartData
+            ? $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false, $qualityThreshold)
+            : [];
+        $monthly = $buildChartData
+            ? $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true, $qualityThreshold)
+            : [];
+        $decisionCharts = $buildChartData
+            ? $this->buildDecisionChartPayload(
+                $actions,
+                $decisionCounts,
+                $synthesisObjectiveRows,
+                $synthesisPaoRows,
+                $synthesisPtaRows,
+                $decisionPriorityRows,
+                $decisionQuarterRows,
+                $statusCards,
+                $monthly,
+                $qualityThreshold
+            )
+            : [];
 
-        $actionRows = $actions
+        $actionRows = $buildTableData ? $actions
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
             ->map(function (Action $action): array {
                 $statusKey = $this->dashboardStatus($action);
@@ -2015,9 +1192,9 @@ class DashboardController extends Controller
                 ];
             })
             ->values()
-            ->all();
+            ->all() : [];
 
-        $ganttRows = $actions
+        $ganttRows = $buildChartData ? $actions
             ->filter(fn (Action $action): bool => $action->date_debut instanceof Carbon && $action->date_fin instanceof Carbon)
             ->sortBy(fn (Action $action): string => $action->date_debut instanceof Carbon ? $action->date_debut->toDateString() : '')
             ->map(function (Action $action): array {
@@ -2038,18 +1215,18 @@ class DashboardController extends Controller
                 ];
             })
             ->values()
-            ->all();
+            ->all() : [];
 
-        $bulletRows = collect($actionRows)
+        $bulletRows = $buildChartData ? collect($actionRows)
             ->map(fn (array $row): array => [
                 'label' => $row['libelle'],
                 'real' => (float) $row['kpi_global'],
                 'target' => (float) ($row['quality_threshold'] ?? $qualityThreshold),
                 'url' => (string) $row['url'],
             ])
-            ->all();
+            ->all() : [];
 
-        $scatterPoints = $actions
+        $scatterPoints = $buildChartData ? $actions
             ->filter(fn (Action $action): bool => $action->actionKpi instanceof ActionKpi)
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
             ->map(function (Action $action): array {
@@ -2068,9 +1245,9 @@ class DashboardController extends Controller
                 ];
             })
             ->values()
-            ->all();
+            ->all() : [];
 
-        $radarDatasets = collect($unitRows)
+        $radarDatasets = $buildChartData ? collect($unitRows)
             ->values()
             ->map(function (array $row, int $index): array {
                 $palette = ['#F26522', '#0F5B66', '#20C76B', '#F4B400'];
@@ -2088,16 +1265,16 @@ class DashboardController extends Controller
                     ],
                 ];
             })
-            ->all();
+            ->all() : [];
 
-        $topActionBars = collect($actionRows)
+        $topActionBars = $buildChartData ? collect($actionRows)
             ->map(fn (array $row): array => [
                 'label' => (string) $row['libelle'],
                 'value' => (float) $row['kpi_global'],
                 'color' => $this->kpiColor((float) $row['kpi_global']),
                 'url' => (string) $row['url'],
             ])
-            ->all();
+            ->all() : [];
 
         return [
             'dashboard_role' => $dashboardRole,
@@ -2203,9 +1380,9 @@ class DashboardController extends Controller
 
     private function resolveDashboardRole(User $user): string
     {
-        // DG — pilotage stratégique
+        // Le DG partage la même lecture opérationnelle que le chef Planification.
         if ($user->hasRole(User::ROLE_DG)) {
-            return 'dg';
+            return 'suivi_evaluation';
         }
 
         if ($user->hasRole(User::ROLE_ADMIN_FONCTIONNEL)) {
@@ -2318,30 +1495,9 @@ class DashboardController extends Controller
      */
     private function statusCounts(Collection $actions): array
     {
-        $counts = [
-            'a_parametrer' => 0,
-            'non_demarre' => 0,
-            'en_cours' => 0,
-            'a_risque' => 0,
-            'en_retard' => 0,
-            'acheve' => 0,
-            'suspendu' => 0,
-            'annule' => 0,
-            'en_avance' => 0,
-        ];
-
-        foreach ($actions as $action) {
-            $status = $this->dashboardStatus($action);
-            $counts[$status] = ($counts[$status] ?? 0) + 1;
-        }
-
-        return $counts;
+        return $this->dashboardOverviewReadModel->statusCounts($actions);
     }
 
-    /**
-     * @param  Collection<int, Action>  $actions
-     * @return array<string, mixed>
-     */
     private function buildRoleTrendChart(Collection $actions): array
     {
         $currentYear = (int) now()->year;
@@ -3120,6 +2276,7 @@ class DashboardController extends Controller
         $portfolio = $this->buildScopePortfolioMetrics($user, $actions, $validatedActions);
         $directionRows = $this->buildGlobalDirectionRows($actions, 8);
         $reviewsControllerStage = $user->hasRole(
+            User::ROLE_DG,
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
             User::ROLE_SCIQ_SUIVI_GLOBAL
@@ -3142,7 +2299,7 @@ class DashboardController extends Controller
                     "Taux d'exécution",
                     UiLabel::percent((float) $portfolio['execution_rate']),
                     $portfolio['actions_echues_realisees'].' action(s) échue(s) réalisée(s) sur '.$portfolio['actions_echues'],
-                    route('workspace.reporting'),
+                    $this->reportingIndexRoute(),
                     '#B45309',
                     '#FFFBEB',
                     null,
@@ -3156,7 +2313,7 @@ class DashboardController extends Controller
                     'Avancement global',
                     UiLabel::percent((float) $portfolio['completion_actions_rate']),
                     $portfolio['actions_realisees'].' action(s) réalisée(s) sur '.$portfolio['actions_programmees'].' programmée(s)',
-                    route('workspace.reporting'),
+                    $this->reportingIndexRoute(),
                     '#2563EB',
                     '#EFF6FF',
                     null,
@@ -3166,7 +2323,7 @@ class DashboardController extends Controller
                 'used' => true,
             ],
             [
-                ...$this->makeRoleCard('Actions suivies', $portfolio['actions_total'], 'Portefeuille visible', route('workspace.actions.index'), '#0F766E', '#F0FDFA', null, 'info'),
+                ...$this->makeRoleCard('Actions suivies', $portfolio['actions_total'], 'Portefeuille visible', $this->actionIndexRoute(), '#0F766E', '#F0FDFA', null, 'info'),
                 'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
                 'used' => true,
             ],
@@ -3186,7 +2343,7 @@ class DashboardController extends Controller
                 'used' => true,
             ],
             [
-                ...$this->makeRoleCard('Directions en difficulté', $portfolio['directions_difficulte'], 'Score faible ou retards', route('workspace.reporting'), '#D97706', '#FFFBEB', null, 'warning'),
+                ...$this->makeRoleCard('Directions en difficulté', $portfolio['directions_difficulte'], 'Score faible ou retards', $this->reportingIndexRoute(), '#D97706', '#FFFBEB', null, 'warning'),
                 'icon' => '<path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M9 13h6"/><path d="M12 10v6"/>',
                 'used' => true,
             ],
@@ -3196,8 +2353,8 @@ class DashboardController extends Controller
             'enabled' => true,
             'role' => 'suivi_evaluation',
             'hero' => [
-                'eyebrow' => 'Vue suivi-evaluation',
-                'title' => 'Controle et suivi-evaluation',
+                'eyebrow' => 'Vue contrôle et suivi',
+                'title' => 'Contrôle et suivi',
                 'subtitle' => 'Lecture globale des alertes, des retards, des preuves attendues et des directions sous vigilance.',
             ],
             'summary_cards' => $summaryCards,
@@ -5289,7 +4446,9 @@ class DashboardController extends Controller
                 'axes.objectifs' => fn ($query) => $query->orderBy('ordre')->orderBy('id'),
                 'axes.objectifs.objectifsOperationnels' => function (Builder|Relation $query) use ($user): void {
                     $query->orderBy('import_ordre')->orderBy('id');
-                    $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
+                    if (! $user->hasCrossOrganizationDashboardAccess()) {
+                        $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
+                    }
 
                     if (($directionId = $this->selectedDashboardDirectionId($user)) !== null) {
                         $query->where('direction_id', $directionId);
@@ -5635,7 +4794,10 @@ class DashboardController extends Controller
             'late_actions_total' => $late,
             'blocked_actions_total' => $actions->filter(fn (Action $action): bool => $this->synthesisBlockageReason($action) !== 'Aucun blocage critique')->count(),
             'sub_actions_total' => $subActions->count(),
-            'detail_url' => route('synthese.index', array_merge(request()->query(), ['dashboardTab' => 'advanced'])),
+            'detail_url' => route('synthese.index', array_merge(
+                $this->dashboardFilterContext->dashboardRouteFilters(),
+                ['dashboardTab' => 'advanced']
+            )),
         ];
     }
 
@@ -5925,28 +5087,30 @@ class DashboardController extends Controller
             ->all();
     }
 
-    private function buildInterannualComparison(User $user): array
+    private function buildInterannualComparison(User $user, Collection $actions): array
     {
         $paoQuery = Pao::query();
         $this->scopePao($paoQuery, $user);
+        $actionsByPta = $actions
+            ->filter(fn (Action $action): bool => $action->pta_id !== null)
+            ->groupBy(fn (Action $action): int => (int) $action->pta_id);
 
         return $paoQuery
+            ->select(['id', 'annee'])
             ->with([
                 'ptas' => function ($query) use ($user): void {
                     $this->scopePta($query, $user);
-                    $query->with([
-                        'actions' => function ($actionQuery) use ($user): void {
-                            $this->scopeAction($actionQuery, $user);
-                        },
-                    ]);
+                    $query->select(['id', 'pao_id']);
                 },
             ])
             ->orderBy('annee')
             ->get()
             ->groupBy('annee')
-            ->map(function (Collection $rows, $annee): array {
+            ->map(function (Collection $rows, $annee) use ($actionsByPta): array {
                 $ptas = $rows->flatMap->ptas;
-                $actions = $ptas->flatMap->actions;
+                $actions = $ptas->flatMap(
+                    fn (Pta $pta): Collection => $actionsByPta->get((int) $pta->id, collect())
+                );
                 $actionsTotal = $actions->count();
                 $validatedActions = $this->officialActions($actions);
                 $actionsValidees = $validatedActions->count();
@@ -5975,7 +5139,7 @@ class DashboardController extends Controller
 
     private function resolveUnitMeta(User $user): array
     {
-        if ($user->hasGlobalReadAccess()) {
+        if ($user->hasCrossOrganizationDashboardAccess()) {
             return ['mode' => 'service', 'label' => 'Services'];
         }
 
@@ -5992,7 +5156,7 @@ class DashboardController extends Controller
     private function resolvePerformanceGaugeMeta(User $user): array
     {
         return match (true) {
-            $user->hasGlobalReadAccess() => [
+            $user->hasCrossOrganizationDashboardAccess() => [
                 'label' => 'Directions',
                 'empty_label' => 'Aucune direction disponible pour les jauges.',
             ],
@@ -6017,7 +5181,7 @@ class DashboardController extends Controller
     private function buildPerformanceGaugeRows(User $user, Collection $actions): array
     {
         $mode = match (true) {
-            $user->hasGlobalReadAccess() => 'direction',
+            $user->hasCrossOrganizationDashboardAccess() => 'direction',
             $user->hasRole(User::ROLE_DIRECTION) => 'service',
             default => 'action',
         };
@@ -6035,16 +5199,9 @@ class DashboardController extends Controller
      */
     private function officialActions(Collection $actions): Collection
     {
-        /** @var Collection<int, Action> $official */
-        $official = $this->actionCalculationSettings->filterOfficial($actions, 'statut_validation');
-
-        return $official;
+        return $this->dashboardOverviewReadModel->officialActions($actions);
     }
 
-    /**
-     * @param  Collection<int, Action>  $actions
-     * @return Collection<int, Action>
-     */
     private function validatedActions(Collection $actions): Collection
     {
         return $this->officialActions($actions);
@@ -6073,9 +5230,38 @@ class DashboardController extends Controller
 
     private function actionIndexRoute(array $filters = []): string
     {
-        return route('workspace.actions.index', array_filter(
-            $filters,
+        $parameters = array_filter(
+            array_merge($this->dashboardActionRouteFilters(), $filters),
             static fn ($value): bool => $value !== null && $value !== ''
+        );
+        ksort($parameters);
+        $cacheKey = json_encode($parameters, JSON_THROW_ON_ERROR);
+
+        return $this->dashboardUrlCache[$cacheKey]
+            ??= route('workspace.actions.index', $parameters);
+    }
+
+    /**
+     * @return array{annee: int|null, direction_id?: int, service_id?: int}
+     */
+    private function dashboardActionRouteFilters(): array
+    {
+        return $this->dashboardFilterContext->currentUserActionRouteFilters();
+    }
+
+    private function reportingIndexRoute(array $filters = []): string
+    {
+        $actionFilters = $this->dashboardActionRouteFilters();
+        $reportingFilters = [
+            'exercice' => $actionFilters['annee'],
+            'direction_id' => $actionFilters['direction_id'] ?? null,
+            'service_id' => $actionFilters['service_id'] ?? null,
+            'periode' => $this->selectedDashboardSynthesisPeriod(),
+        ];
+
+        return route('workspace.reporting', array_filter(
+            array_merge($reportingFilters, $filters),
+            static fn ($value): bool => $value !== null && $value !== '' && $value !== 'all'
         ));
     }
 
@@ -6171,41 +5357,6 @@ class DashboardController extends Controller
             || max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0)) >= 15;
     }
 
-    private function activeActionAlertLogsCount(User $user): int
-    {
-        $query = ActionLog::query()
-            ->activeAlert()
-            ->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
-                $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
-            });
-
-        if (($directionId = $this->selectedDashboardDirectionId($user)) !== null) {
-            $query->whereHas('action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
-        }
-
-        if (($serviceId = $this->selectedDashboardServiceId($user)) !== null) {
-            $query->whereHas('action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
-        }
-
-        if (! $user->isAgent()) {
-            $query->whereHas('action', function (Builder $actionQuery) use ($user): void {
-                $actionQuery
-                    ->where(function (Builder $contextQuery): void {
-                        $contextQuery
-                            ->whereNull('contexte_action')
-                            ->orWhere('contexte_action', Action::CONTEXT_PILOTAGE);
-                    })
-                    ->where(function (Builder $responsableQuery) use ($user): void {
-                        $responsableQuery
-                            ->whereNull('responsable_id')
-                            ->orWhere('responsable_id', '!=', (int) $user->id);
-                    });
-            });
-        }
-
-        return $query->count();
-    }
-
     private function completionRate(int $completed, int $total): float
     {
         if ($total <= 0) {
@@ -6213,13 +5364,5 @@ class DashboardController extends Controller
         }
 
         return round(($completed / $total) * 100, 2);
-    }
-
-    private function canReadDashboard(User $user): bool
-    {
-        return $user->hasPermission('planning.read')
-            || $user->hasGlobalReadAccess()
-            || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE)
-            || $user->isAgent();
     }
 }

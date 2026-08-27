@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -40,6 +41,52 @@ class BrevoMailService
     ) {}
 
     /**
+     * @return array{
+     *     enabled: bool,
+     *     configured: bool,
+     *     transport: string,
+     *     issue: string|null
+     * }
+     */
+    public function configurationStatus(): array
+    {
+        $enabled = (bool) config('services.brevo.enabled', false);
+        $transport = $this->transport();
+
+        if (! $enabled) {
+            return [
+                'enabled' => false,
+                'configured' => false,
+                'transport' => $transport,
+                'issue' => null,
+            ];
+        }
+
+        if ($transport === 'api') {
+            $configured = trim((string) config('services.brevo.api_key', '')) !== '';
+
+            return [
+                'enabled' => true,
+                'configured' => $configured,
+                'transport' => $transport,
+                'issue' => $configured ? null : 'api_key_missing',
+            ];
+        }
+
+        $mailer = config('mail.mailers.'.$this->mailerName());
+        $configured = is_array($mailer)
+            && trim((string) ($mailer['username'] ?? '')) !== ''
+            && trim((string) ($mailer['password'] ?? '')) !== '';
+
+        return [
+            'enabled' => true,
+            'configured' => $configured,
+            'transport' => $transport,
+            'issue' => $configured ? null : 'smtp_credentials_missing',
+        ];
+    }
+
+    /**
      * @param  Collection<int, User>|EloquentCollection<int, User>  $targets
      * @param  array<string, mixed>  $payload
      */
@@ -61,7 +108,19 @@ class BrevoMailService
         Collection|EloquentCollection $recipients,
         array $payload
     ): void {
-        if (! $this->canSendEmails()) {
+        $configuration = $this->configurationStatus();
+
+        if (! $configuration['enabled']) {
+            return;
+        }
+
+        if (! $configuration['configured']) {
+            Log::warning('Brevo email channel is enabled but not configured.', [
+                'event' => $event,
+                'transport' => $configuration['transport'],
+                'issue' => $configuration['issue'],
+            ]);
+
             return;
         }
 
@@ -76,27 +135,79 @@ class BrevoMailService
             return;
         }
 
-        // En contexte web, on enfile un job dedie : un envoi Brevo lent ne doit
-        // jamais ajouter une erreur PHP apres une reponse JSON deja emise.
-        // En console (commandes, workers, tests), l'envoi reste synchrone.
-        if (app()->runningInConsole()) {
+        // Les appels applicatifs utilisent toujours la file, y compris depuis
+        // une commande ou un worker. Seuls les tests gardent une livraison
+        // synchrone afin de pouvoir verifier le transport sans executer un
+        // second processus de file d'attente.
+        if (app()->runningUnitTests()) {
             $this->sendToTargets($event, $targets, $payload);
 
             return;
         }
 
-        try {
-            app(Dispatcher::class)->dispatch(new SendBrevoNotificationEmailsJob(
-                $event,
-                $targets->pluck('id')->map(fn ($id): int => (int) $id)->all(),
-                $payload
+        foreach ($targets as $target) {
+            try {
+                app(Dispatcher::class)->dispatch(new SendBrevoNotificationEmailsJob(
+                    $event,
+                    [(int) $target->id],
+                    $payload
+                ));
+            } catch (Throwable $exception) {
+                Log::warning('Brevo email queue dispatch failed (non-blocking).', [
+                    'event' => $event,
+                    'recipient_id' => (int) $target->id,
+                    'exception_type' => get_debug_type($exception),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Deliver recipients from a queue worker and surface transient failures so
+     * Laravel can apply the job retry and backoff policy.
+     *
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $recipients
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws RuntimeException When at least one delivery fails.
+     */
+    public function deliverQueued(
+        string $event,
+        Collection|EloquentCollection $recipients,
+        array $payload
+    ): void {
+        $configuration = $this->configurationStatus();
+
+        if (! $configuration['enabled']) {
+            return;
+        }
+
+        if (! $configuration['configured']) {
+            throw new RuntimeException('Brevo email channel is enabled but not configured.');
+        }
+
+        $targets = $recipients
+            ->filter(static fn ($user): bool => $user instanceof User
+                && (string) ($user->email ?? '') !== ''
+            )
+            ->unique('id')
+            ->values();
+
+        $failedDeliveries = 0;
+
+        foreach ($targets as $user) {
+            try {
+                $this->sendOne($event, $user, $payload, true);
+            } catch (Throwable) {
+                $failedDeliveries++;
+            }
+        }
+
+        if ($failedDeliveries > 0) {
+            throw new RuntimeException(sprintf(
+                'Brevo delivery failed for %d recipient(s).',
+                $failedDeliveries
             ));
-        } catch (Throwable $exception) {
-            Log::warning('Brevo email queue dispatch failed (non-blocking).', [
-                'event' => $event,
-                'recipient_count' => $targets->count(),
-                'exception' => $exception->getMessage(),
-            ]);
         }
     }
 
@@ -106,8 +217,12 @@ class BrevoMailService
      *
      * @param  array<string, mixed>  $payload
      */
-    private function sendOne(string $event, User $user, array $payload): void
-    {
+    private function sendOne(
+        string $event,
+        User $user,
+        array $payload,
+        bool $rethrowFailure = false
+    ): void {
         $logId = null;
 
         try {
@@ -118,7 +233,7 @@ class BrevoMailService
             Log::warning('Brevo email log queue failed.', [
                 'event' => $event,
                 'user_id' => $user->id,
-                'exception' => $exception->getMessage(),
+                'exception_type' => get_debug_type($exception),
             ]);
         }
 
@@ -137,16 +252,19 @@ class BrevoMailService
             // FAIL-SAFE absolu : on n'interrompt jamais le workflow métier.
             $this->updateLog($logId, [
                 'status' => 'failed',
-                'error_message' => $this->truncate($exception->getMessage()),
+                'error_message' => $this->safeFailureMessage($exception),
             ]);
 
             Log::warning('Brevo email send failed (non-blocking).', [
                 'event' => $event,
                 'transport' => $this->transport(),
                 'user_id' => $user->id,
-                'recipient_email' => $user->email,
-                'exception' => $exception->getMessage(),
+                'exception_type' => get_debug_type($exception),
             ]);
+
+            if ($rethrowFailure) {
+                throw $exception;
+            }
         }
     }
 
@@ -155,7 +273,7 @@ class BrevoMailService
      *
      * @param  array<string, mixed>  $payload
      *
-     * @throws \RuntimeException Si l'API retourne un code != 2xx.
+     * @throws RuntimeException Si l'API retourne un code != 2xx.
      */
     private function sendViaApi(string $event, User $user, array $payload): void
     {
@@ -211,7 +329,7 @@ class BrevoMailService
 
         if (! $response->successful()) {
             $errorBody = $response->body();
-            throw new \RuntimeException(sprintf(
+            throw new RuntimeException(sprintf(
                 'Brevo API responded with HTTP %d: %s',
                 $response->status(),
                 $this->truncate($errorBody, 350)
@@ -290,29 +408,9 @@ class BrevoMailService
         } catch (Throwable $exception) {
             Log::warning('Brevo email log update failed.', [
                 'log_id' => $logId,
-                'exception' => $exception->getMessage(),
+                'exception_type' => get_debug_type($exception),
             ]);
         }
-    }
-
-    /**
-     * Email actif uniquement si Brevo est explicitement activé ET que les
-     * credentials du transport sélectionné sont présents.
-     *
-     *   - transport=api  : services.brevo.api_key doit être défini.
-     *   - transport=smtp : mail.mailers.brevo doit exister + credentials SMTP.
-     */
-    private function canSendEmails(): bool
-    {
-        if (! (bool) config('services.brevo.enabled', false)) {
-            return false;
-        }
-
-        if ($this->transport() === 'api') {
-            return (string) config('services.brevo.api_key', '') !== '';
-        }
-
-        return (bool) config('mail.mailers.'.$this->mailerName());
     }
 
     private function transport(): string
@@ -325,6 +423,11 @@ class BrevoMailService
     private function mailerName(): string
     {
         return (string) config('services.brevo.mailer', 'brevo');
+    }
+
+    private function safeFailureMessage(Throwable $exception): string
+    {
+        return sprintf('Brevo delivery failed (%s).', get_debug_type($exception));
     }
 
     private function truncate(string $value, int $max = 500): string

@@ -118,22 +118,58 @@ class PersonalTaskService
      * d'alertes) pour ne pas rejouer les 8 requetes sources a chaque chargement
      * de page (badge sidebar) ni a chaque ouverture du dashboard (forUser).
      *
-     * La cle integre la version d'alertes, bumpee sur evenement metier
-     * (statut action, kpi_mesure, justificatif, suppression...), afin que la
-     * liste reagisse immediatement aux changements sans attendre l'expiration
-     * du TTL.
+     * La cle integre les versions alertes et dashboard. Elle est donc invalidee
+     * par les evenements metier ainsi que par toute modification d'action
+     * (notamment une reaffectation), sans attendre l'expiration du TTL.
      *
      * @return Collection<int, array<string, mixed>>
      */
     private function collectCached(User $user): Collection
     {
-        $version = app(AnalyticsCacheVersionService::class)->alertsVersion();
+        $versions = app(AnalyticsCacheVersionService::class);
+        $alertsVersion = $versions->alertsVersion();
+        $dashboardVersion = $versions->dashboardVersion();
 
-        return Cache::remember(
-            'personal-tasks:collect:'.(int) $user->id.':'.$version,
+        $cachedTasks = Cache::remember(
+            'personal-tasks:collect:'.(int) $user->id.':'.$alertsVersion.':'.$dashboardVersion,
             now()->addSeconds(60),
-            fn (): Collection => $this->collect($user)
+            fn (): array => $this->collect($user)
+                ->map(fn (array $task): array => $this->serializeTaskDates($task))
+                ->all()
         );
+
+        return collect($cachedTasks instanceof Collection ? $cachedTasks->all() : $cachedTasks)
+            ->filter(fn (mixed $task): bool => is_array($task))
+            ->map(fn (array $task): array => $this->restoreTaskDates($task))
+            ->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $task
+     * @return array<string, mixed>
+     */
+    private function serializeTaskDates(array $task): array
+    {
+        foreach (['received_at', 'deadline_at'] as $key) {
+            if (($task[$key] ?? null) instanceof \DateTimeInterface) {
+                $task[$key] = Carbon::instance($task[$key])->toISOString();
+            }
+        }
+
+        return $task;
+    }
+
+    /**
+     * @param  array<string, mixed>  $task
+     * @return array<string, mixed>
+     */
+    private function restoreTaskDates(array $task): array
+    {
+        foreach (['received_at', 'deadline_at'] as $key) {
+            $task[$key] = $this->carbon($task[$key] ?? null);
+        }
+
+        return $task;
     }
 
     /**

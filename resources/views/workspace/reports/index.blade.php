@@ -67,7 +67,7 @@
         {{-- Meme motif de barre de filtres que les pages PAS / PAO / PTA. --}}
         <section class="showcase-toolbar app-screen-block mt-5">
             <div><h2 class="showcase-panel-title">Filtres</h2></div>
-            <form method="GET" action="{{ route('workspace.reports.index') }}">
+            <form method="GET" action="{{ route('workspace.reports.index') }}" data-auto-filter-form>
                 <input type="hidden" name="tab" value="{{ $activeTab }}">
                 <div class="showcase-filter-grid">
                     <div><label for="report_q">Recherche</label><input id="report_q" name="q" type="search" value="{{ $filters['q'] }}" placeholder="Objet, résumé ou décision"></div>
@@ -77,7 +77,6 @@
                     <div><label for="report_status">Statut</label><select id="report_status" name="status"><option value="">Tous</option><option value="draft" @selected($filters['status'] === 'draft')>Brouillon</option><option value="submitted_sciq" @selected($filters['status'] === 'submitted_sciq')>En vérification</option><option value="verified" @selected($filters['status'] === 'verified')>Vérifié</option><option value="returned" @selected($filters['status'] === 'returned')>À corriger</option></select></div>
                 </div>
                 <div class="showcase-filter-actions mt-4">
-                    <button class="btn btn-primary" type="submit">Appliquer</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.reports.index', ['tab' => $activeTab]) }}">Réinitialiser</a>
                 </div>
             </form>

@@ -227,7 +227,7 @@
                 <span class="text-sm text-slate-500">{{ $archives->total() }} résultat{{ $archives->total() > 1 ? 's' : '' }}</span>
             </div>
 
-            <form method="GET" action="{{ route('workspace.retention.index') }}" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_repeat(5,minmax(9rem,auto))_auto] xl:items-end">
+            <form method="GET" action="{{ route('workspace.retention.index') }}" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_repeat(5,minmax(9rem,auto))_auto] xl:items-end" data-auto-filter-form>
                 <label class="grid gap-1 text-xs font-bold uppercase text-slate-500">
                     Recherche
                     <input name="q" type="search" maxlength="120" value="{{ $filters['q'] ?? '' }}" placeholder="Périmètre, source, lot, opérateur">
@@ -268,7 +268,6 @@
                     <input name="date_to" type="date" value="{{ $filters['date_to'] ?? '' }}">
                 </label>
                 <div class="flex gap-2">
-                    <button class="btn btn-primary" type="submit">Filtrer</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.retention.index') }}" title="Réinitialiser les filtres" aria-label="Réinitialiser les filtres">×</a>
                 </div>
             </form>

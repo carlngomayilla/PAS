@@ -259,10 +259,16 @@ php artisan migrate:status
 
 ### Taches d'exploitation a brancher
 
-Worker de queue :
+Worker de queue (secours `QUEUE_CONNECTION=database`) :
 
 ```bash
-php artisan queue:work --queue=default,notifications
+php artisan queue:work --queue=notifications,exports,ai-imports,default --tries=3 --timeout=1320
+```
+
+Avec `QUEUE_CONNECTION=redis`, Horizon supervise les quatre files :
+
+```bash
+php artisan horizon
 ```
 
 Scheduler systeme :

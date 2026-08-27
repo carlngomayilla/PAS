@@ -334,6 +334,14 @@
                         </div>
                 </aside>
             </div>
+        @else
+            <div class="showcase-panel p-4">
+                <x-ui.empty-state
+                    title="Aucune donnée pour les tableaux"
+                    message="Aucune analyse PTA ne correspond au périmètre et aux filtres sélectionnés."
+                    icon="filter"
+                />
+            </div>
         @endif
 
         @if (false)

@@ -1,0 +1,23 @@
+[Unit]
+Description=ANBG PAS - dashboard Pilotage Next.js
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+Group=__APP_GROUP__
+WorkingDirectory=__PROJECT_ROOT__
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/etc/anbg-pas/dashboard-pilot.env
+ExecStart=/usr/bin/npm run next:start -- --hostname 127.0.0.1
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

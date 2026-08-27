@@ -16,7 +16,7 @@ class SecurityHardeningTest extends TestCase
 
     public function test_web_and_api_responses_include_security_headers(): void
     {
-        $this->get(route('login.form'))
+        $response = $this->get(route('login.form'))
             ->assertOk()
             ->assertHeader('Content-Security-Policy')
             ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()')
@@ -26,6 +26,11 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin')
             ->assertHeader('Cross-Origin-Resource-Policy', 'same-origin')
             ->assertHeader('X-Permitted-Cross-Domain-Policies', 'none');
+
+        $this->assertStringNotContainsString(
+            'http://127.0.0.1:5173',
+            (string) $response->headers->get('Content-Security-Policy')
+        );
 
         $admin = $this->createAdminUser([
             'password' => Hash::make('Pass@12345'),
@@ -46,6 +51,18 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin')
             ->assertHeader('Cross-Origin-Resource-Policy', 'same-origin')
             ->assertHeader('X-Permitted-Cross-Domain-Policies', 'none');
+    }
+
+    public function test_local_security_policy_allows_the_fixed_vite_development_origin(): void
+    {
+        $this->app->detectEnvironment(static fn (): string => 'local');
+
+        $response = $this->get(route('login.form'))->assertOk();
+
+        $this->assertStringContainsString(
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com http://127.0.0.1:5173",
+            (string) $response->headers->get('Content-Security-Policy')
+        );
     }
 
     public function test_api_login_rejects_inactive_user_and_sets_token_expiration_for_active_user(): void

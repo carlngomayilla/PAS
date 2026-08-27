@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ActionController;
 use App\Http\Controllers\Api\ActionValidationController;
 use App\Http\Controllers\Api\AlerteController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\JournalAuditController;
 use App\Http\Controllers\Api\KpiController;
 use App\Http\Controllers\Api\KpiMesureController;
@@ -27,6 +28,9 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
     Route::middleware(['auth:sanctum', EnsureActiveAccount::class, EnsurePasswordIsFresh::class, 'throttle:api'])->group(function (): void {
         Route::get('me', [AuthController::class, 'me'])->name('api.me');
         Route::post('logout', [AuthController::class, 'logout'])->name('api.logout');
+
+        Route::get('dashboard/overview', [DashboardController::class, 'overview'])
+            ->name('dashboard.overview');
 
         Route::get('referentiel/directions', [ReferentielController::class, 'directions'])
             ->name('api.referentiel.directions');

@@ -439,6 +439,18 @@ class User extends Authenticatable
         return $this->hasGlobalWriteAccess() || $this->hasPermission('scope.global.read');
     }
 
+    public function hasCrossOrganizationDashboardAccess(): bool
+    {
+        return $this->hasGlobalReadAccess()
+            || $this->hasRole(
+                self::ROLE_DG,
+                self::ROLE_PLANIFICATION,
+                self::ROLE_SCIQ,
+                self::ROLE_SCIQ_SUIVI_GLOBAL,
+            )
+            || $this->isPlanningControlChief();
+    }
+
     public function roleLabel(): string
     {
         return app(RoleRegistryService::class)->label($this->effectiveRoleCode());

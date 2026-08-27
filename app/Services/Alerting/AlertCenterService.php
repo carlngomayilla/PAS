@@ -27,7 +27,8 @@ class AlertCenterService
     public function __construct(
         private readonly AlertRoutingService $alertRoutingService,
         private readonly DynamicReferentialSettings $dynamicReferentialSettings,
-        private readonly AlertRuleSettings $alertRuleSettings
+        private readonly AlertRuleSettings $alertRuleSettings,
+        private readonly AnalyticsCacheVersionService $cacheVersionService
     ) {}
 
     /**
@@ -37,11 +38,15 @@ class AlertCenterService
     {
         $limit = max(1, min(100, $limit));
 
-        return Cache::remember(
+        $cachedItems = Cache::remember(
             $this->cacheKey('items', $user, ['limit' => $limit]),
             now()->addSeconds(self::CACHE_TTL_SECONDS),
-            fn (): Collection => $this->collectForUser($user, $limit)
+            fn (): array => $this->collectForUser($user, $limit)->all()
         );
+
+        return collect($cachedItems instanceof Collection ? $cachedItems->all() : $cachedItems)
+            ->filter(fn (mixed $item): bool => is_array($item))
+            ->values();
     }
 
     /**
@@ -49,11 +54,15 @@ class AlertCenterService
      */
     public function allForUser(User $user): Collection
     {
-        return Cache::remember(
+        $cachedItems = Cache::remember(
             $this->cacheKey('items-all', $user),
             now()->addSeconds(self::CACHE_TTL_SECONDS),
-            fn (): Collection => $this->collectForUser($user, null)
+            fn (): array => $this->collectForUser($user, null)->all()
         );
+
+        return collect($cachedItems instanceof Collection ? $cachedItems->all() : $cachedItems)
+            ->filter(fn (mixed $item): bool => is_array($item))
+            ->values();
     }
 
     /**
@@ -131,20 +140,12 @@ class AlertCenterService
         ksort($context);
 
         // A39 — Inclut la version d alertes maintenue par AnalyticsCacheVersionService
-        // (bumpAlerts() appele depuis ActionObserver / hooks metier) pour
-        // invalider automatiquement le cache 60s des qu un evenement modifie
-        // l etat des alertes. La cle legacy `alert-center:version` reste
-        // additionnee pour retro-compatibilite avec d eventuels incrementations
-        // manuelles existantes.
-        $alertsVersion = app(AnalyticsCacheVersionService::class)->alertsVersion();
-        $legacyVersion = (int) Cache::get('alert-center:version', 1);
-
         return 'alert-center:'.$segment.':'.sha1(json_encode([
             'user_id' => (int) $user->id,
             'role' => (string) $user->role,
             'direction_id' => $user->direction_id !== null ? (int) $user->direction_id : null,
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
-            'version' => $alertsVersion + $legacyVersion,
+            'version' => $this->cacheVersionService->alertsVersion(),
             'context' => $context,
         ], JSON_THROW_ON_ERROR));
     }

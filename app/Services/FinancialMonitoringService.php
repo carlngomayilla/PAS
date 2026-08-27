@@ -9,6 +9,7 @@ use App\Models\FinancialTransaction;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -198,6 +199,41 @@ class FinancialMonitoringService
         $actions = $this->scopedActions($user);
         $actionIds = (clone $actions)->select('id');
         $budget = (float) (clone $actions)->sum('montant_estime');
+        $actionsTotal = (clone $actions)->count();
+
+        return $this->dashboardSummaryForActionIds($actionIds, $budget, $actionsTotal);
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array{budget:float,engaged:float,disbursed:float,remaining:float,engagement_rate:float,disbursement_rate:float,actions_total:int}|null
+     */
+    public function dashboardSummaryForActions(User $user, Collection $actions): ?array
+    {
+        if (! $this->canView($user)) {
+            return null;
+        }
+
+        $financialActions = $actions
+            ->filter(fn (Action $action): bool => $action->montant_estime !== null)
+            ->unique(fn (Action $action): int => (int) $action->getKey())
+            ->values();
+        $actionIds = $financialActions
+            ->map(fn (Action $action): int => (int) $action->getKey())
+            ->all();
+        $budget = (float) $financialActions->sum(
+            fn (Action $action): float => (float) $action->montant_estime
+        );
+
+        return $this->dashboardSummaryForActionIds($actionIds, $budget, $financialActions->count());
+    }
+
+    /**
+     * @param  Builder<Action>|list<int>  $actionIds
+     * @return array{budget:float,engaged:float,disbursed:float,remaining:float,engagement_rate:float,disbursement_rate:float,actions_total:int}
+     */
+    private function dashboardSummaryForActionIds(Builder|array $actionIds, float $budget, int $actionsTotal): array
+    {
         $totals = FinancialTransaction::query()
             ->whereIn('action_id', $actionIds)
             ->selectRaw("COALESCE(SUM(CASE WHEN operation_type = 'engagement' THEN amount ELSE 0 END), 0) as engaged")
@@ -213,7 +249,7 @@ class FinancialMonitoringService
             'remaining' => $budget - $disbursed,
             'engagement_rate' => $budget > 0 ? round($engaged / $budget * 100, 2) : 0.0,
             'disbursement_rate' => $budget > 0 ? round($disbursed / $budget * 100, 2) : 0.0,
-            'actions_total' => (clone $actions)->count(),
+            'actions_total' => $actionsTotal,
         ];
     }
 

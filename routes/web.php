@@ -17,6 +17,7 @@ use App\Http\Controllers\Web\AiReportGenerationController;
 use App\Http\Controllers\Web\AiReportValidationController;
 use App\Http\Controllers\Web\AiUsageController;
 use App\Http\Controllers\Web\AuditWebController;
+use App\Http\Controllers\Web\DashboardResponsibleOptionsController;
 use App\Http\Controllers\Web\DeadlineExtensionWebController;
 use App\Http\Controllers\Web\DependentSelectController;
 use App\Http\Controllers\Web\FinancialMonitoringWebController;
@@ -96,6 +97,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::get('/synthese/services-by-direction/{direction}', [DependentSelectController::class, 'servicesByDirection'])
             ->whereNumber('direction')
             ->name('synthese.services-by-direction');
+        Route::get('/synthese/responsables', DashboardResponsibleOptionsController::class)
+            ->name('synthese.responsibles');
 
         Route::get('/pta/suivi', [PtaSuiviWebController::class, 'index'])
             ->name('pta.suivi.index');

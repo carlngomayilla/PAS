@@ -4,11 +4,26 @@ namespace App\Providers;
 
 use App\Database\Connectors\PostgresConnector;
 use App\Models\Action;
+use App\Models\ActionKpi;
+use App\Models\ActionLog;
+use App\Models\BudgetOverrunRequest;
 use App\Models\DeadlineExtensionRequest;
+use App\Models\Delegation;
+use App\Models\Direction;
+use App\Models\FinancialTransaction;
+use App\Models\Justificatif;
+use App\Models\Kpi;
+use App\Models\KpiMesure;
 use App\Models\Meeting;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
+use App\Models\PaoObjectifOperationnel;
 use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\Pta;
+use App\Models\Service;
+use App\Models\SousAction;
 use App\Models\User;
 use App\Observers\ActionObserver;
 use App\Observers\PlanningCacheObserver;
@@ -18,7 +33,9 @@ use App\Policies\PaoPolicy;
 use App\Policies\PasPolicy;
 use App\Services\ActionCalculationSettings;
 use App\Services\ActionManagementSettings;
+use App\Services\AdminLayoutViewDataService;
 use App\Services\AppearanceSettings;
+use App\Services\Dashboard\DashboardAccessService;
 use App\Services\DashboardProfileSettings;
 use App\Services\DocumentPolicySettings;
 use App\Services\DynamicReferentialSettings;
@@ -95,15 +112,32 @@ class AppServiceProvider extends ServiceProvider
 
         Blade::directive('cspNonce', static fn (): string => '<?php echo "nonce=\"".e(\Illuminate\Support\Facades\Vite::cspNonce())."\""; ?>');
         Action::observe(ActionObserver::class);
+        ActionKpi::observe(PlanningCacheObserver::class);
+        ActionLog::observe(PlanningCacheObserver::class);
+        BudgetOverrunRequest::observe(PlanningCacheObserver::class);
         DeadlineExtensionRequest::observe(PlanningCacheObserver::class);
+        Delegation::observe(PlanningCacheObserver::class);
+        Direction::observe(PlanningCacheObserver::class);
+        FinancialTransaction::observe(PlanningCacheObserver::class);
+        Justificatif::observe(PlanningCacheObserver::class);
+        Kpi::observe(PlanningCacheObserver::class);
+        KpiMesure::observe(PlanningCacheObserver::class);
+        ObjectifOperationnel::observe(PlanningCacheObserver::class);
         Pao::observe(PlanningCacheObserver::class);
+        PaoObjectifOperationnel::observe(PlanningCacheObserver::class);
+        PasAxe::observe(PlanningCacheObserver::class);
+        PasObjectif::observe(PlanningCacheObserver::class);
         Pta::observe(PlanningCacheObserver::class);
+        Service::observe(PlanningCacheObserver::class);
+        SousAction::observe(PlanningCacheObserver::class);
         User::observe(PlanningCacheObserver::class);
 
         Gate::policy(Action::class, ActionPolicy::class);
         Gate::policy(Meeting::class, MeetingPolicy::class);
         Gate::policy(Pas::class, PasPolicy::class);
         Gate::policy(Pao::class, PaoPolicy::class);
+        $dashboardAccess = $this->app->make(DashboardAccessService::class);
+        Gate::define('dashboard.view', fn (User $user): bool => $dashboardAccess->canReadDashboard($user));
 
         RateLimiter::for('login', function (Request $request): array {
             $identifier = Str::lower(trim((string) $request->input('email', 'guest')));
@@ -146,5 +180,6 @@ class AppServiceProvider extends ServiceProvider
 
         View::share('appearanceSettings', $this->app->make(AppearanceSettings::class));
         View::share('platformSettings', $platformSettings);
+        View::composer('layouts.admin', AdminLayoutViewDataService::class);
     }
 }

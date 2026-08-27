@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\PlatformSetting;
+use App\Models\User;
+use App\Services\RolePermissionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
@@ -145,5 +148,97 @@ class ReportingExportDownloadSecurityTest extends TestCase
             [302, 401, 403],
             'Une requete anonyme sur le download d export doit etre bloquee (401/403) ou redirigee vers login (302).'
         );
+    }
+
+    public function test_unsigned_url_is_rejected(): void
+    {
+        $owner = $this->createAdminUser([
+            'email' => 'unsigned.export@anbg.test',
+            'password' => Hash::make('Pass@12345'),
+        ]);
+
+        Storage::fake('local');
+        $path = 'exports/reporting/'.$owner->id.'/unsigned.xlsx';
+        Storage::disk('local')->put($path, 'PRIVATE');
+
+        $this->actingAs($owner)
+            ->get(route('workspace.reporting.exports.download', [
+                'path' => Crypt::encryptString($path),
+                'name' => 'reporting.xlsx',
+            ]))
+            ->assertForbidden();
+
+        Storage::disk('local')->assertExists($path);
+    }
+
+    public function test_owner_cannot_download_after_reporting_permission_is_revoked(): void
+    {
+        $this->setRolePermissions(User::ROLE_ADMIN, ['planning.read', 'reporting.read']);
+
+        $owner = $this->createAdminUser([
+            'email' => 'revoked.reporting@anbg.test',
+            'password' => Hash::make('Pass@12345'),
+        ]);
+
+        Storage::fake('local');
+        $path = 'exports/reporting/'.$owner->id.'/revoked-reporting.xlsx';
+        Storage::disk('local')->put($path, 'PRIVATE');
+        $url = $this->signedDownloadUrl($path);
+
+        $this->setRolePermissions(User::ROLE_ADMIN, ['planning.read']);
+
+        $this->actingAs($owner)
+            ->get($url)
+            ->assertForbidden();
+
+        Storage::disk('local')->assertExists($path);
+    }
+
+    public function test_owner_cannot_download_after_planning_permission_is_revoked(): void
+    {
+        $this->setRolePermissions(User::ROLE_ADMIN, ['planning.read', 'reporting.read']);
+
+        $owner = $this->createAdminUser([
+            'email' => 'revoked.planning@anbg.test',
+            'password' => Hash::make('Pass@12345'),
+        ]);
+
+        Storage::fake('local');
+        $path = 'exports/reporting/'.$owner->id.'/revoked-planning.xlsx';
+        Storage::disk('local')->put($path, 'PRIVATE');
+        $url = $this->signedDownloadUrl($path);
+
+        $this->setRolePermissions(User::ROLE_ADMIN, ['reporting.read']);
+
+        $this->actingAs($owner)
+            ->get($url)
+            ->assertForbidden();
+
+        Storage::disk('local')->assertExists($path);
+    }
+
+    private function signedDownloadUrl(string $path): string
+    {
+        return URL::temporarySignedRoute(
+            'workspace.reporting.exports.download',
+            now()->addMinutes(5),
+            [
+                'path' => Crypt::encryptString($path),
+                'name' => 'reporting.xlsx',
+            ]
+        );
+    }
+
+    /**
+     * @param  list<string>  $permissions
+     */
+    private function setRolePermissions(string $role, array $permissions): void
+    {
+        PlatformSetting::query()->updateOrCreate(
+            ['group' => 'role_permissions', 'key' => 'role_permissions_'.$role],
+            ['value' => json_encode($permissions, JSON_UNESCAPED_SLASHES)]
+        );
+
+        app(RolePermissionSettings::class)->flush();
     }
 }

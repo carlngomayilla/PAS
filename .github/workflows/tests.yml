@@ -18,10 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP 8.3
+      - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           extensions: mbstring, intl, pdo_sqlite, sqlite3, gd, zip, xml, openssl, fileinfo, dom
           coverage: none
           tools: composer:v2
@@ -35,6 +35,9 @@ jobs:
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Audit Composer dependencies
+        run: composer audit --locked
 
       - name: Prepare environment
         run: |
@@ -89,10 +92,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP 8.3
+      - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           extensions: mbstring, intl, pdo_pgsql, pgsql, gd, zip, xml, openssl, fileinfo, dom
           coverage: none
           tools: composer:v2
@@ -124,3 +127,185 @@ jobs:
 
       - name: Run PHPUnit against PostgreSQL
         run: php artisan test -c phpunit.pgsql.xml
+
+  dashboard-browser:
+    name: Dashboard (Vite + Chromium)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pas_e2e
+          POSTGRES_PASSWORD: pas_e2e_secret
+          POSTGRES_DB: pas_anbg_ci_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pas_e2e -d pas_anbg_ci_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      APP_ENV: e2e
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: pas_anbg_ci_e2e
+      DB_USERNAME: pas_e2e
+      DB_PASSWORD: pas_e2e_secret
+      DB_SSLMODE: prefer
+      DB_LOGIN_PREFLIGHT: 'false'
+      E2E_DB_DATABASE: pas_anbg_ci_e2e
+      E2E_STORAGE_ROOT: storage/app/ci-e2e-private
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: database
+      MAIL_MAILER: array
+      ANTIVIRUS_SCAN_ENABLED: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_pgsql, pgsql, gd, zip, xml, openssl, fileinfo, dom
+          coverage: none
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist --no-scripts
+          npm ci
+
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Test Laravel frontend behavior
+        run: npm run test:ui
+
+      - name: Verify Next dashboard pilot
+        run: |
+          npm run next:typecheck
+          npm run next:lint
+          npm run next:test
+          npm run next:build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run dashboard smoke test
+        run: npm run test:e2e:chromium -- tests/e2e/dashboard-stabilization.spec.ts
+
+  redis-horizon:
+    name: Redis et Horizon (PHP 8.4 Linux)
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      CACHE_STORE: redis_failover
+      CACHE_VERSION_STORE: redis
+      CACHE_LIMITER_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: database
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_CACHE_DB: 1
+      REDIS_SESSION_DB: 2
+      REDIS_QUEUE_DB: 3
+      REDIS_HORIZON_DB: 4
+      RUN_REDIS_HORIZON_TESTS: 'true'
+      MAIL_MAILER: array
+      ANTIVIRUS_SCAN_ENABLED: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4 avec Redis et signaux Unix
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_sqlite, sqlite3, gd, zip, xml, openssl, fileinfo, dom, redis, pcntl, posix
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Discover Laravel packages
+        run: php artisan package:discover --ansi
+
+      - name: Run Redis and Horizon integration tests
+        run: php artisan test --compact tests/Feature/QueueOperationsConfigurationTest.php tests/Feature/RedisHorizonRuntimeTest.php tests/Feature/HorizonConfigurationTest.php
+
+      - name: Boot and gracefully stop Horizon
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_ENV=local php artisan horizon > storage/logs/horizon-ci.log 2>&1 &
+          horizon_pid=$!
+
+          cleanup() {
+            APP_ENV=local php artisan horizon:terminate >/dev/null 2>&1 || true
+            wait "$horizon_pid" 2>/dev/null || true
+          }
+
+          trap cleanup EXIT
+
+          horizon_ready=0
+          for attempt in $(seq 1 20); do
+            if APP_ENV=local php artisan horizon:status >/dev/null 2>&1; then
+              horizon_ready=1
+              break
+            fi
+
+            sleep 1
+          done
+
+          if [ "$horizon_ready" != "1" ]; then
+            cat storage/logs/horizon-ci.log
+            exit 1
+          fi
+
+          APP_ENV=local php artisan horizon:snapshot
+          APP_ENV=local php artisan horizon:terminate
+          wait "$horizon_pid" || true
+          trap - EXIT

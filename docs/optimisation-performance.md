@@ -17,9 +17,9 @@ LOG_LEVEL=warning
 LOG_STACK=daily
 LOG_DAILY_DAYS=14
 
-# File d'attente : indispensable pour que les e-mails Brevo ne ralentissent pas
-# les requêtes. La table `jobs` existe déjà (migration 0001_01_01_000002).
-QUEUE_CONNECTION=database
+# File d'attente de production après le drain database décrit plus bas.
+# Horizon doit être actif pour consommer les jobs Redis.
+QUEUE_CONNECTION=redis
 
 # Filet de sécurité réseau Brevo
 BREVO_API_TIMEOUT=5
@@ -34,19 +34,21 @@ bash scripts/deploy.sh
 
 Le script enchaîne : garde-fou `APP_DEBUG`, mode maintenance, `composer install
 --no-dev`, build des assets, `migrate --force`, `optimize` (config + routes + vues +
-events), `queue:restart`, puis `reload php-fpm` (purge OPcache). Équivalent manuel :
+events), rechargement du runtime de queue, puis `reload php-fpm` (purge OPcache).
+Avec Redis, il termine Horizon proprement et attend son redémarrage par le
+moniteur de processus ; avec une autre connexion, il exécute `queue:restart`.
+Socle manuel commun :
 
 ```bash
 php artisan migrate --force
 php artisan optimize        # config:cache + event:cache + route:cache + view:cache
-php artisan queue:restart
 sudo systemctl reload php8.4-fpm
 ```
 
 > ⚠️ Après un `config:cache`, toute modification du `.env` exige de relancer
 > `php artisan config:cache` (ou `php artisan optimize:clear`) pour être prise en compte.
 
-### Worker de file d'attente (obligatoire si `QUEUE_CONNECTION=database`)
+### Worker de file d'attente (alternative `QUEUE_CONNECTION=database`)
 
 Un processus doit consommer la file en continu. Exemple **systemd**
 (`/etc/systemd/system/pas-queue.service`) :
@@ -59,20 +61,87 @@ After=network.target
 [Service]
 User=www-data
 Restart=always
+RestartSec=5
 WorkingDirectory=/var/www/pas
-ExecStart=/usr/bin/php artisan queue:work --queue=notifications,default --sleep=1 --tries=3 --max-time=3600
+ExecStart=/usr/bin/php artisan queue:work --queue=notifications,exports,ai-imports,default --sleep=1 --tries=3 --timeout=1320 --max-time=3600
+TimeoutStopSec=1800
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 ```bash
+sudo systemctl daemon-reload
 sudo systemctl enable --now pas-queue.service
 ```
 
-À défaut de worker, l'application reste fonctionnelle : l'envoi des e-mails est
-**déjà différé après la réponse HTTP** (cf. §2), donc la requête utilisateur n'est
-jamais bloquée même sans file d'attente.
+Avec `QUEUE_CONNECTION=redis`, utiliser Horizon sous un moniteur de processus :
+
+```ini
+[Unit]
+Description=PAS ANBG Horizon
+After=network.target
+
+[Service]
+User=www-data
+Restart=always
+RestartSec=5
+WorkingDirectory=/var/www/pas
+ExecStart=/usr/bin/php artisan horizon
+ExecStop=/usr/bin/php artisan horizon:terminate
+TimeoutStopSec=1800
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Après création ou modification de `pas-horizon.service` :
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now pas-horizon.service
+```
+
+Horizon utilise `fast_termination=true`. Les superviseurs conservent néanmoins
+des timeouts de 660 à 1320 secondes, tous supérieurs aux jobs de cinq minutes,
+et inférieurs au `retry_after` Redis de 1500 secondes.
+
+### Bascule manuelle de la file database vers Redis
+
+Ne désactivez jamais l'ancien worker tant que la table `jobs` n'est pas vide.
+Le drain explicite est :
+
+```bash
+QUEUE_CONNECTION=database php artisan queue:work database --queue=notifications,exports,ai-imports,default --stop-when-empty --timeout=1320 --tries=3
+sudo systemctl disable --now pas-queue.service
+systemctl is-active pas-queue.service
+systemctl is-enabled pas-queue.service
+```
+
+Les deux dernières commandes doivent indiquer respectivement `inactive` et
+`disabled` avant d'activer Redis/Horizon. Cette vérification reste manuelle :
+le script `deploy.sh` ne désactive pas automatiquement ce service historique.
+
+### Build Next sans interruption de la release précédente
+
+Le script actuel lance encore `next:build` directement. En production, arrêter
+d'abord `anbg-dashboard-pilot.service`, déplacer
+`/var/www/pas/frontend/dashboard-pilot/.next` vers le chemin fixe
+`.next.deploy-backup`, puis construire. En cas d'échec ou d'interruption,
+remettre ce backup en `.next`, redémarrer le service et exécuter
+`php artisan up`. Après un build réussi, redémarrer le service, vérifier
+`/dashboard-pilot/health` puis `php artisan anbg:health-check`, et seulement
+ensuite supprimer le backup. L'automatisation transactionnelle de cette
+procédure nécessite une autorisation opérationnelle explicite avant intégration
+dans `deploy.sh`.
+
+Les sessions restent sur `SESSION_DRIVER=database` : les ecrans de liste et de
+revocation des sessions ne sont pas encore compatibles avec un stockage Redis.
+
+Sans worker ou Horizon actif, les requêtes peuvent encore placer des jobs dans
+la file, mais les e-mails, exports et imports asynchrones ne sont pas exécutés :
+le backlog augmente jusqu'au rétablissement d'un consommateur. Un runtime de
+queue supervisé est donc obligatoire en production.
 
 ---
 
@@ -80,7 +149,7 @@ jamais bloquée même sans file d'attente.
 
 | Date | Changement | Effet |
 |------|-----------|-------|
-| 2026-06-10 | `BrevoMailService::dispatch()` diffère l'envoi e-mail **après la réponse HTTP** (`dispatch()->afterResponse()`) en contexte web. Synchrone conservé en console/tests. | La requête ne bloque plus sur l'API/SMTP Brevo (jusqu'à plusieurs secondes). |
+| 2026-08-24 | `BrevoMailService::dispatch()` place un job dans la file par destinataire unique, depuis le web comme depuis les commandes et workers. Seuls les tests unitaires livrent synchronement. | Isole la requête et les commandes de la latence API/SMTP Brevo ; nécessite un consommateur de queue actif. |
 | 2026-06-10 | `BREVO_API_TIMEOUT` par défaut abaissé `10s → 5s`. | Borne le pire cas réseau. |
 | 2026-06-10 | Suppression du module Messagerie. | −2 requêtes SQL par page authentifiée (header). |
 

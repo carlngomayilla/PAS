@@ -24,14 +24,16 @@ class AnalyzePasPaoPtaWithAiJob implements ShouldQueue
 
     public function __construct(
         public int $sessionId
-    ) {}
+    ) {
+        $this->onQueue((string) config('ai_training.pta.import_queue', 'ai-imports'));
+    }
 
     public function handle(DocumentExtractionService $documents, PasPaoPtaAnalysisService $analysis): void
     {
         $session = AiImportSession::query()->with('user')->findOrFail($this->sessionId);
         $extraction = $documents->extract($session);
         $analysis->analyzeAndPersist($session, $extraction, $session->user);
-        ValidateImportRowsJob::dispatch($session->id)->onQueue((string) config('ai_training.pta.import_queue', 'ai-imports'));
+        ValidateImportRowsJob::dispatch($session->id);
     }
 
     public function failed(?Throwable $exception): void

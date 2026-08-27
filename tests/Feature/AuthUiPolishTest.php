@@ -74,7 +74,7 @@ class AuthUiPolishTest extends TestCase
         $this->assertStringContainsString('admin-navbar-user', $layout);
         $this->assertStringContainsString('admin-navbar-profile', $layout);
         $this->assertStringContainsString('data-navbar-user-copy', $layout);
-        $this->assertStringContainsString('$layoutUser?->roleLabel()', $layout);
+        $this->assertStringContainsString('$layoutUserRoleLabel', $layout);
         $this->assertStringNotContainsString('admin-exercise-filter', $layout);
         $this->assertStringNotContainsString('name="exercice"', $layout);
         $this->assertStringNotContainsString('name="trimestre"', $layout);

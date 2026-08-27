@@ -5,7 +5,7 @@
     $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
     $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
     $currentDashboardUser = auth()->user();
-    $dashboardNotifications = $currentDashboardUser?->notifications()->latest()->limit(6)->get() ?? collect();
+    $dashboardNotifications = $dashboardNotifications ?? collect();
     $analytics = $dashboardData ?? [];
     $financialSummary = is_array($analytics['financial_summary'] ?? null) ? $analytics['financial_summary'] : null;
     $dashboardRole = $analytics['dashboard_role'] ?? 'global';
@@ -81,10 +81,8 @@
     $synthesisWorkflowCounts = is_array($synthesisDecisionSummary['workflow'] ?? null) ? $synthesisDecisionSummary['workflow'] : [];
     $synthesisDelayCounts = is_array($synthesisDecisionSummary['delay'] ?? null) ? $synthesisDecisionSummary['delay'] : [];
     $synthesisAlertCounts = is_array($synthesisDecisionSummary['alerts'] ?? null) ? $synthesisDecisionSummary['alerts'] : [];
-    $exerciceContext = app(\App\Services\ExerciceContext::class);
-    $ptaSuiviService = app(\App\Services\PtaSuiviService::class);
-    $synthesisExerciseOptions = $exerciceContext->options();
-    $synthesisPeriodOptions = $ptaSuiviService->periodOptions();
+    $synthesisExerciseOptions = $synthesisExerciseOptions ?? [];
+    $synthesisPeriodOptions = $synthesisPeriodOptions ?? [];
     $synthesisWorkflowOptions = [
         'all' => 'Tous suivis',
         'a_parametrer' => 'À paramétrer',
@@ -108,14 +106,17 @@
         'cloturee' => 'Clôturée',
         'a_parametrer' => 'À paramétrer',
     ];
+    $synthesisActionStatusOptions = ['all' => 'Tous statuts'] + \App\Services\Dashboard\DashboardFilterContext::ACTION_STATUS_OPTIONS;
     $selectedSynthesisYear = request()->query('exercice', $exerciseFilter['year'] ?? 'all');
-    $selectedSynthesisPeriod = $ptaSuiviService->normalizePeriod(request()->query('periode', request()->query('trimestre', $exerciseFilter['period'] ?? 'all')));
-    $selectedSynthesisDirection = (string) ($directionSelector['selected_id'] ?? request('direction_id', 'all'));
-    $selectedSynthesisService = (string) ($directionSelector['service_selected_id'] ?? request('service_id', 'all'));
+    $selectedSynthesisPeriod = $selectedSynthesisPeriod ?? ($exerciseFilter['period'] ?? 'all');
+    $selectedSynthesisDirection = ($directionSelector['selected_id'] ?? null) !== null
+        ? (string) $directionSelector['selected_id']
+        : 'all';
+    $selectedSynthesisService = ($directionSelector['service_selected_id'] ?? null) !== null
+        ? (string) $directionSelector['service_selected_id']
+        : 'all';
     $selectedSynthesisRmo = (string) request('responsable_id', 'all');
-    $selectedSynthesisRmoLabel = ($selectedSynthesisRmo !== '' && $selectedSynthesisRmo !== 'all' && ctype_digit($selectedSynthesisRmo))
-        ? \App\Models\User::query()->whereKey((int) $selectedSynthesisRmo)->value('name')
-        : null;
+    $selectedSynthesisRmoLabel = $selectedSynthesisRmoLabel ?? null;
     // Profils qui pilotent au-dela de leur propre perimetre et ont donc besoin
     // des filtres Direction / Service / RMO. `suivi_evaluation` couvre le SCIQ,
     // la planification et le chef de planification.
@@ -123,9 +124,9 @@
     $showDirectionSynthesisSelector = ($directionSelector['enabled'] ?? false)
         && in_array($dashboardRole, $pilotDashboardRoles, true);
     $availableDashboardTabs = [
-        'overview' => 'Synthèse',
+        'overview' => 'Pilotage',
+        'advanced' => 'Tableaux',
         'charts' => 'Graphiques',
-        'advanced' => 'Vue détaillée',
     ];
     $dashboardTabAliases = [
         'overview' => 'overview',
@@ -141,10 +142,9 @@
         'analyse' => 'advanced',
     ];
     $requestedDashboardTab = request()->query('dashboardTab', 'overview');
-    $currentDashboardTab = $dashboardTabAliases[$requestedDashboardTab] ?? 'overview';
-    if ($currentDashboardTab === 'tables') {
-        $currentDashboardTab = 'overview';
-    }
+    $currentDashboardTab = isset($currentDashboardTab) && array_key_exists($currentDashboardTab, $availableDashboardTabs)
+        ? $currentDashboardTab
+        : ($dashboardTabAliases[$requestedDashboardTab] ?? 'overview');
     $canOpenPtaSuivi = $currentDashboardUser
         && (
             $currentDashboardUser->hasPermission(\App\Services\PtaSuiviService::PERMISSION)
@@ -167,6 +167,17 @@
         'statut_delai' => request('statut_delai'),
         'alerte_echeance' => request('alerte_echeance'),
     ])->filter(fn ($value): bool => $value !== null && trim((string) $value) !== '' && trim((string) $value) !== 'all')->all();
+    $nextPilotFilters = [
+        'exercice' => $exerciseFilter['year'] ?? null,
+        'periode' => $synthesisFilters['periode'] ?? null,
+        'direction_id' => $directionSelector['selected_id'] ?? null,
+        'service_id' => $directionSelector['service_selected_id'] ?? null,
+        'responsable_id' => $synthesisFilters['responsable_id'] ?? null,
+        'statut_action' => $synthesisFilters['statut_action'] ?? null,
+        'statut_suivi' => $synthesisFilters['statut_suivi'] ?? null,
+        'statut_delai' => $synthesisFilters['statut_delai'] ?? null,
+        'alerte_echeance' => $synthesisFilters['alerte_echeance'] ?? null,
+    ];
 
     $summaryStrip = ($roleDashboard['summary_cards'] ?? []) !== [] ? $roleDashboard['summary_cards'] : [
         ['label' => 'Actions totales', 'value' => $metrics['totals']['actions_total'] ?? 0, 'accent' => '#1F2937', 'bg' => '#F8FBFF', 'meta' => null, 'href' => route('workspace.actions.index')],
@@ -366,7 +377,9 @@
     $decisionChainCellLevels = [0 => 'pas', 1 => 'strategic-objective', 2 => 'pao', 3 => 'operational-objective', 4 => 'pta', 5 => 'action'];
     $actionOnlyCellLevels = [0 => 'action'];
 
-    $directionSynthesisTables = [
+    $directionSynthesisTables = [];
+    if ($currentDashboardTab === 'overview' && ($showSynthesisTablesInOverview ?? false)) {
+        $directionSynthesisTables = [
         [
             'title' => 'Directions',
             'chip' => count($directionPerformanceRows).' directions',
@@ -645,37 +658,8 @@
                 $fmtPct($row['score'] ?? 0),
             ]])->all(),
         ],
-    ];
-
-    $decisionCharts = [
-        [
-            'title' => 'Services',
-            'rows' => collect($decisionServiceRows)->map(fn (array $row): array => [
-                'label' => $shortText($row['service'] ?? '-', 34),
-                'value' => (float) ($row['score'] ?? 0),
-                'meta' => $fmtCount($row['actions'] ?? 0).' actions',
-                'color' => '#3996D3',
-            ])->all(),
-        ],
-        [
-            'title' => 'Agents',
-            'rows' => collect($decisionAgentRows)->map(fn (array $row): array => [
-                'label' => $shortText($row['agent'] ?? '-', 34),
-                'value' => (float) ($row['score'] ?? 0),
-                'meta' => $fmtCount($row['actions_affectees'] ?? 0).' actions',
-                'color' => '#8FC043',
-            ])->all(),
-        ],
-        [
-            'title' => 'Evolution trimestrielle',
-            'rows' => collect($decisionQuarterRows)->map(fn (array $row): array => [
-                'label' => $row['trimestre'] ?? '-',
-                'value' => (float) ($row['taux_execution'] ?? 0),
-                'meta' => $fmtCount($row['terminees'] ?? 0).' terminées / '.$fmtCount($row['actions_prevues'] ?? 0).' prévues',
-                'color' => '#F9B13C',
-            ])->all(),
-        ],
-    ];
+        ];
+    }
 
 @endphp
 
@@ -689,11 +673,11 @@
                     aria-current="{{ $currentDashboardTab === 'overview' ? 'page' : 'false' }}"
                     role="tab"
                 >
-                    Synthèse
+                    Pilotage
                 </summary>
                 <div class="absolute left-0 top-[calc(100%+0.5rem)] z-[9999] min-w-[240px] overflow-hidden rounded-2xl border border-[#3996d3]/20 bg-white p-2 shadow-xl">
                     <a class="block rounded-xl px-3 py-2 text-sm font-semibold text-[#17324a] hover:bg-[#e8f3fb]" href="{{ request()->fullUrlWithQuery(['dashboardTab' => 'overview', 'direction_id' => 'all']) }}">
-                        Synthèse globale
+                        Pilotage global
                     </a>
                     @foreach (($directionSelector['options'] ?? []) as $directionOption)
                         <a class="block rounded-xl px-3 py-2 text-sm font-semibold text-[#17324a] hover:bg-[#e8f3fb]" href="{{ request()->fullUrlWithQuery(['dashboardTab' => 'overview', 'direction_id' => $directionOption['id'], 'service_id' => 'all']) }}">
@@ -714,7 +698,7 @@
             </a>
         @endif
     @endforeach
-    <form method="GET" action="{{ route('workspace.search') }}" class="dashboard-tabs-search" role="search" aria-label="Recherche globale">
+    <form method="GET" action="{{ route('workspace.search') }}" class="dashboard-tabs-search" role="search" aria-label="Recherche globale" data-auto-filter-form>
         <span class="dashboard-tabs-search-icon" aria-hidden="true">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
@@ -727,24 +711,49 @@
             value="{{ request('q') }}"
             placeholder="Rechercher..."
             autocomplete="off"
+            minlength="2"
             aria-label="Recherche globale"
             inputmode="search"
         >
     </form>
 </div>
 
+<x-dashboard.next-pilot-link :filters="$nextPilotFilters" />
+
 <form
         method="GET"
-        action="{{ route('synthese.index') }}"
+        action="{{ route('dashboard') }}"
         class="mb-4 rounded-2xl border border-[#3996d3]/20 bg-white/95 p-3 shadow-sm"
         data-filter-form
+        data-auto-filter-form
         data-form-layout="wide"
         data-dashboard-synthesis-filter-form
+        data-mobile-collapsed="true"
         data-services-url-template="{{ route('synthese.services-by-direction', ['direction' => '__DIRECTION__']) }}"
-        data-users-url="{{ route('workspace.ajax.users') }}"
+        data-responsibles-url="{{ route('synthese.responsibles') }}"
     >
         <input type="hidden" name="dashboardTab" value="{{ $currentDashboardTab }}">
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
+        <button
+            type="button"
+            class="dashboard-filter-toggle"
+            data-dashboard-filter-toggle
+            aria-expanded="false"
+            aria-controls="dashboard-filter-fields"
+        >
+            <span class="dashboard-filter-toggle-icon" aria-hidden="true">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M7 12h10M10 18h4" />
+                </svg>
+            </span>
+            <span>
+                <strong>Filtres de pilotage</strong>
+                <small>{{ $directionSelector['selected_label'] ?? 'Pilotage global' }} · {{ $exerciseFilter['label'] ?? 'Exercice courant' }}</small>
+            </span>
+            <span class="dashboard-filter-toggle-chevron" aria-hidden="true"></span>
+        </button>
+
+        <div id="dashboard-filter-fields" data-dashboard-filter-fields>
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-9">
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
                 Annee
                 <select name="exercice" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
@@ -791,6 +800,14 @@
                 </label>
             @endif
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                Statut action
+                <select name="statut_action" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
+                    @foreach ($synthesisActionStatusOptions as $value => $label)
+                        <option value="{{ $value }}" @selected((string) ($synthesisFilters['statut_action'] ?? 'all') === (string) $value || (($synthesisFilters['statut_action'] ?? null) === null && $value === 'all'))>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
                 Statut suivi
                 <select name="statut_suivi" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
                     @foreach ($synthesisWorkflowOptions as $value => $label)
@@ -817,12 +834,12 @@
         </div>
         <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
             <div class="text-xs font-semibold text-[#667085]">
-                {{ $directionSelector['selected_label'] ?? 'Synthese globale' }} | {{ $directionSelector['service_selected_label'] ?? 'Tous les services' }} | {{ $exerciseFilter['label'] ?? 'Exercice courant' }}
+                {{ $directionSelector['selected_label'] ?? 'Pilotage global' }} | {{ $directionSelector['service_selected_label'] ?? 'Tous les services' }} | {{ $exerciseFilter['label'] ?? 'Exercice courant' }}
             </div>
             <div class="flex flex-wrap gap-2">
-                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('synthese.index', ['dashboardTab' => $currentDashboardTab, 'direction_id' => 'all', 'service_id' => 'all', 'responsable_id' => 'all', 'exercice' => 'all', 'periode' => 'all', 'trimestre' => 'all', 'statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']) }}">Réinitialiser</a>
-                <button type="submit" class="btn btn-primary btn-sm rounded-xl px-3 py-1.5 text-xs">Appliquer</button>
+                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('dashboard', ['dashboardTab' => $currentDashboardTab, 'direction_id' => 'all', 'service_id' => 'all', 'responsable_id' => 'all', 'exercice' => 'all', 'periode' => 'all', 'trimestre' => 'all', 'statut_action' => 'all', 'statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']) }}">Réinitialiser</a>
             </div>
+        </div>
         </div>
     </form>
 
@@ -862,8 +879,8 @@
             {!! json_encode([
                 'dashboardData' => $dashboardClientData ?? $dashboardData ?? [],
                 'reportingAnalytics' => $reportingClientAnalytics ?? ['charts' => (($reportingAnalytics ?? [])['charts'] ?? [])],
-                'dgPayload' => $dgPayload ?? [],
-                'ganttRows' => $ganttRows ?? [],
+                'dgPayload' => $currentDashboardTab === 'charts' ? ($dgPayload ?? []) : [],
+                'ganttRows' => $currentDashboardTab === 'charts' ? ($ganttRows ?? []) : [],
             ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
         </script>
     @endpush

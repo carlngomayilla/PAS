@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Services\Analytics\AnalyticsCacheVersionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -36,17 +35,6 @@ class ActionLog extends Model
             'details' => 'array',
             'lu' => 'boolean',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        static::saved(static function (): void {
-            app(AnalyticsCacheVersionService::class)->bumpAlerts();
-        });
-
-        static::deleted(static function (): void {
-            app(AnalyticsCacheVersionService::class)->bumpAlerts();
-        });
     }
 
     public function action(): BelongsTo

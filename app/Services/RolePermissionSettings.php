@@ -4,13 +4,15 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Collection;
 
 class RolePermissionSettings
 {
     public function __construct(
-        private readonly RoleRegistryService $roleRegistry
+        private readonly RoleRegistryService $roleRegistry,
+        private readonly AnalyticsCacheVersionService $analyticsCacheVersionService,
     ) {}
 
     /**
@@ -187,6 +189,7 @@ class RolePermissionSettings
         }
 
         $this->flush();
+        $this->analyticsCacheVersionService->bumpDashboard();
 
         return $this->all();
     }

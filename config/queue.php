@@ -41,7 +41,7 @@ return [
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 1500),
-            'after_commit' => false,
+            'after_commit' => true,
         ],
 
         'beanstalkd' => [
@@ -66,11 +66,11 @@ return [
 
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
-            'block_for' => null,
-            'after_commit' => false,
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 1500),
+            'block_for' => (int) env('REDIS_QUEUE_BLOCK_FOR', 5),
+            'after_commit' => true,
         ],
 
         'deferred' => [
@@ -89,6 +89,25 @@ return [
             ],
         ],
 
+    ],
+
+    'workloads' => [
+        'notifications' => [
+            'job_timeout' => 600,
+            'supervisor_timeout' => 660,
+        ],
+        'exports' => [
+            'job_timeout' => 900,
+            'supervisor_timeout' => 960,
+        ],
+        'ai-imports' => [
+            'job_timeout' => 1260,
+            'supervisor_timeout' => 1320,
+        ],
+        'default' => [
+            'job_timeout' => 600,
+            'supervisor_timeout' => 660,
+        ],
     ],
 
     /*

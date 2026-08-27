@@ -70,6 +70,36 @@ const CHART_HEADER_SELECTOR = [
   '[class*="justify-between"]',
 ].join(',');
 
+const chartDisclosureControllers = new WeakMap();
+
+function bindProgressiveDetails() {
+  document.querySelectorAll('[data-progressive-accordion-group]').forEach((group) => {
+    if (!(group instanceof HTMLElement) || group.dataset.progressiveDetailsReady === '1') {
+      return;
+    }
+
+    const items = Array.from(group.querySelectorAll(':scope > details[data-progressive-accordion-item]'))
+      .filter((item) => item instanceof HTMLDetailsElement);
+
+    items.forEach((item, index) => {
+      item.open = index === 0;
+      item.addEventListener('toggle', () => {
+        if (!item.open) {
+          return;
+        }
+
+        items.forEach((otherItem) => {
+          if (otherItem !== item) {
+            otherItem.open = false;
+          }
+        });
+      });
+    });
+
+    group.dataset.progressiveDetailsReady = '1';
+  });
+}
+
 function applyPatternCards() {
   const root = document.querySelector('body.admin-theme-scope') || document.body;
 
@@ -117,9 +147,16 @@ function addToggleButton(panel, header, body) {
   button.title = 'Replier ou deployer';
   button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 
-  const setExpanded = (expanded) => {
+  const setExpanded = (expanded, animate = true) => {
     panel.classList.toggle('chart-disclosure-collapsed', !expanded);
     button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    const position = button.dataset.chartDisclosurePosition || '';
+    button.setAttribute('aria-label', `${expanded ? 'Replier' : 'Afficher'} le graphique${position ? ` ${position}` : ''}`);
+
+    if (!animate) {
+      body.style.maxHeight = expanded ? '' : '0px';
+      return;
+    }
 
     if (expanded) {
       body.style.maxHeight = `${body.scrollHeight}px`;
@@ -140,10 +177,24 @@ function addToggleButton(panel, header, body) {
   };
 
   button.addEventListener('click', () => {
-    setExpanded(panel.classList.contains('chart-disclosure-collapsed'));
+    const shouldExpand = panel.classList.contains('chart-disclosure-collapsed');
+
+    if (shouldExpand) {
+      const group = panel.closest('[data-dashboard-panel]') || document.body;
+      group.querySelectorAll('.chart-disclosure-panel').forEach((otherPanel) => {
+        if (otherPanel === panel) {
+          return;
+        }
+
+        chartDisclosureControllers.get(otherPanel)?.(false);
+      });
+    }
+
+    setExpanded(shouldExpand);
   });
 
   header.appendChild(button);
+  chartDisclosureControllers.set(panel, setExpanded);
 
   return button;
 }
@@ -187,10 +238,42 @@ function bindChartAccordions() {
 
     addToggleButton(panel, header, body);
   });
+
+  const groups = new Map();
+
+  panels.forEach((panel) => {
+    const group = panel.closest('[data-dashboard-panel]') || document.body;
+    const groupPanels = groups.get(group) || [];
+    groupPanels.push(panel);
+    groups.set(group, groupPanels);
+  });
+
+  groups.forEach((groupPanels, group) => {
+    if (!(group instanceof HTMLElement) || group.dataset.progressiveAccordionsReady === '1') {
+      return;
+    }
+
+    groupPanels.forEach((panel, index) => {
+      const button = panel.querySelector(':scope .chart-disclosure-toggle');
+
+      if (button instanceof HTMLButtonElement) {
+        button.dataset.chartDisclosurePosition = `${index + 1} sur ${groupPanels.length}`;
+      }
+
+      chartDisclosureControllers.get(panel)?.(index === 0, false);
+    });
+
+    group.dataset.progressiveAccordionsReady = '1';
+  });
 }
+
+window.AnBGChartDisclosure = {
+  refresh: bindChartAccordions,
+};
 
 function initVisualPolish() {
   applyPatternCards();
+  bindProgressiveDetails();
   bindChartAccordions();
 }
 

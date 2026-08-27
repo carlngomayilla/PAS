@@ -150,7 +150,7 @@
             @endforeach
         </div>
 
-        <form method="GET" action="{{ route('workspace.reporting') }}" class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+        <form method="GET" action="{{ route('workspace.reporting') }}" class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]" data-auto-filter-form>
             <input type="hidden" name="report_type" value="{{ $activeReportType }}">
             <div>
                 <label for="exercice">Exercice</label>
@@ -231,7 +231,6 @@
                 <input id="periode_fin" name="periode_fin" type="date" value="{{ request('periode_fin') }}">
             </div>
             <div class="flex items-end gap-2">
-                <button class="btn btn-primary w-full rounded-2xl px-4 py-2.5" type="submit">Filtrer</button>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting', ['report_type' => $activeReportType]) }}">Réinitialiser</a>
             </div>
         </form>

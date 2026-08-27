@@ -57,9 +57,10 @@ class EssentialDashboardWorkflowTest extends TestCase
         $this->actingAs($fixture['admin'])
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Synth')
+            ->assertSee('Pilotage')
+            ->assertSee('Tableaux')
             ->assertSee('Graphiques')
-            ->assertSee('Vue détaillée')
+            ->assertDontSee('Vue détaillée')
             ->assertSee('Vue synthétique des axes')
             ->assertSee('Suivi PTA')
             ->assertSee('Axe dashboard sans action')
@@ -71,11 +72,11 @@ class EssentialDashboardWorkflowTest extends TestCase
         $fixture = $this->createPlanningFixture();
         $this->createAction($fixture);
 
-        foreach (['planification', 'chef_planification', 'sciq', 'chef_sciq'] as $userKey) {
+        foreach (['planification', 'chef_planification', 'sciq', 'chef_sciq', 'dg'] as $userKey) {
             $dashboard = app(EssentialDashboardService::class)->forUser($fixture[$userKey]);
 
             $this->assertSame('suivi_evaluation', $dashboard['profile']);
-            $this->assertSame('Vue suivi-evaluation', $dashboard['label']);
+            $this->assertSame('Vue contrôle et suivi', $dashboard['label']);
         }
     }
 
@@ -219,6 +220,10 @@ class EssentialDashboardWorkflowTest extends TestCase
             'role' => User::ROLE_CHEF_UNITE_SCIQ,
             'password_changed_at' => now(),
         ]);
+        $dg = User::factory()->create([
+            'role' => User::ROLE_DG,
+            'password_changed_at' => now(),
+        ]);
 
         $pas = Pas::query()->create([
             'titre' => 'PAS dashboard',
@@ -291,6 +296,7 @@ class EssentialDashboardWorkflowTest extends TestCase
             'chef_planification' => $chefPlanification,
             'sciq' => $sciq,
             'chef_sciq' => $chefSciq,
+            'dg' => $dg,
             'pas' => $pas,
             'pas_objectif' => $objectif,
             'pao' => $pao,

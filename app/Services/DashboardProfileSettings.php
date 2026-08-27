@@ -4,11 +4,16 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Arr;
 
 class DashboardProfileSettings
 {
+    public function __construct(
+        private readonly AnalyticsCacheVersionService $analyticsCacheVersionService,
+    ) {}
+
     /**
      * @var array<string, array<string, mixed>>|null
      */
@@ -67,7 +72,7 @@ class DashboardProfileSettings
             User::ROLE_ADMIN_FONCTIONNEL => 'Administrateur fonctionnel',
             User::ROLE_DG => 'Direction Générale',
             User::ROLE_PLANIFICATION => 'Planification',
-            'suivi_evaluation' => 'Suivi-evaluation (Planification / SCIQ)',
+            'suivi_evaluation' => 'Contrôle et suivi (Planification / SCIQ)',
             User::ROLE_DIRECTION => 'Directeur de direction',
             User::ROLE_SERVICE => 'Chef de service',
             User::ROLE_AGENT => 'Agent',
@@ -234,6 +239,7 @@ class DashboardProfileSettings
         }
 
         $this->flush();
+        $this->analyticsCacheVersionService->bumpDashboard();
 
         return $this->all();
     }

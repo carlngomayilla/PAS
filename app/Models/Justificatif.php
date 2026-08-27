@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use App\Services\Analytics\AnalyticsCacheVersionService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Support\Facades\Cache;
 
 class Justificatif extends Model
 {
@@ -89,7 +87,7 @@ class Justificatif extends Model
             return;
         }
 
-        $updated = ActionLog::query()
+        ActionLog::query()
             ->where('action_id', (int) $this->justifiable_id)
             ->where('type_evenement', 'justificatif_absent')
             ->whereIn('niveau', ['warning', 'critical', 'urgence'])
@@ -106,12 +104,5 @@ class Justificatif extends Model
                 'updated_at' => now(),
             ]);
 
-        if ($updated > 0) {
-            if (Cache::increment('alert-center:version') === false) {
-                Cache::forever('alert-center:version', 2);
-            }
-
-            app(AnalyticsCacheVersionService::class)->bumpAll();
-        }
     }
 }

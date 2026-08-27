@@ -267,6 +267,7 @@ import { gsap } from 'gsap';
 
     function initTableAccordions() {
         document.querySelectorAll('.showcase-panel, article.showcase-panel').forEach(function (section) {
+            if (section instanceof HTMLDetailsElement) return;
             if (section.dataset.accordionReady === '1') return;
             if (section.classList.contains('hidden')) return;
             if (section.dataset.keepAccordion === '0') return;
@@ -663,7 +664,12 @@ import { gsap } from 'gsap';
     function initSpotlight() {
         var backdrop = document.getElementById('spotlight-backdrop');
         var input    = document.getElementById('spotlight-input');
+        var trigger  = document.getElementById('admin-spotlight-open');
         if (!backdrop || !input) return;
+
+        if (trigger) {
+            trigger.addEventListener('click', openSpotlight);
+        }
 
         // Close on backdrop click (outside panel)
         backdrop.addEventListener('click', function (e) {
@@ -1084,9 +1090,32 @@ import { gsap } from 'gsap';
         });
     }
 
+    function initDashboardFilterDisclosures() {
+        document.querySelectorAll('[data-dashboard-synthesis-filter-form]').forEach(function (form) {
+            if (form.dataset.filterDisclosureBound) return;
+
+            var toggle = form.querySelector('[data-dashboard-filter-toggle]');
+            var fields = form.querySelector('[data-dashboard-filter-fields]');
+            if (!toggle || !fields) return;
+
+            var sync = function (expanded) {
+                form.dataset.mobileCollapsed = expanded ? 'false' : 'true';
+                toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            };
+
+            toggle.addEventListener('click', function () {
+                sync(toggle.getAttribute('aria-expanded') !== 'true');
+            });
+
+            sync(false);
+            form.dataset.filterDisclosureBound = '1';
+        });
+    }
+
     function initDynamicDom() {
         enhanceForms(document);
         initDeadlineChangeFields();
+        initDashboardFilterDisclosures();
         initFlash();
         flashToToast();
         initClientValidation();
