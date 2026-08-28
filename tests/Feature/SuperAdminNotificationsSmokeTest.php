@@ -120,7 +120,15 @@ class SuperAdminNotificationsSmokeTest extends TestCase
         // Force le canal email en mode SMTP pour ce test (Mail::fake).
         config()->set('services.brevo.enabled', true);
         config()->set('services.brevo.transport', 'smtp');
-        config()->set('mail.mailers.brevo', config('mail.mailers.smtp'));
+        config()->set('services.brevo.mailer', 'brevo');
+        config()->set('mail.mailers.brevo', [
+            'transport' => 'smtp',
+            'host' => 'smtp-relay.brevo.com',
+            'port' => 587,
+            'username' => 'fake',
+            'password' => 'fake',
+            'encryption' => 'tls',
+        ]);
 
         $admin = User::factory()->create([
             'role' => User::ROLE_SUPER_ADMIN,

@@ -84,6 +84,7 @@ jobs:
       DB_LOGIN_PREFLIGHT: 'false'
       BCRYPT_ROUNDS: '4'
       CACHE_STORE: array
+      CACHE_VERSION_STORE: array
       MAIL_MAILER: array
       QUEUE_CONNECTION: sync
       SESSION_DRIVER: array
@@ -199,6 +200,8 @@ jobs:
         run: npm run build
 
       - name: Test Laravel frontend behavior
+        env:
+          LARAVEL_BYPASS_ENV_CHECK: '1'
         run: npm run test:ui
 
       - name: Verify Next dashboard pilot
