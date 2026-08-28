@@ -27,7 +27,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertSee('Graphiques');
         $response->assertDontSee('Vue détaillée');
         $response->assertSee('Pilotage du service');
-        $response->assertSee('Flux à traiter');
+        $response->assertSee('À traiter aujourd’hui');
         $response->assertSee("Reports d'échéance");
     }
 
