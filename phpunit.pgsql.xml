@@ -41,6 +41,7 @@
         <!-- A11 — Pas de DB_CONNECTION/DB_DATABASE ici : on s appuie sur les
              variables d environnement injectees par le job CI (postgres). -->
         <env name="MAIL_MAILER" value="array"/>
+        <env name="BREVO_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
