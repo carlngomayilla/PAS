@@ -48,6 +48,8 @@ class PtaHierarchyService
             'validateur:id,name,email',
             'actions' => fn (Builder|Relation $query) => $query
                 ->with([
+                    'objectifOperationnel.pasAxe:id,pas_id,code,libelle',
+                    'objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
                     'responsable:id,name,email',
                     'responsables:id,name,email',
                     'sousActions' => fn (Builder|Relation $subActionQuery) => $subActionQuery
@@ -185,6 +187,15 @@ class PtaHierarchyService
             'code' => (string) ($action->code ?: 'ACT-'.$action->id),
             'label' => (string) $action->libelle,
             'description' => $action->description,
+            'axis' => (string) (
+                $action->objectifOperationnel?->pasAxe?->libelle
+                ?? $action->objectifOperationnel?->pasObjectif?->pasAxe?->libelle
+                ?? 'Axe strategique non renseigne'
+            ),
+            'strategic_objective' => (string) (
+                $action->objectifOperationnel?->pasObjectif?->libelle
+                ?? 'Objectif strategique non renseigne'
+            ),
             'type' => $action->typeActionLabel(),
             'indicator_type' => $action->type_indicateur_label,
             'indicator' => $this->firstFilledText([

@@ -787,7 +787,9 @@ class ActionTrackingService
     private function refreshStructuredActionMetrics(Action $action, Carbon $referenceDate): Action
     {
         $metrics = $this->actionProgressService->compute($action, $referenceDate);
-        $realProgress = (float) ($metrics['progression_reelle'] ?? 0);
+        $realProgress = $action->historical_execution_recorded_at !== null
+            ? (float) ($action->progression_reelle ?? 0)
+            : (float) ($metrics['progression_reelle'] ?? 0);
         $theoreticalProgress = (float) ($metrics['progression_theorique'] ?? 0);
         $beforeStatus = (string) $action->statut_dynamique;
 
@@ -806,12 +808,14 @@ class ActionTrackingService
 
         $updates = [
             'date_echeance' => $action->date_echeance ?? $action->date_fin,
-            'quantite_realisee' => (float) ($metrics['quantite_realisee'] ?? $action->quantite_realisee ?? 0),
+            'quantite_realisee' => $action->historical_execution_recorded_at !== null
+                ? (float) ($action->quantite_realisee ?? 0)
+                : (float) ($metrics['quantite_realisee'] ?? $action->quantite_realisee ?? 0),
             'progression_reelle' => $realProgress,
             'progression_theorique' => $theoreticalProgress,
             'avancement_operationnel' => (float) ($metrics['avancement_operationnel'] ?? 0),
             'taux_atteinte_cible' => (float) ($metrics['taux_atteinte_cible'] ?? 0),
-            'taux_global' => (float) ($metrics['taux_global'] ?? $realProgress),
+            'taux_global' => $realProgress,
             'statut_dynamique' => $status,
             'statut' => $legacyStatus,
         ];
@@ -999,7 +1003,7 @@ class ActionTrackingService
         $endDate = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
         $actualEnd = $action->date_fin_reelle !== null ? Carbon::parse($action->date_fin_reelle)->endOfDay() : null;
 
-        if ($actualEnd !== null && $this->hasFinalValidation($action)) {
+        if ($actualEnd !== null && ($this->hasFinalValidation($action) || $action->historical_execution_recorded_at !== null)) {
             $realEnd = $action->date_fin_reelle !== null
                 ? Carbon::parse($action->date_fin_reelle)->endOfDay()
                 : $referenceDate->copy()->endOfDay();

@@ -23,6 +23,7 @@ use App\Http\Controllers\Web\DependentSelectController;
 use App\Http\Controllers\Web\FinancialMonitoringWebController;
 use App\Http\Controllers\Web\GlobalSearchWebController;
 use App\Http\Controllers\Web\GovernanceWebController;
+use App\Http\Controllers\Web\HistoricalExecutionImportWebController;
 use App\Http\Controllers\Web\InstitutionalReportWebController;
 use App\Http\Controllers\Web\KpiMesureWebController;
 use App\Http\Controllers\Web\KpiWebController;
@@ -294,6 +295,12 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::get('imports-excel/nouveau', [PlanningImportWebController::class, 'create'])->name('imports.create');
             Route::post('imports-excel/preview', [PlanningImportWebController::class, 'preview'])->name('imports.preview');
             Route::get('imports-excel/modele', [PlanningImportWebController::class, 'template'])->name('imports.template');
+            Route::get('imports-excel/execution-historique', [HistoricalExecutionImportWebController::class, 'index'])->name('imports.historical.index');
+            Route::post('imports-excel/execution-historique/preview', [HistoricalExecutionImportWebController::class, 'preview'])->name('imports.historical.preview');
+            Route::get('imports-excel/execution-historique/modele', [HistoricalExecutionImportWebController::class, 'template'])->name('imports.historical.template');
+            Route::get('imports-excel/execution-historique/{import}', [HistoricalExecutionImportWebController::class, 'show'])->name('imports.historical.show');
+            Route::post('imports-excel/execution-historique/{import}/confirmer', [HistoricalExecutionImportWebController::class, 'confirm'])->name('imports.historical.confirm');
+            Route::delete('imports-excel/execution-historique/{import}', [HistoricalExecutionImportWebController::class, 'destroy'])->name('imports.historical.destroy');
             Route::get('imports-excel/{import}', [PlanningImportWebController::class, 'show'])->name('imports.show');
             Route::post('imports-excel/{import}/colonnes', [PlanningImportWebController::class, 'mapping'])->name('imports.mapping');
             Route::post('imports-excel/{import}/confirmer', [PlanningImportWebController::class, 'confirm'])->name('imports.confirm');
@@ -470,6 +477,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             // Suivi opérationnel V2 : enregistrement (save) + soumission (submit).
             Route::post('actions/{action}/execution', [ActionTrackingWebController::class, 'updateActionProgress'])
                 ->name('actions.execution.update');
+            Route::post('actions/{action}/execution-historique', [ActionTrackingWebController::class, 'recordHistoricalExecution'])
+                ->name('actions.historical-execution.store');
             Route::post('actions/{action}/sous-actions/{sousAction}', [ActionTrackingWebController::class, 'updateSubActionProgress'])
                 ->name('actions.sub-actions.update');
             // Validation chef (action simple ou sous-action via sous_action_id).

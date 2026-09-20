@@ -195,6 +195,8 @@ class Action extends Model
     {
         return [
             'date_debut' => 'date',
+            'date_debut_reelle' => 'date',
+            'historical_execution_recorded_at' => 'datetime',
             'mode_evaluation' => 'string',
             'type_action' => 'string',
             'type_indicateur' => 'string',

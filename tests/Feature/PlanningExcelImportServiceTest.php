@@ -90,6 +90,77 @@ class PlanningExcelImportServiceTest extends TestCase
         $this->assertSame((int) $fixture['agent']->id, (int) $action->responsable_id);
     }
 
+    public function test_import_keeps_repeated_objective_and_action_orders_separate_per_axis(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(PlanningExcelImportService::class);
+        $rows = collect(range(1, 4))
+            ->map(fn (int $axisOrder): array => $this->row([
+                'ordre_axe' => $axisOrder,
+                'libelle_axe' => 'Axe '.$axisOrder,
+                'ordre_objectif_strategique' => 1,
+                'libelle_objectif_strategique' => 'Objectif strategique '.$axisOrder,
+                'ordre_objectif_operationnel' => 1,
+                'libelle_objectif_operationnel' => 'Objectif operationnel '.$axisOrder,
+                'ordre_action' => 1,
+                'libelle_action' => 'Action axe '.$axisOrder,
+            ]))
+            ->all();
+
+        $preview = $service->validateSheet($this->sheet($rows));
+
+        $this->assertFalse($preview['has_errors']);
+        $this->executePreview($service, $fixture['admin'], $preview);
+
+        $this->assertDatabaseCount('pas_axes', 4);
+        $this->assertDatabaseCount('pas_objectifs', 4);
+        $this->assertDatabaseCount('objectifs_operationnels', 4);
+        $this->assertDatabaseCount('actions', 4);
+
+        $actions = Action::query()
+            ->with('objectifOperationnel.pasAxe')
+            ->orderBy('id')
+            ->get();
+
+        $this->assertSame(
+            [1, 2, 3, 4],
+            $actions
+                ->map(fn (Action $action): int => (int) $action->objectifOperationnel->pasAxe->import_ordre)
+                ->all()
+        );
+        $this->assertCount(4, $actions->pluck('code')->unique());
+    }
+
+    public function test_update_import_relinks_legacy_action_to_axis_from_workbook(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(PlanningExcelImportService::class);
+        $initialPreview = $service->validateSheet($this->sheet([
+            $this->row([
+                'ordre_axe' => 1,
+                'libelle_axe' => 'Ancien axe principal',
+                'libelle_action' => 'Action legacy a rattacher',
+            ]),
+        ]));
+        $this->assertFalse($initialPreview['has_errors']);
+        $this->executePreview($service, $fixture['admin'], $initialPreview);
+
+        $updatedPreview = $service->validateSheet($this->sheet([
+            $this->row([
+                'ordre_axe' => 2,
+                'libelle_axe' => 'Axe corrige du fichier',
+                'libelle_action' => 'Action legacy a rattacher',
+            ]),
+        ]));
+        $this->assertFalse($updatedPreview['has_errors']);
+        $this->executePreview($service, $fixture['admin'], $updatedPreview, PlanningImport::MODE_UPDATE_EXISTING);
+
+        $this->assertDatabaseCount('actions', 1);
+        $action = Action::query()->with('objectifOperationnel.pasAxe')->firstOrFail();
+        $this->assertSame('Axe corrige du fichier', $action->objectifOperationnel->pasAxe->libelle);
+        $this->assertSame(2, (int) $action->objectifOperationnel->pasAxe->import_ordre);
+    }
+
     public function test_deleted_pas_clears_planning_tree_before_same_workbook_reimport(): void
     {
         $fixture = $this->fixture();

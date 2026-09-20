@@ -28,6 +28,7 @@ use App\Services\Workflow\DeadlineExtensionChangeSet;
 use App\Services\WorkflowSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -125,6 +126,7 @@ class ActionTrackingWebController extends Controller
             && ($action->isResponsible($user) || $user->isAgent());
         $canReviewByChef = $this->canReviewByChef($user, $action);
         $canReviewByController = $this->canReviewByController($user);
+        $canRecordHistoricalExecution = $this->canRecordHistoricalExecution($user);
         $canRequestDeadlineExtension = $user->can('requestDeadlineExtension', $action);
         $canReviewDeadlineExtensionByChef = $user->can('reviewDeadlineExtensionByChef', $action);
         $canReviewDeadlineExtensionByDirector = $user->can('reviewDeadlineExtensionByDirector', $action);
@@ -163,6 +165,7 @@ class ActionTrackingWebController extends Controller
             'canTrackSubActionsV2' => $canTrackSubActions,
             'canReviewByChefV2' => $canReviewByChef,
             'canReviewByControllerV2' => $canReviewByController,
+            'canRecordHistoricalExecutionV2' => $canRecordHistoricalExecution,
             // Le responsable VOIT toujours le formulaire (figé si non éditable),
             // tant que l'action est paramétrée. L'édition dépend de canTrackActionV2.
             'v2ActionResponsible' => $action->isResponsible($user)
@@ -344,6 +347,83 @@ class ActionTrackingWebController extends Controller
             ->with('success', $intent === 'submit'
                 ? 'Action soumise au chef de service pour validation.'
                 : 'Avancement enregistré. Vous pourrez soumettre quand vous serez prêt.');
+    }
+
+    /** Enregistre une réalisation passée sans antidater le visa du workflow. */
+    public function recordHistoricalExecution(Request $request, Action $action, ActionTrackingService $trackingService): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id', 'sousActions');
+        if (! $this->canRecordHistoricalExecution($user)) {
+            abort(403, 'Cette reprise est réservée au SCIQ, à la planification et à leurs chefs.');
+        }
+        if (! $this->canReadAction($user, $action)) {
+            abort(403, 'Action hors de votre périmètre.');
+        }
+
+        $validated = $request->validate([
+            'statut_execution' => ['required', Rule::in(['en_cours', 'achevee'])],
+            'date_debut_reelle' => ['required', 'date', 'before_or_equal:today'],
+            'date_fin_reelle' => ['nullable', 'date', 'before_or_equal:today', 'after_or_equal:date_debut_reelle'],
+            'quantite_realisee' => ['nullable', 'numeric', 'min:0'],
+            'progression' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'commentaire' => ['required', 'string', 'min:5', 'max:5000'],
+        ]);
+        if ($validated['statut_execution'] === 'achevee' && empty($validated['date_fin_reelle'])) {
+            return back()->withInput()->withErrors(['date_fin_reelle' => 'La date de fin est obligatoire pour une action achevée.']);
+        }
+        if ($validated['statut_execution'] === 'en_cours' && ! empty($validated['date_fin_reelle'])) {
+            return back()->withInput()->withErrors(['date_fin_reelle' => 'Une action en cours ne doit pas avoir de date de fin.']);
+        }
+
+        $quantity = $validated['quantite_realisee'] ?? $action->quantite_realisee;
+        $progression = $validated['progression'] ?? null;
+        if ($progression === null && $action->usesQuantitativeProgress() && (float) ($action->quantite_cible ?? 0) > 0) {
+            $progression = $validated['statut_execution'] === 'achevee'
+                ? 100
+                : min(100, max(0, ((float) $quantity / (float) $action->quantite_cible) * 100));
+        }
+        $progression ??= $validated['statut_execution'] === 'achevee' ? 100 : (float) ($action->progression_reelle ?? 0);
+
+        $before = $action->only(['statut', 'statut_dynamique', 'progression_reelle', 'quantite_realisee', 'date_fin_reelle']);
+        DB::transaction(function () use ($action, $validated, $user, $quantity, $progression): void {
+            $completedOnTime = true;
+            if ($validated['statut_execution'] === 'achevee' && ! empty($validated['date_fin_reelle'])) {
+                $deadline = $action->date_echeance ?? $action->date_fin ?? $action->echeance_cible;
+                $completedOnTime = $deadline === null
+                    || Carbon::parse($validated['date_fin_reelle'])->lte(Carbon::parse($deadline));
+            }
+            $dynamicStatus = $validated['statut_execution'] === 'achevee'
+                ? ($completedOnTime ? ActionTrackingService::STATUS_ACHEVE_DANS_DELAI : ActionTrackingService::STATUS_ACHEVE_HORS_DELAI)
+                : ActionTrackingService::STATUS_EN_COURS;
+            $action->forceFill([
+                'date_debut_reelle' => $validated['date_debut_reelle'],
+                'date_fin_reelle' => $validated['date_fin_reelle'] ?? null,
+                'quantite_realisee' => $quantity,
+                'progression_reelle' => $progression,
+                'historical_execution_recorded_at' => now(),
+                'historical_execution_recorded_by' => $user->id,
+                'historical_execution_comment' => $validated['commentaire'],
+                'statut' => $dynamicStatus,
+                'statut_dynamique' => $dynamicStatus,
+            ])->save();
+        });
+
+        $trackingService->refreshActionMetrics(
+            $action->fresh(),
+            ! empty($validated['date_fin_reelle']) ? Carbon::parse($validated['date_fin_reelle']) : Carbon::today()
+        );
+
+        $this->recordAudit($request, 'action', 'record_historical_execution', $action->fresh(), $before, [
+            ...$action->fresh()->only(['statut', 'statut_dynamique', 'progression_reelle', 'quantite_realisee', 'date_fin_reelle', 'date_debut_reelle']),
+            'historical_execution' => true,
+        ]);
+
+        return redirect()->route('workspace.actions.suivi', $action)->with('success', 'Réalisation historique enregistrée. Le visa reste daté du jour de sa validation.');
     }
 
     /**
@@ -1054,6 +1134,18 @@ class ActionTrackingWebController extends Controller
         return app(PlanningModificationLockService::class)->canGivePlanifAvis($user)
             || $user->isSuperAdmin()
             || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
+    }
+
+    /** Profils autorisés à saisir une réalisation antérieure. */
+    private function canRecordHistoricalExecution(User $user): bool
+    {
+        return $user->hasRole(
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_CHEF_UNITE_SCIQ,
+        );
     }
 
     /**

@@ -96,6 +96,63 @@ class ReportingAnalyticsServiceTest extends TestCase
         $this->assertSame(1, $payload['statuts']['objectifs_operationnels']['en_cours']);
     }
 
+    public function test_reporting_uses_the_action_operational_objective_axis(): void
+    {
+        [$admin, $pta] = $this->createPlanningFixture();
+        $pao = $pta->pao()->firstOrFail();
+        $pas = $pao->pas()->firstOrFail();
+        $secondAxis = PasAxe::query()->create([
+            'pas_id' => $pas->id,
+            'code' => 'AXE-RA-2',
+            'libelle' => 'Axe Reporting secondaire',
+            'ordre' => 2,
+        ]);
+        $secondObjective = PasObjectif::query()->create([
+            'pas_axe_id' => $secondAxis->id,
+            'code' => 'OS-RA-2',
+            'libelle' => 'Objectif Reporting secondaire',
+            'ordre' => 2,
+        ]);
+        $secondOperationalObjective = ObjectifOperationnel::query()->create([
+            'pao_id' => $pao->id,
+            'pas_id' => $pas->id,
+            'pas_axe_id' => $secondAxis->id,
+            'pas_objectif_id' => $secondObjective->id,
+            'direction_id' => $pao->direction_id,
+            'service_id' => $pao->service_id,
+            'code' => 'OO-RA-2',
+            'libelle' => 'Objectif operationnel secondaire',
+            'echeance' => '2026-12-31',
+            'statut' => 'en_cours',
+        ]);
+        Action::query()->create([
+            'pta_id' => $pta->id,
+            'pao_id' => $pao->id,
+            'objectif_operationnel_id' => $secondOperationalObjective->id,
+            'libelle' => 'Action axe secondaire',
+            'type_cible' => 'qualitative',
+            'resultat_attendu' => 'Livrer',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-12-31',
+            'date_echeance' => '2026-12-31',
+            'responsable_id' => $admin->id,
+            'statut' => 'en_cours',
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'progression_reelle' => 20,
+            'progression_theorique' => 20,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+        ]);
+
+        $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, true, false);
+        $rows = collect(data_get($payload, 'details.direction_service_report', []))
+            ->flatMap(fn (array $direction): array => $direction['services'] ?? [])
+            ->flatMap(fn (array $service): array => $service['actions'] ?? []);
+
+        $secondaryRow = $rows->firstWhere('action', 'Action axe secondaire');
+        $this->assertSame('Axe Reporting secondaire', $secondaryRow['axe_strategique'] ?? null);
+        $this->assertSame('Objectif Reporting secondaire', $secondaryRow['objectif_strategique'] ?? null);
+    }
+
     public function test_cached_reporting_payload_contains_only_serializable_primitives(): void
     {
         [$admin] = $this->createPlanningFixture();

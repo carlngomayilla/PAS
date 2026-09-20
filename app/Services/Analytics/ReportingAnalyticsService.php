@@ -327,8 +327,19 @@ class ReportingAnalyticsService
                         // opérationnel = ObjectifOperationnel->libelle. Les anciens
                         // fallbacks vers les titres de PAO/PTA causaient l'affichage
                         // de "PTA - SCIQ" en lieu et place du libellé d'OO.
-                        'axe_strategique' => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->libelle ?? '-'),
-                        'objectif_strategique' => (string) ($action->pta?->pao?->pasObjectif?->libelle ?? '-'),
+                        'axe_strategique' => (string) (
+                            $action->objectifOperationnel?->pasAxe?->libelle
+                            ?? $action->objectifOperationnel?->pasObjectif?->pasAxe?->libelle
+                            ?? $action->pta?->objectifOperationnel?->pasAxe?->libelle
+                            ?? $action->pta?->pao?->pasObjectif?->pasAxe?->libelle
+                            ?? '-'
+                        ),
+                        'objectif_strategique' => (string) (
+                            $action->objectifOperationnel?->pasObjectif?->libelle
+                            ?? $action->pta?->objectifOperationnel?->pasObjectif?->libelle
+                            ?? $action->pta?->pao?->pasObjectif?->libelle
+                            ?? '-'
+                        ),
                         'objectif_operationnel' => (string) (
                             $action->objectifOperationnel?->libelle
                             ?? $action->pta?->objectifOperationnel?->libelle
@@ -486,7 +497,10 @@ class ReportingAnalyticsService
                 // directement) pour que reportActionRow() puisse afficher le bon
                 // libelle d'OO et eviter le fallback sur le titre du PTA.
                 'pta.objectifOperationnel:id,libelle',
-                'objectifOperationnel:id,libelle',
+                'objectifOperationnel:id,pas_axe_id,pas_objectif_id,libelle',
+                'objectifOperationnel.pasAxe:id,code,libelle,periode_fin',
+                'objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
+                'objectifOperationnel.pasObjectif.pasAxe:id,code,libelle,periode_fin',
                 'pta.pao:id,pas_objectif_id,titre,annee,direction_id,service_id,objectif_operationnel,echeance',
                 'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
                 'pta.pao.pasObjectif.pasAxe:id,code,libelle,periode_fin',
@@ -1005,7 +1019,9 @@ class ReportingAnalyticsService
             || $progression >= 100.0;
         $isDelayed = $this->isReportActionDelayed($action);
         $strategicObjective = (string) (
-            $action->pta?->pao?->pasObjectif?->libelle
+            $action->objectifOperationnel?->pasObjectif?->libelle
+            ?? $action->pta?->objectifOperationnel?->pasObjectif?->libelle
+            ?? $action->pta?->pao?->pasObjectif?->libelle
             ?? $action->pta?->pao?->titre
             ?? '-'
         );
@@ -1020,8 +1036,14 @@ class ReportingAnalyticsService
             ?? $action->pta?->pao?->objectif_operationnel
             ?? '-'
         );
-        $pasAxe = $action->pta?->pao?->pasObjectif?->pasAxe;
-        $pasObjectif = $action->pta?->pao?->pasObjectif;
+        $pasAxe = $action->objectifOperationnel?->pasAxe
+            ?? $action->objectifOperationnel?->pasObjectif?->pasAxe
+            ?? $action->pta?->objectifOperationnel?->pasAxe
+            ?? $action->pta?->objectifOperationnel?->pasObjectif?->pasAxe
+            ?? $action->pta?->pao?->pasObjectif?->pasAxe;
+        $pasObjectif = $action->objectifOperationnel?->pasObjectif
+            ?? $action->pta?->objectifOperationnel?->pasObjectif
+            ?? $action->pta?->pao?->pasObjectif;
         $pao = $action->pta?->pao;
         $justificatifs = $this->reportActionJustificatifs($action);
         $financementStatus = $action->financementStatus();

@@ -816,6 +816,26 @@
             </div>
         @endif
 
+        @if (($canRecordHistoricalExecutionV2 ?? false) && ! $v2IsValidated)
+            <div class="mt-4 rounded-lg border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
+                <h3 class="text-base font-black text-indigo-950 dark:text-indigo-100">Reprise d'une réalisation antérieure</h3>
+                <p class="mt-1 max-w-3xl text-sm text-indigo-900/80 dark:text-indigo-200/80">Enregistrez ici une action déjà réalisée au premier trimestre. Les dates indiquées sont les dates réelles ; la saisie et le visa restent datés du jour.</p>
+                <form method="POST" action="{{ route('workspace.actions.historical-execution.store', $action) }}" class="mt-4 grid gap-3 md:grid-cols-2">
+                    @csrf
+                    <div><label for="historical-statut">État d'exécution</label><select id="historical-statut" name="statut_execution" required onchange="this.form.date_fin_reelle.required = this.value === 'achevee'; if (this.value !== 'achevee') { this.form.date_fin_reelle.value = ''; }"><option value="en_cours" @selected(old('statut_execution') === 'en_cours')>En cours</option><option value="achevee" @selected(old('statut_execution', 'achevee') === 'achevee')>Achevée</option></select></div>
+                    <div><label for="historical-start">Date réelle de début</label><input id="historical-start" name="date_debut_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_debut_reelle', optional($action->date_debut_reelle)->toDateString()) }}" required>@error('date_debut_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
+                    <div><label for="historical-end">Date réelle de fin <span class="text-xs font-normal text-slate-500">(obligatoire si achevée)</span></label><input id="historical-end" name="date_fin_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_fin_reelle', optional($action->date_fin_reelle)->toDateString()) }}" @required(old('statut_execution', 'achevee') === 'achevee')>@error('date_fin_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
+                    @if ($action->isQuantitative())
+                        <div><label for="historical-quantity">Quantité réalisée</label><input id="historical-quantity" name="quantite_realisee" type="number" min="0" step="0.01" value="{{ old('quantite_realisee', $action->quantite_realisee) }}"></div>
+                    @else
+                        <div><label for="historical-progress">Progression réalisée (%)</label><input id="historical-progress" name="progression" type="number" min="0" max="100" step="0.01" value="{{ old('progression', $action->progression_reelle) }}"></div>
+                    @endif
+                    <div class="md:col-span-2"><label for="historical-comment">Commentaire et source de vérification</label><textarea id="historical-comment" name="commentaire" rows="3" minlength="5" maxlength="5000" required placeholder="Ex. Rapport trimestriel signé, référence du procès-verbal…">{{ old('commentaire') }}</textarea>@error('commentaire')<p class="field-error">{{ $message }}</p>@enderror</div>
+                    <div class="md:col-span-2 flex flex-wrap items-center justify-between gap-3"><span class="text-xs text-indigo-900/70 dark:text-indigo-200/70">L'opération est tracée avec votre identité et la date actuelle.</span><button class="btn btn-primary" type="submit">Enregistrer la réalisation passée</button></div>
+                </form>
+            </div>
+        @endif
+
         {{-- 3e visa du circuit : validation finale (cloture) par la planification. --}}
         @php
             $isAwaitingPlanification = $validationStatus === 'soumise_planification';

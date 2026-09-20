@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\PlanningImport;
+use App\Services\Imports\HistoricalExecutionImportService;
 use App\Services\Imports\PlanningExcelImportService;
 use App\Services\Imports\SimpleSpreadsheet;
 use Illuminate\Http\Request;
@@ -21,7 +22,11 @@ class PlanningImportWebController extends Controller
         $this->authorizeAccess($request);
 
         return view('workspace.imports.index', [
-            'imports' => PlanningImport::query()->with('user:id,name,email,role,custom_role_code')->latest()->paginate(15),
+            'imports' => PlanningImport::query()
+                ->where('module', '!=', HistoricalExecutionImportService::MODULE)
+                ->with('user:id,name,email,role,custom_role_code')
+                ->latest()
+                ->paginate(15),
         ]);
     }
 

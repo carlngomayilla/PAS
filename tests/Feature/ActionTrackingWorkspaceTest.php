@@ -73,6 +73,53 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertSame(1, substr_count($response->getContent(), 'action-detail-tab-panel is-active'));
     }
 
+    public function test_historical_execution_form_is_limited_to_sciq_and_planning_profiles(): void
+    {
+        $fixture = $this->createFixture();
+        $historicalRoute = route('workspace.actions.historical-execution.store', $fixture['action']);
+
+        foreach ([
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_CHEF_UNITE_SCIQ,
+        ] as $role) {
+            $reviewer = User::factory()->create(['role' => $role]);
+
+            $this->actingAs($reviewer)
+                ->get(route('workspace.actions.suivi', $fixture['action']))
+                ->assertOk()
+                ->assertSee($historicalRoute, false);
+        }
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.suivi', $fixture['action']))
+            ->assertOk()
+            ->assertDontSee($historicalRoute, false);
+    }
+
+    public function test_manual_historical_execution_recalculates_quantitative_performance(): void
+    {
+        $fixture = $this->createFixture();
+
+        $this->actingAs($fixture['controller'])
+            ->post(route('workspace.actions.historical-execution.store', $fixture['action']), [
+                'statut_execution' => 'achevee',
+                'date_debut_reelle' => '2026-01-05',
+                'date_fin_reelle' => '2026-03-28',
+                'quantite_realisee' => 80,
+                'commentaire' => 'PV historique a joindre.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $fixture['action']));
+
+        $action = $fixture['action']->fresh(['actionKpi']);
+        $this->assertSame('100.00', (string) $action->progression_reelle);
+        $this->assertSame('80.0000', (string) $action->quantite_realisee);
+        $this->assertSame(100.0, (float) $action->actionKpi?->progression_reelle);
+        $this->assertNotNull($action->historical_execution_recorded_at);
+    }
+
     public function test_action_tracking_tabs_handle_direct_links_errors_and_keyboard_navigation(): void
     {
         $script = (string) file_get_contents(resource_path('js/action-detail-tabs.js'));

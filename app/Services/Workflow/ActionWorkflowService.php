@@ -61,6 +61,9 @@ class ActionWorkflowService
             'seuil_atteint_le' => $thresholdReachedAt,
             'statut' => ActionTrackingService::STATUS_EN_COURS,
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'historical_execution_recorded_at' => null,
+            'historical_execution_recorded_by' => null,
+            'historical_execution_comment' => null,
             // Tant que non soumise, on reste en non_soumise / correction.
             'statut_validation' => in_array((string) $action->statut_validation, [
                 ActionTrackingService::VALIDATION_NON_SOUMISE,

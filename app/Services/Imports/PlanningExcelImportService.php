@@ -464,15 +464,26 @@ class PlanningExcelImportService
 
             $this->detectOrderConflict($seenLabels['axes'], $startYear.'-'.$endYear.'|'.$normalized['ordre_axe'], $normalized['libelle_axe'], $errors, 'ordre_axe');
             $this->detectOrderConflict($seenLabels['strategic'], $startYear.'-'.$endYear.'|'.$normalized['ordre_axe'].'|'.$normalized['ordre_objectif_strategique'], $normalized['libelle_objectif_strategique'], $errors, 'ordre_objectif_strategique');
-            $this->detectOrderConflict($seenLabels['operational'], $directionKey.'|'.$serviceKey.'|'.$startYear.'|'.$normalized['ordre_objectif_operationnel'], $normalized['libelle_objectif_operationnel'], $errors, 'ordre_objectif_operationnel');
-            $this->detectOrderConflict($seenLabels['actions'], $serviceKey.'|'.$startYear.'|'.$normalized['ordre_objectif_operationnel'].'|'.$normalized['ordre_action'], $normalized['libelle_action'], $errors, 'ordre_action');
+            $operationalScope = $directionKey.'|'.$serviceKey.'|'.$startYear.'-'.$endYear
+                .'|'.$normalized['ordre_axe']
+                .'|'.$normalized['ordre_objectif_strategique']
+                .'|'.$normalized['ordre_objectif_operationnel'];
+            $this->detectOrderConflict($seenLabels['operational'], $operationalScope, $normalized['libelle_objectif_operationnel'], $errors, 'ordre_objectif_operationnel');
+            $this->detectOrderConflict($seenLabels['actions'], $operationalScope.'|'.$normalized['ordre_action'], $normalized['libelle_action'], $errors, 'ordre_action');
 
             if ($errors === [] && $service instanceof Service) {
                 $existing = Action::query()
                     ->whereHas('pta', fn ($query) => $query->where('service_id', $service->id))
                     ->whereHas('objectifOperationnel', fn ($query) => $query
                         ->where('service_id', $service->id)
-                        ->where('import_ordre', (int) $normalized['ordre_objectif_operationnel']))
+                        ->where('import_ordre', (int) $normalized['ordre_objectif_operationnel'])
+                        ->whereHas('pasObjectif', fn ($strategicQuery) => $strategicQuery
+                            ->where('import_ordre', (int) $normalized['ordre_objectif_strategique'])
+                            ->whereHas('pasAxe', fn ($axisQuery) => $axisQuery
+                                ->where('import_ordre', (int) $normalized['ordre_axe'])
+                                ->whereHas('pas', fn ($pasQuery) => $pasQuery
+                                    ->where('periode_debut', $startYear)
+                                    ->where('periode_fin', $endYear)))))
                     ->where('ordre_import', (int) $normalized['ordre_action'])
                     ->whereYear('date_debut', $startYear)
                     ->exists();
@@ -893,9 +904,18 @@ class PlanningExcelImportService
                 'service_id' => $service->id,
                 'import_ordre' => $operationalOrder,
                 'pao_id' => $pao->id,
+                'pas_axe_id' => $axis->id,
+                'pas_objectif_id' => $strategic->id,
             ],
             [
-                'code' => $this->codes->operationalObjective($direction, $year, $service, $operationalOrder),
+                'code' => $this->codes->operationalObjective(
+                    $direction,
+                    $year,
+                    $service,
+                    $operationalOrder,
+                    $axisOrder,
+                    $strategicOrder
+                ),
                 'pas_id' => $pas->id,
                 'pas_axe_id' => $axis->id,
                 'pas_objectif_id' => $strategic->id,
@@ -928,6 +948,18 @@ class PlanningExcelImportService
             ->where('ordre_import', $actionOrder)
             ->first();
 
+        // Les anciennes versions de l'import rattachaient les actions au
+        // premier objectif opérationnel du PTA. En mode de mise à jour, on
+        // récupère une action legacy par son ordre et son libellé afin de la
+        // rattacher au nouvel objectif issu de l'axe du fichier.
+        if (! $action instanceof Action && $mode === PlanningImport::MODE_UPDATE_EXISTING) {
+            $action = Action::query()
+                ->where('pta_id', $pta->id)
+                ->where('ordre_import', $actionOrder)
+                ->where('libelle', (string) $row['libelle_action'])
+                ->first();
+        }
+
         if ($action instanceof Action && $mode === PlanningImport::MODE_CREATE_ONLY) {
             throw new RuntimeException('Doublon detecte en mode Creer uniquement: '.$row['libelle_action']);
         }
@@ -952,7 +984,14 @@ class PlanningExcelImportService
         $financingRequired = (string) $row['financement'] === '1';
         $hasParametrage = $this->normalizeImportActionType($row['type_action'] ?? '') !== '';
         $payload = [
-            'code' => $this->codes->action($service, $year, $operationalOrder, $actionOrder),
+            'code' => $this->codes->action(
+                $service,
+                $year,
+                $operationalOrder,
+                $actionOrder,
+                $axisOrder,
+                $strategicOrder
+            ),
             'exercice_id' => $exercise->id,
             'pta_id' => $pta->id,
             'pao_id' => $pao->id,

@@ -4,8 +4,9 @@
 @php
     $totalImports = $imports->total();
     $lastImport = $imports->first();
-    $successfulImports = \App\Models\PlanningImport::query()->where('status', 'imported')->count();
-    $importsWithErrors = \App\Models\PlanningImport::query()->where('error_rows', '>', 0)->count();
+    $planningImportQuery = \App\Models\PlanningImport::query()->where('module', '!=', \App\Services\Imports\HistoricalExecutionImportService::MODULE);
+    $successfulImports = (clone $planningImportQuery)->where('status', 'imported')->count();
+    $importsWithErrors = (clone $planningImportQuery)->where('error_rows', '>', 0)->count();
 @endphp
 <div class="app-screen-flow">
     <section class="showcase-panel app-screen-block" data-keep-empty="1" data-keep-accordion="0">
@@ -16,6 +17,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Télécharger le modele Excel</a>
+                <a class="btn btn-outline" href="{{ route('workspace.imports.historical.index') }}">Reprise des executions</a>
                 <a class="btn btn-primary" href="{{ route('workspace.imports.create') }}">Nouvel import</a>
             </div>
         </div>

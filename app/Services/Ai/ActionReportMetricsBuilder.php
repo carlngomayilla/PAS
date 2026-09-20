@@ -21,11 +21,14 @@ class ActionReportMetricsBuilder
     public function build(string $scope, array $filters = []): array
     {
         $query = Action::query()->with([
-            'objectifOperationnel',
+            'objectifOperationnel.pasAxe',
+            'objectifOperationnel.pasObjectif',
             'pao.direction',
             'pta.direction',
             'pta.service',
             'pta.objectifOperationnel',
+            'pta.objectifOperationnel.pasAxe',
+            'pta.objectifOperationnel.pasObjectif.pasAxe',
             'pta.pao.pasObjectif.pasAxe',
             'responsable',
         ]);
@@ -209,7 +212,7 @@ class ActionReportMetricsBuilder
         $axes = $actions
             ->groupBy(fn (Action $action): string => $this->axisKey($action))
             ->map(fn (Collection $rows): array => $this->analysisRow($rows, $periodEnd) + [
-                'code' => (string) ($rows->first()?->pta?->pao?->pasObjectif?->pasAxe?->code ?? ''),
+                'code' => $this->axisCode($rows->first()),
                 'libelle' => $this->axisLabel($rows->first()),
             ])
             ->sortBy('libelle')
@@ -440,7 +443,7 @@ class ActionReportMetricsBuilder
                 })->all();
 
                 return [
-                    'code' => (string) ($rows->first()?->pta?->pao?->pasObjectif?->pasAxe?->code ?? ''),
+                    'code' => $this->axisCode($rows->first()),
                     'axe' => $this->axisLabel($rows->first()),
                     'mois' => $rates,
                     'evolution' => round((float) (collect($rates)->last()['taux'] ?? 0) - (float) (collect($rates)->first()['taux'] ?? 0), 2),
@@ -631,12 +634,38 @@ class ActionReportMetricsBuilder
 
     private function axisKey(?Action $action): string
     {
-        return (string) ($action?->pta?->pao?->pasObjectif?->pasAxe?->id ?? 'sans_axe');
+        return (string) (
+            $action?->objectifOperationnel?->pasAxe?->id
+            ?? $action?->objectifOperationnel?->pasObjectif?->pasAxe?->id
+            ?? $action?->pta?->objectifOperationnel?->pasAxe?->id
+            ?? $action?->pta?->objectifOperationnel?->pasObjectif?->pasAxe?->id
+            ?? $action?->pta?->pao?->pasObjectif?->pasAxe?->id
+            ?? 'sans_axe'
+        );
     }
 
     private function axisLabel(?Action $action): string
     {
-        return (string) ($action?->pta?->pao?->pasObjectif?->pasAxe?->libelle ?? 'Sans axe strategique');
+        return (string) (
+            $action?->objectifOperationnel?->pasAxe?->libelle
+            ?? $action?->objectifOperationnel?->pasObjectif?->pasAxe?->libelle
+            ?? $action?->pta?->objectifOperationnel?->pasAxe?->libelle
+            ?? $action?->pta?->objectifOperationnel?->pasObjectif?->pasAxe?->libelle
+            ?? $action?->pta?->pao?->pasObjectif?->pasAxe?->libelle
+            ?? 'Sans axe strategique'
+        );
+    }
+
+    private function axisCode(?Action $action): string
+    {
+        return (string) (
+            $action?->objectifOperationnel?->pasAxe?->code
+            ?? $action?->objectifOperationnel?->pasObjectif?->pasAxe?->code
+            ?? $action?->pta?->objectifOperationnel?->pasAxe?->code
+            ?? $action?->pta?->objectifOperationnel?->pasObjectif?->pasAxe?->code
+            ?? $action?->pta?->pao?->pasObjectif?->pasAxe?->code
+            ?? ''
+        );
     }
 
     private function serviceKey(Action $action): string
@@ -646,6 +675,12 @@ class ActionReportMetricsBuilder
 
     private function strategicObjectiveLabel(Action $action): string
     {
+        $objective = $action->objectifOperationnel?->pasObjectif?->libelle
+            ?? $action->pta?->objectifOperationnel?->pasObjectif?->libelle;
+        if (is_string($objective) && trim($objective) !== '') {
+            return $objective;
+        }
+
         return (string) ($action->pta?->pao?->pasObjectif?->libelle ?? 'Non renseigné');
     }
 

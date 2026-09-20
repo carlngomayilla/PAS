@@ -119,12 +119,15 @@ import { gsap } from 'gsap';
             if (!pagination) return;
             if (section.querySelector('.pagination-summary')) return;
 
-            var rows = section.querySelectorAll('tbody tr');
+            var rows = Array.prototype.slice.call(section.querySelectorAll('tbody tr'))
+                .filter(function (row) {
+                    return !row.hidden && !row.classList.contains('hidden') && !row.classList.contains('data-table-empty-row');
+                });
             if (rows.length === 0) return;
 
             var summary = document.createElement('span');
             summary.className = 'pagination-summary';
-            summary.textContent = rows.length + ' ligne(s) sur cette page';
+            summary.textContent = rows.length + ' ligne(s) affichée(s) sur cette page';
             pagination.insertBefore(summary, pagination.firstChild);
         });
     }
@@ -189,9 +192,10 @@ import { gsap } from 'gsap';
             if (section.dataset.keepEmpty === '1') return;
             var table = section.querySelector('table');
             if (!table) return;
-            if (!tableHasRealData(table)) {
-                section.classList.add('hidden');
-            }
+            // Keep the table shell visible so users can understand why no
+            // records are shown and clear or change their filters. Hiding the
+            // whole panel made empty states and server-side errors invisible.
+            section.classList.toggle('is-empty-table-section', !tableHasRealData(table));
         });
     }
 

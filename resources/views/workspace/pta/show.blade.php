@@ -179,6 +179,11 @@
                                     <td class="min-w-[290px] align-top">
                                         <span class="font-mono text-xs font-black text-[#3996d3]">{{ $action['code'] }}</span>
                                         <p class="mt-1 font-bold text-slate-900 dark:text-white">{{ $action['label'] }}</p>
+                                        <p class="mt-1 text-xs font-semibold text-[#7656a8]">
+                                            Axe : {{ $action['axis'] ?? 'Axe strategique non renseigne' }}
+                                            <span class="text-slate-400">·</span>
+                                            {{ $action['strategic_objective'] ?? 'Objectif strategique non renseigne' }}
+                                        </p>
                                         @if ($action['description'])
                                             <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ $action['description'] }}</p>
                                         @endif

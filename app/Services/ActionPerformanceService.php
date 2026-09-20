@@ -30,6 +30,10 @@ class ActionPerformanceService
 
     public function calculateRealProgress(Action $action): float
     {
+        if ($action->historical_execution_recorded_at !== null) {
+            return $this->boundRate((float) ($action->progression_reelle ?? 0));
+        }
+
         $target = max(0.0, (float) ($action->quantite_cible ?? 0));
 
         if ($this->businessRules->isActionQuantifiable($action) && $target > 0.0) {
@@ -137,6 +141,20 @@ class ActionPerformanceService
 
         $deadline = Carbon::parse($deadline)->endOfDay();
         $mode = (string) config('kpis.delay.mode', 'graduated');
+
+        if ($action->date_fin_reelle !== null) {
+            $completedAt = Carbon::parse($action->date_fin_reelle)->endOfDay();
+
+            if ($completedAt->lte($deadline)) {
+                return 100.0;
+            }
+
+            if ($mode === 'binary') {
+                return 0.0;
+            }
+
+            return $this->graduatedDelayScore($action, $deadline, $completedAt);
+        }
 
         if ($action->soumise_le !== null) {
             $submittedAt = Carbon::parse($action->soumise_le)->endOfDay();
@@ -362,6 +380,11 @@ class ActionPerformanceService
 
     private function isDeclaredNonQuantifiableActionCompleted(Action $action): bool
     {
+        if ($action->historical_execution_recorded_at !== null) {
+            return $action->date_fin_reelle !== null
+                || (float) ($action->progression_reelle ?? 0) >= 100.0;
+        }
+
         if ($this->businessRules->isActionQuantifiable($action)) {
             return false;
         }

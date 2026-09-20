@@ -645,16 +645,13 @@ class DashboardController extends Controller
      */
     private function dashboardPtaActionLine(Action $action): array
     {
+        $strategicObjective = $this->dashboardPtaStrategicObjective($action);
+
         return [
             'code' => (string) ($action->code ?? ''),
             'libelle' => (string) ($action->libelle ?? ''),
             'axe' => $this->dashboardPtaAxisLabel($action),
-            'objectif_strategique' => (string) (
-                $action->objectifOperationnel?->pasObjectif?->libelle
-                ?? $action->pta?->objectifOperationnel?->pasObjectif?->libelle
-                ?? $action->pta?->pao?->pasObjectif?->libelle
-                ?? 'Non renseigné'
-            ),
+            'objectif_strategique' => (string) ($strategicObjective?->libelle ?? 'Non renseigne'),
             'objectif_operationnel' => (string) (
                 $action->objectifOperationnel?->libelle
                 ?? $action->pta?->objectifOperationnel?->libelle
@@ -753,32 +750,33 @@ class DashboardController extends Controller
 
     private function dashboardPtaAxisKey(Action $action): string
     {
-        return (string) (
-            $action->objectifOperationnel?->pas_axe_id
-            ?? $action->pta?->objectifOperationnel?->pas_axe_id
-            ?? $action->pta?->pao?->pasObjectif?->pas_axe_id
-            ?? 'sans_axe'
-        );
+        return (string) ($this->dashboardPtaAxis($action)?->id ?? 'sans_axe');
     }
 
     private function dashboardPtaAxisCode(?Action $action): string
     {
-        return (string) (
-            $action?->objectifOperationnel?->pasAxe?->code
-            ?? $action?->pta?->objectifOperationnel?->pasAxe?->code
-            ?? $action?->pta?->pao?->pasObjectif?->pasAxe?->code
-            ?? ''
-        );
+        return (string) ($this->dashboardPtaAxis($action)?->code ?? '');
     }
 
     private function dashboardPtaAxisLabel(?Action $action): string
     {
-        return (string) (
-            $action?->objectifOperationnel?->pasAxe?->libelle
-            ?? $action?->pta?->objectifOperationnel?->pasAxe?->libelle
-            ?? $action?->pta?->pao?->pasObjectif?->pasAxe?->libelle
-            ?? 'Sans axe strategique'
-        );
+        return (string) ($this->dashboardPtaAxis($action)?->libelle ?? 'Sans axe strategique');
+    }
+
+    private function dashboardPtaAxis(?Action $action): ?PasAxe
+    {
+        return $action?->objectifOperationnel?->pasAxe
+            ?? $action?->objectifOperationnel?->pasObjectif?->pasAxe
+            ?? $action?->pta?->objectifOperationnel?->pasAxe
+            ?? $action?->pta?->objectifOperationnel?->pasObjectif?->pasAxe
+            ?? $action?->pta?->pao?->pasObjectif?->pasAxe;
+    }
+
+    private function dashboardPtaStrategicObjective(?Action $action): ?PasObjectif
+    {
+        return $action?->objectifOperationnel?->pasObjectif
+            ?? $action?->pta?->objectifOperationnel?->pasObjectif
+            ?? $action?->pta?->pao?->pasObjectif;
     }
 
     private function dashboardPtaServiceKey(Action $action): string
@@ -1995,10 +1993,10 @@ class DashboardController extends Controller
     private function buildDecisionAxisProgressRows(Collection $actions, float $qualityThreshold): array
     {
         return $actions
-            ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->id ?? 0))
+            ->groupBy(fn (Action $action): string => (string) ($this->dashboardPtaAxis($action)?->id ?? 0))
             ->map(function (Collection $rows) use ($qualityThreshold): array {
                 $first = $rows->first();
-                $axis = $first?->pta?->pao?->pasObjectif?->pasAxe;
+                $axis = $this->dashboardPtaAxis($first);
                 $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
                 $progress = round((float) $rows->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2);
                 $axisId = (int) ($axis?->id ?? 0);
@@ -2006,7 +2004,11 @@ class DashboardController extends Controller
                 return [
                     'axe' => trim(((string) ($axis?->code ?? '')).' - '.((string) ($axis?->libelle ?? 'Axe non renseigné')), ' -'),
                     'progression' => $progress,
-                    'meta' => $rows->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count().' objectif(s) | '.$rows->count().' actions | '.$late.' retard(s)',
+                    'meta' => $rows
+                        ->map(fn (Action $action): ?int => $this->dashboardPtaStrategicObjective($action)?->id)
+                        ->filter()
+                        ->unique()
+                        ->count().' objectif(s) | '.$rows->count().' actions | '.$late.' retard(s)',
                     'status' => $this->decisionProgressStatus($progress, $late, $qualityThreshold),
                     'url' => $axisId > 0 ? $this->actionIndexRoute(['pas_axe_id' => $axisId]) : $this->actionIndexRoute(),
                 ];
@@ -2921,13 +2923,15 @@ class DashboardController extends Controller
             $label = 'Non renseigné';
 
             if ($mode === 'objectif_strategique') {
-                $groupKey = (string) ($action->pta?->pao?->pasObjectif?->id ?? 0);
-                $axeCode = (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->code ?? '');
-                $objectifCode = (string) ($action->pta?->pao?->pasObjectif?->code ?? '');
-                $objectifLibelle = (string) ($action->pta?->pao?->pasObjectif?->libelle ?? 'Non renseigné');
+                $strategicObjective = $this->dashboardPtaStrategicObjective($action);
+                $axis = $this->dashboardPtaAxis($action);
+                $groupKey = (string) ($strategicObjective?->id ?? 0);
+                $axeCode = (string) ($axis?->code ?? '');
+                $objectifCode = (string) ($strategicObjective?->code ?? '');
+                $objectifLibelle = (string) ($strategicObjective?->libelle ?? 'Non renseigne');
                 $label = trim($axeCode.' / '.$objectifCode.' - '.$objectifLibelle, ' /-') ?: $objectifLibelle;
                 $url = $this->officialActionIndexRoute([
-                    'pas_objectif_id' => (int) ($action->pta?->pao?->pasObjectif?->id ?? 0),
+                    'pas_objectif_id' => (int) ($strategicObjective?->id ?? 0),
                 ]);
             } elseif ($mode === 'direction') {
                 $groupKey = (string) ($action->pta?->direction?->id ?? 0);
@@ -2992,7 +2996,7 @@ class DashboardController extends Controller
         $aligned = $actions->filter(function (Action $action): bool {
             return $action->pta !== null
                 && $action->pta?->pao !== null
-                && $action->pta?->pao?->pasObjectif !== null
+                && $this->dashboardPtaStrategicObjective($action) !== null
                 && $action->pta?->pao?->pas !== null;
         })->count();
 
@@ -3007,8 +3011,8 @@ class DashboardController extends Controller
         });
 
         return [
-            'axes_concernes' => $actions->pluck('pta.pao.pasObjectif.pasAxe.id')->filter()->unique()->count(),
-            'objectifs_strategiques_concernes' => $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
+            'axes_concernes' => $actions->map(fn (Action $action): ?int => $this->dashboardPtaAxis($action)?->id)->filter()->unique()->count(),
+            'objectifs_strategiques_concernes' => $actions->map(fn (Action $action): ?int => $this->dashboardPtaStrategicObjective($action)?->id)->filter()->unique()->count(),
             'pas_lies' => $actions->pluck('pta.pao.pas.id')->filter()->unique()->count(),
             'paos_lies' => $actions->pluck('pta.pao.id')->filter()->unique()->count(),
             'ptas_lies' => $actions->pluck('pta.id')->filter()->unique()->count(),
@@ -3049,7 +3053,7 @@ class DashboardController extends Controller
             ->groupBy(function (Action $action): string {
                 return implode(':', [
                     (int) ($action->pta?->pao?->pas?->id ?? 0),
-                    (int) ($action->pta?->pao?->pasObjectif?->id ?? 0),
+                    (int) ($this->dashboardPtaStrategicObjective($action)?->id ?? 0),
                     (int) ($action->pta?->pao?->id ?? 0),
                     (int) ($action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id ?? 0),
                     (int) ($action->pta?->id ?? 0),
@@ -3060,7 +3064,7 @@ class DashboardController extends Controller
                 $total = $rows->count();
                 $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
                 $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
-                $objective = $first?->pta?->pao?->pasObjectif;
+                $objective = $this->dashboardPtaStrategicObjective($first);
                 $operationalObjective = $first?->objectifOperationnel ?? $first?->pta?->objectifOperationnel;
                 $pas = $first?->pta?->pao?->pas;
                 $pao = $first?->pta?->pao;
@@ -3480,10 +3484,13 @@ class DashboardController extends Controller
             ->groupBy(fn (Action $action): string => (string) ($action->pta?->direction?->id ?? 0))
             ->map(function (Collection $rows): array {
                 $first = $rows->first();
-                $strategicObjectives = $rows->pluck('pta.pao.pasObjectif.id')->filter()->unique();
+                $strategicObjectives = $rows
+                    ->map(fn (Action $action): ?int => $this->dashboardPtaStrategicObjective($action)?->id)
+                    ->filter()
+                    ->unique();
                 $declinedStrategicObjectives = $rows
                     ->filter(fn (Action $action): bool => ($action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id) !== null)
-                    ->pluck('pta.pao.pasObjectif.id')
+                    ->map(fn (Action $action): ?int => $this->dashboardPtaStrategicObjective($action)?->id)
                     ->filter()
                     ->unique();
                 $declinationRate = $this->completionRate($declinedStrategicObjectives->count(), max(1, $strategicObjectives->count()));
@@ -3491,7 +3498,11 @@ class DashboardController extends Controller
 
                 return [
                     'direction' => (string) ($first?->pta?->direction?->code ?? $first?->pta?->direction?->libelle ?? 'Non renseignée'),
-                    'axes' => $rows->pluck('pta.pao.pasObjectif.pasAxe.id')->filter()->unique()->count(),
+                    'axes' => $rows
+                        ->map(fn (Action $action): ?int => $this->dashboardPtaAxis($action)?->id)
+                        ->filter()
+                        ->unique()
+                        ->count(),
                     'objectifs_strategiques' => $strategicObjectives->count(),
                     'pao_cree' => $paoCount > 0 ? 'Oui' : 'Non',
                     'objectifs_operationnels' => $rows->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)->filter()->unique()->count(),
@@ -3515,7 +3526,7 @@ class DashboardController extends Controller
             ->groupBy(function (Action $action): string {
                 return implode(':', [
                     (int) ($action->pta?->direction?->id ?? 0),
-                    (int) ($action->pta?->pao?->pasObjectif?->id ?? 0),
+                    (int) ($this->dashboardPtaStrategicObjective($action)?->id ?? 0),
                     (int) ($action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id ?? 0),
                     (int) ($action->pta?->service?->id ?? 0),
                 ]);
@@ -3530,7 +3541,7 @@ class DashboardController extends Controller
 
                 return [
                     'direction' => (string) ($first?->pta?->direction?->code ?? $first?->pta?->direction?->libelle ?? '-'),
-                    'objectif_strategique' => $this->strategicObjectiveLabel($first?->pta?->pao?->pasObjectif),
+                    'objectif_strategique' => $this->strategicObjectiveLabel($this->dashboardPtaStrategicObjective($first)),
                     'objectif_operationnel' => (string) ($operationalObjective?->libelle ?: 'Non renseigné'),
                     'service' => (string) ($first?->pta?->service?->libelle ?? $first?->pta?->service?->code ?? '-'),
                     'echeance' => $operationalObjective?->echeance instanceof Carbon ? $operationalObjective->echeance->format('d/m/Y') : '-',
@@ -4393,7 +4404,7 @@ class DashboardController extends Controller
             ->flatMap(fn (Pas $pas): Collection => $pas->axes->map(fn (PasAxe $axis): array => $this->emptySynthesisAxisNode($axis)))
             ->values();
         $actionAxes = $actions
-            ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->id ?? 0))
+            ->groupBy(fn (Action $action): string => (string) ($this->dashboardPtaAxis($action)?->id ?? 0))
             ->map(fn (Collection $rows): array => $this->buildSynthesisAxisNode($rows))
             ->values();
         $strategicObjectivesTotal = $pasRows
@@ -4413,10 +4424,18 @@ class DashboardController extends Controller
                 'remaining' => $this->formatPercent(max(0.0, 100.0 - $progress)),
                 'axes_total' => $skeletonAxes->isNotEmpty()
                     ? $skeletonAxes->pluck('key')->filter()->unique()->count()
-                    : $actions->pluck('pta.pao.pasObjectif.pasAxe.id')->filter()->unique()->count(),
+                    : $actions
+                        ->map(fn (Action $action): ?int => $this->dashboardPtaAxis($action)?->id)
+                        ->filter()
+                        ->unique()
+                        ->count(),
                 'strategic_objectives_total' => $strategicObjectivesTotal > 0
                     ? $strategicObjectivesTotal
-                    : $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
+                    : $actions
+                        ->map(fn (Action $action): ?int => $this->dashboardPtaStrategicObjective($action)?->id)
+                        ->filter()
+                        ->unique()
+                        ->count(),
                 'operational_objectives_total' => $actions
                     ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
                     ->filter()
@@ -4621,13 +4640,17 @@ class DashboardController extends Controller
      */
     private function buildSynthesisAxisNode(Collection $actions): array
     {
-        $axis = $actions->first()?->pta?->pao?->pasObjectif?->pasAxe;
+        $axis = $this->dashboardPtaAxis($actions->first());
 
         return array_merge($this->synthesisGroupMetrics($actions), [
             'key' => (string) ($axis?->id ?? 0),
             'code' => (string) ($axis?->code ?: 'AXE'),
             'label' => (string) ($axis?->libelle ?: 'Axe non renseigné'),
-            'objectives_total' => $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
+            'objectives_total' => $actions
+                ->map(fn (Action $action): ?int => $this->dashboardPtaStrategicObjective($action)?->id)
+                ->filter()
+                ->unique()
+                ->count(),
             'operational_objectives_total' => $actions
                 ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
                 ->filter()
@@ -4635,7 +4658,7 @@ class DashboardController extends Controller
                 ->count(),
             'ptas_total' => $actions->pluck('pta.id')->filter()->unique()->count(),
             'objectives' => $actions
-                ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->id ?? 0))
+                ->groupBy(fn (Action $action): string => (string) ($this->dashboardPtaStrategicObjective($action)?->id ?? 0))
                 ->map(fn (Collection $rows): array => $this->buildSynthesisStrategicObjectiveNode($rows))
                 ->sortBy('code')
                 ->values()
@@ -4649,7 +4672,7 @@ class DashboardController extends Controller
      */
     private function buildSynthesisStrategicObjectiveNode(Collection $actions): array
     {
-        $objective = $actions->first()?->pta?->pao?->pasObjectif;
+        $objective = $this->dashboardPtaStrategicObjective($actions->first());
 
         return array_merge($this->synthesisGroupMetrics($actions), [
             'key' => (string) ($objective?->id ?? 0),
@@ -4888,7 +4911,7 @@ class DashboardController extends Controller
     private function buildSynthesisObjectiveRows(Collection $actions, int $limit = 12): array
     {
         return $actions
-            ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->id ?? 0))
+            ->groupBy(fn (Action $action): string => (string) ($this->dashboardPtaStrategicObjective($action)?->id ?? 0))
             ->map(function (Collection $rows): array {
                 $first = $rows->first();
                 $total = $rows->count();
@@ -4898,7 +4921,7 @@ class DashboardController extends Controller
                 $late = $rows
                     ->filter(fn (Action $action): bool => $this->isLateAction($action))
                     ->count();
-                $objective = $first?->pta?->pao?->pasObjectif;
+                $objective = $this->dashboardPtaStrategicObjective($first);
                 $axisCode = (string) ($objective?->pasAxe?->code ?? '');
                 $objectiveCode = (string) ($objective?->code ?? '');
                 $objectiveLabel = (string) ($objective?->libelle ?? 'Non renseigné');
