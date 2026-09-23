@@ -135,9 +135,9 @@ class HistoricalExecutionImportWebController extends Controller
                     'headers' => ['colonne', 'obligation', 'valeurs_acceptees', 'explication'],
                     'rows' => [
                         ['code_action', 'Oui', 'Code existant dans Actions', 'Ne pas utiliser le libelle pour identifier une action.'],
-                        ['statut_execution', 'Oui', 'non_executee / en_cours / achevee', 'Le statut achevee exige une date de fin et 100 %.'],
-                        ['date_debut_reelle', 'Selon statut', 'AAAA-MM-JJ', 'Date réelle de démarrage, jamais dans le futur.'],
-                        ['date_fin_reelle', 'Pour achevee', 'AAAA-MM-JJ', 'Date réelle de fin, conservée pour le calcul du délai.'],
+                        ['statut_execution', 'Oui', 'non_executee / en_cours / achevee', 'Achevee exige 100 % ; en_cours exige un taux strictement entre 0 et 100 %.'],
+                        ['date_debut_reelle', 'Facultative', 'AAAA-MM-JJ', 'Renseigner uniquement la date réelle connue dans la source ; jamais dans le futur.'],
+                        ['date_fin_reelle', 'Facultative pour achevee', 'AAAA-MM-JJ', 'Laisser vide si la source ne donne pas la date. Interdite pour en_cours et non_executee.'],
                         ['progression_reelle', 'Oui', '0 a 100', 'Pour une action quantitative, renseigner aussi quantite_realisee.'],
                         ['quantite_realisee', 'Quantitatif', 'Nombre positif', 'Quantité réellement produite à la date de reprise.'],
                         ['commentaire_historique', 'Oui', 'Texte >= 5 caractères', 'Source de vérification à compléter ensuite avec le justificatif.'],

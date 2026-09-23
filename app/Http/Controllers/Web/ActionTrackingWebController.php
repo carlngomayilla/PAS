@@ -1078,6 +1078,7 @@ class ActionTrackingWebController extends Controller
             ActionTrackingService::STATUS_ANNULE,
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
             ActionTrackingService::STATUS_CLOTUREE,
             'cloture',
             'archive',

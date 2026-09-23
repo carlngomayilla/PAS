@@ -1097,6 +1097,7 @@ final class DashboardOverviewReadModel
         return ! in_array((string) ($action->statut_dynamique ?? ''), [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
             ActionTrackingService::STATUS_SUSPENDU,
             ActionTrackingService::STATUS_ANNULE,
         ], true);

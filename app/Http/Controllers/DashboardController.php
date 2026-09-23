@@ -1634,6 +1634,7 @@ class DashboardController extends Controller
         if (in_array((string) ($action->statut_dynamique ?? ''), [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
             ActionTrackingService::STATUS_ANNULE,
         ], true)) {
             return false;
@@ -3809,6 +3810,7 @@ class DashboardController extends Controller
         return in_array((string) ($action->statut_dynamique ?? ''), [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
         ], true);
     }
 
@@ -4249,6 +4251,7 @@ class DashboardController extends Controller
         return in_array($rawStatus, [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
             ActionTrackingService::STATUS_CLOTUREE,
         ], true)
             || in_array($validationStatus, [
@@ -5300,7 +5303,8 @@ class DashboardController extends Controller
     {
         return match ($status) {
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI => 'acheve',
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE => 'acheve',
             ActionTrackingService::STATUS_A_RISQUE => 'a_risque',
             ActionTrackingService::STATUS_EN_AVANCE => 'en_avance',
             ActionTrackingService::STATUS_EN_RETARD => 'en_retard',

@@ -1847,7 +1847,7 @@ class ReportingAnalyticsService
         // signales sur les graphiques (notamment l'absence de "À paramétrer").
         $bucketExpr = 'CASE '
             ."WHEN actions.statut_parametrage = 'a_parametrer' THEN 'a_parametrer' "
-            ."WHEN actions.statut_dynamique IN ('acheve_dans_delai','acheve_hors_delai','cloturee') THEN 'acheve' "
+            ."WHEN actions.statut_dynamique IN ('acheve','acheve_dans_delai','acheve_hors_delai','cloturee') THEN 'acheve' "
             ."WHEN actions.statut_dynamique = 'en_retard' THEN 'en_retard' "
             ."WHEN actions.statut_dynamique = 'a_risque' THEN 'a_risque' "
             ."WHEN actions.statut_dynamique = 'en_avance' THEN 'en_avance' "

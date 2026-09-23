@@ -131,7 +131,11 @@ class MonitoringWebController extends Controller
         $paosValides = (clone $paos)->where('statut', 'valide')->count();
         $ptasValides = 0;
         $actionsTerminees = (clone $actions)
-            ->whereIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai'])
+            ->whereIn('statut_dynamique', [
+                ActionTrackingService::STATUS_ACHEVE,
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ])
             ->count();
         $objectifsOperationnelsTermines = (clone $objectifsOperationnels)->whereIn('statut', ['termine', 'cloture'])->count();
         $kpisAvecMesures = (clone $kpis)->has('mesures')->count();
@@ -193,6 +197,7 @@ class MonitoringWebController extends Controller
         $actionsCloturees = (clone $actions)->where('statut_dynamique', 'cloturee')->count();
         $actionsAcheveDansDelai = (clone $actions)->where('statut_dynamique', 'acheve_dans_delai')->count();
         $actionsAcheveHorsDelai = (clone $actions)->where('statut_dynamique', 'acheve_hors_delai')->count();
+        $actionsAcheveDateInconnue = (clone $actions)->where('statut_dynamique', ActionTrackingService::STATUS_ACHEVE)->count();
 
         $validationsEnAttente = (clone $actions)
             ->whereIn('statut_validation', ['soumise_chef', 'validee_chef', 'soumise_controle'])
@@ -393,6 +398,7 @@ class MonitoringWebController extends Controller
                 'en_cours' => $actionsEnCours,
                 'acheve_dans_delai' => $actionsAcheveDansDelai,
                 'acheve_hors_delai' => $actionsAcheveHorsDelai,
+                'acheve_date_inconnue' => $actionsAcheveDateInconnue,
                 'en_retard' => $actionsRetard,
                 'a_corriger' => $actionsACorriger,
                 'rejetees' => $actionsRejetees,
@@ -1594,6 +1600,7 @@ class MonitoringWebController extends Controller
             return in_array((string) $action->statut_dynamique, [
                 ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
                 ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE,
             ], true);
         })->count();
         $late = $actions->filter(fn (Action $action): bool => (string) $action->statut_dynamique === ActionTrackingService::STATUS_EN_RETARD)->count();

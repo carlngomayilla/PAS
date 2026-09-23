@@ -97,6 +97,93 @@ class HistoricalExecutionImportServiceTest extends TestCase
         $this->assertNull($notStarted->fresh()->date_debut_reelle);
     }
 
+    public function test_import_accepts_completed_action_without_dates_without_inventing_delay_status(): void
+    {
+        $fixture = $this->fixture();
+        $action = $this->createAction($fixture, 'ACT-COMPLETED-WITHOUT-DATES', Action::TYPE_NON_QUANTITATIVE);
+        $service = app(HistoricalExecutionImportService::class);
+        $preview = $service->validateSheet($this->sheet([
+            $this->row($action->code, [
+                'statut_execution' => 'achevee',
+                'progression_reelle' => 100,
+                'commentaire_historique' => 'Action achevee selon le PTA, dates reelles non renseignees.',
+            ]),
+        ]));
+
+        $this->assertFalse($preview['has_errors']);
+
+        $import = $this->createImport($fixture['user'], $preview, 1);
+        $service->execute($import, $fixture['user']);
+        $action = $action->fresh(['actionKpi']);
+
+        $this->assertNull($action->date_debut_reelle);
+        $this->assertNull($action->date_fin_reelle);
+        $this->assertSame('100.00', (string) $action->progression_reelle);
+        $this->assertSame(ActionTrackingService::STATUS_ACHEVE, $action->statut_dynamique);
+        $this->assertSame(ActionTrackingService::STATUS_ACHEVE, $action->actionKpi?->statut_calcule);
+        $this->assertContains(ActionTrackingService::STATUS_ACHEVE, ActionTrackingService::completedActionStatuses());
+    }
+
+    public function test_import_accepts_in_progress_action_without_start_date(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(HistoricalExecutionImportService::class);
+        $preview = $service->validateSheet($this->sheet([
+            $this->row($fixture['action']->code, [
+                'statut_execution' => 'en_cours',
+                'progression_reelle' => 45,
+                'quantite_realisee' => 45,
+                'commentaire_historique' => 'Action en cours selon le PTA, date de debut non renseignee.',
+            ]),
+        ]));
+
+        $this->assertFalse($preview['has_errors']);
+
+        $import = $this->createImport($fixture['user'], $preview, 1);
+        $service->execute($import, $fixture['user']);
+        $action = $fixture['action']->fresh();
+
+        $this->assertNull($action->date_debut_reelle);
+        $this->assertNull($action->date_fin_reelle);
+        $this->assertSame('45.00', (string) $action->progression_reelle);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+    }
+
+    public function test_status_specific_rules_remain_enforced_when_dates_are_optional(): void
+    {
+        $fixture = $this->fixture();
+        $zeroProgress = $this->createAction($fixture, 'ACT-IN-PROGRESS-ZERO', Action::TYPE_NON_QUANTITATIVE);
+        $completedProgress = $this->createAction($fixture, 'ACT-IN-PROGRESS-COMPLETE', Action::TYPE_NON_QUANTITATIVE);
+        $endDated = $this->createAction($fixture, 'ACT-IN-PROGRESS-END-DATED', Action::TYPE_NON_QUANTITATIVE);
+        $missingQuantity = $this->createAction($fixture, 'ACT-MISSING-QUANTITY', Action::TYPE_QUANTITATIVE);
+        $service = app(HistoricalExecutionImportService::class);
+        $preview = $service->validateSheet($this->sheet([
+            $this->row($zeroProgress->code, [
+                'statut_execution' => 'en_cours',
+                'progression_reelle' => 0,
+            ]),
+            $this->row($completedProgress->code, [
+                'statut_execution' => 'en_cours',
+                'progression_reelle' => 100,
+            ]),
+            $this->row($endDated->code, [
+                'statut_execution' => 'en_cours',
+                'date_fin_reelle' => '2026-03-01',
+                'progression_reelle' => 40,
+            ]),
+            $this->row($missingQuantity->code, [
+                'statut_execution' => 'achevee',
+                'progression_reelle' => 100,
+            ]),
+        ]));
+
+        $this->assertTrue($preview['has_errors']);
+        $this->assertStringContainsString('strictement comprise entre 0 et 100', $preview['rows'][0]['message']);
+        $this->assertStringContainsString('strictement comprise entre 0 et 100', $preview['rows'][1]['message']);
+        $this->assertStringContainsString('ne doit pas avoir de date_fin_reelle', $preview['rows'][2]['message']);
+        $this->assertStringContainsString('quantite_realisee est obligatoire', $preview['rows'][3]['message']);
+    }
+
     public function test_preview_rejects_unknown_duplicate_future_and_incomplete_rows(): void
     {
         $fixture = $this->fixture();

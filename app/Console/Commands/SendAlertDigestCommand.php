@@ -136,6 +136,7 @@ class SendAlertDigestCommand extends Command
             ->whereNotIn('statut_dynamique', [
                 ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
                 ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE,
             ])
             ->get(['id']);
 

@@ -47,6 +47,7 @@ class ActionStatusService
         ActionTrackingService::STATUS_EN_RETARD,
         ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
         ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+        ActionTrackingService::STATUS_ACHEVE,
         ActionTrackingService::STATUS_A_CORRIGER,
         ActionTrackingService::STATUS_CLOTUREE,
         ActionTrackingService::STATUS_SUSPENDU,
@@ -156,6 +157,7 @@ class ActionStatusService
         return in_array($dynamicStatus, [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
             ActionTrackingService::STATUS_CLOTUREE,
             'acheve',
             'achevee',

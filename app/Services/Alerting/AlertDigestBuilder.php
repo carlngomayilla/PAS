@@ -43,7 +43,7 @@ class AlertDigestBuilder
             ->with(['pta:id,direction_id,service_id,titre', 'responsable:id,name,email'])
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai', 'suspendu', 'annule']);
+            ->whereNotIn('statut_dynamique', ['acheve', 'acheve_dans_delai', 'acheve_hors_delai', 'suspendu', 'annule']);
         $this->scopeAction($actionsQuery, $user);
 
         $kpiMesureIds = $this->kpiSousSeuilIds($user, $limit);

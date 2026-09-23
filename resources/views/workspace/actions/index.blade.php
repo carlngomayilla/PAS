@@ -72,10 +72,11 @@
             'a_corriger'        => $sc('a_corriger'),
             'acheve_dans_delai' => $sc('acheve_dans_delai'),
             'acheve_hors_delai' => $sc('acheve_hors_delai'),
+            'acheve'            => $sc('acheve'),
             'cloturee'          => $sc('cloturee'),
             'achevees'          => $hasSummaryStatusCounts
-                ? (int) (($summaryStatusCounts['acheve_dans_delai'] ?? 0) + ($summaryStatusCounts['acheve_hors_delai'] ?? 0))
-                : $listing->filter(fn ($item) => in_array($item->statut_dynamique, ['acheve_dans_delai', 'acheve_hors_delai'], true))->count(),
+                ? (int) (($summaryStatusCounts['acheve'] ?? 0) + ($summaryStatusCounts['acheve_dans_delai'] ?? 0) + ($summaryStatusCounts['acheve_hors_delai'] ?? 0))
+                : $listing->filter(fn ($item) => in_array($item->statut_dynamique, ['acheve', 'acheve_dans_delai', 'acheve_hors_delai'], true))->count(),
         ];
         $statusStyles = [
             'non_demarre'       => 'anbg-badge anbg-badge-neutral',
@@ -88,6 +89,7 @@
             'a_corriger'        => 'anbg-badge anbg-badge-warning',
             'acheve_dans_delai' => 'anbg-badge anbg-badge-success',
             'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
+            'acheve'            => 'anbg-badge anbg-badge-success',
             'cloturee'          => 'anbg-badge anbg-badge-success',
         ];
         $validationStyles = [
@@ -125,6 +127,7 @@
             'suspendu'          => ['label' => 'Suspendu',        'color' => '#6b7280', 'tone' => 'neutral'],
             'acheve_dans_delai' => ['label' => 'Réalisée',        'color' => '#178f5f', 'tone' => 'success'],
             'acheve_hors_delai' => ['label' => 'Réalisée tardive','color' => '#f59e0b', 'tone' => 'warning'],
+            'acheve'            => ['label' => 'Réalisée (date non renseignée)', 'color' => '#178f5f', 'tone' => 'success'],
             'a_corriger'        => ['label' => 'À corriger',      'color' => '#f97316', 'tone' => 'warning'],
             'cloturee'          => ['label' => 'Clôturée',        'color' => '#178f5f', 'tone' => 'success'],
         ];
@@ -177,6 +180,7 @@
             'a_risque'          => '#f59e0b',
             'acheve_dans_delai' => '#178f5f',
             'acheve_hors_delai' => '#f59e0b',
+            'acheve'            => '#178f5f',
             default             => '#94a3b8',
         };
 

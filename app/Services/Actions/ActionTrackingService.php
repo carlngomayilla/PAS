@@ -76,6 +76,8 @@ class ActionTrackingService
 
     public const STATUS_ACHEVE_HORS_DELAI = 'acheve_hors_delai';
 
+    public const STATUS_ACHEVE = 'acheve';
+
     public const STATUS_A_CORRIGER = 'a_corriger';
 
     public const STATUS_CLOTUREE = 'cloturee';
@@ -179,6 +181,7 @@ class ActionTrackingService
         return [
             self::STATUS_ACHEVE_DANS_DELAI,
             self::STATUS_ACHEVE_HORS_DELAI,
+            self::STATUS_ACHEVE,
             self::STATUS_SUSPENDU,
             self::STATUS_ANNULE,
             self::STATUS_CLOTUREE,
@@ -197,6 +200,7 @@ class ActionTrackingService
             self::STATUS_ANNULE,
             self::STATUS_ACHEVE_DANS_DELAI,
             self::STATUS_ACHEVE_HORS_DELAI,
+            self::STATUS_ACHEVE,
             self::STATUS_A_CORRIGER,
             self::STATUS_CLOTUREE,
         ];
@@ -216,6 +220,7 @@ class ActionTrackingService
             && ! in_array((string) $action->statut_dynamique, [
                 self::STATUS_ACHEVE_DANS_DELAI,
                 self::STATUS_ACHEVE_HORS_DELAI,
+                self::STATUS_ACHEVE,
                 self::STATUS_CLOTUREE,
                 self::STATUS_ANNULE,
             ], true)
@@ -1015,6 +1020,10 @@ class ActionTrackingService
             return self::STATUS_ACHEVE_HORS_DELAI;
         }
 
+        if ($action->historical_execution_recorded_at !== null && $realProgress >= 100.0) {
+            return self::STATUS_ACHEVE;
+        }
+
         if ($realProgress <= 0.0 && ! $this->actionStatusService->isStarted($action)) {
             return self::STATUS_NON_DEMARRE;
         }
@@ -1426,7 +1435,7 @@ class ActionTrackingService
             self::STATUS_SUSPENDU => 'suspendu',
             self::STATUS_ANNULE => 'annule',
             self::STATUS_CLOTUREE => 'cloturee',
-            self::STATUS_ACHEVE_DANS_DELAI, self::STATUS_ACHEVE_HORS_DELAI => 'termine',
+            self::STATUS_ACHEVE, self::STATUS_ACHEVE_DANS_DELAI, self::STATUS_ACHEVE_HORS_DELAI => 'termine',
             self::STATUS_EN_RETARD => 'en_cours',
             default => 'en_cours',
         };

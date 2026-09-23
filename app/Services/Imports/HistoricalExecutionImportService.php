@@ -146,17 +146,6 @@ class HistoricalExecutionImportService
                 $errors[] = 'date_debut_reelle doit etre inferieure ou egale a date_fin_reelle.';
             }
 
-            if ($data['statut_execution'] === 'achevee') {
-                if ($start === null) {
-                    $errors[] = 'date_debut_reelle est obligatoire pour une action achevee.';
-                }
-                if ($end === null) {
-                    $errors[] = 'date_fin_reelle est obligatoire pour une action achevee.';
-                }
-            }
-            if ($data['statut_execution'] === 'en_cours' && $start === null) {
-                $errors[] = 'date_debut_reelle est obligatoire pour une action en cours.';
-            }
             if ($data['statut_execution'] === 'en_cours' && $end !== null) {
                 $errors[] = 'Une action en cours ne doit pas avoir de date_fin_reelle.';
             }
@@ -169,6 +158,8 @@ class HistoricalExecutionImportService
                 $errors[] = 'progression_reelle doit etre comprise entre 0 et 100.';
             } elseif ($data['statut_execution'] === 'achevee' && (float) $progress < 100) {
                 $errors[] = 'Une action achevee doit avoir une progression_reelle de 100.';
+            } elseif ($data['statut_execution'] === 'en_cours' && ((float) $progress <= 0 || (float) $progress >= 100)) {
+                $errors[] = 'Une action en cours doit avoir une progression_reelle strictement comprise entre 0 et 100.';
             } elseif ($data['statut_execution'] === 'non_executee' && (float) $progress !== 0.0) {
                 $errors[] = 'Une action non executee doit avoir une progression_reelle de 0.';
             }
@@ -249,11 +240,14 @@ class HistoricalExecutionImportService
                 if ($status === 'en_cours') {
                     $dynamicStatus = ActionTrackingService::STATUS_EN_COURS;
                 } elseif ($status === 'achevee') {
-                    $deadline = $action->date_echeance ?? $action->date_fin ?? $action->echeance_cible;
-                    $onTime = $deadline === null || Carbon::parse($endDate)->lte(Carbon::parse($deadline));
-                    $dynamicStatus = $onTime
-                        ? ActionTrackingService::STATUS_ACHEVE_DANS_DELAI
-                        : ActionTrackingService::STATUS_ACHEVE_HORS_DELAI;
+                    $dynamicStatus = ActionTrackingService::STATUS_ACHEVE;
+                    if ($endDate !== null) {
+                        $deadline = $action->date_echeance ?? $action->date_fin ?? $action->echeance_cible;
+                        $onTime = $deadline === null || Carbon::parse($endDate)->lte(Carbon::parse($deadline));
+                        $dynamicStatus = $onTime
+                            ? ActionTrackingService::STATUS_ACHEVE_DANS_DELAI
+                            : ActionTrackingService::STATUS_ACHEVE_HORS_DELAI;
+                    }
                     $progress = 100.0;
                 }
 

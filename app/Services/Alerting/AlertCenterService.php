@@ -167,7 +167,7 @@ class AlertCenterService
             ])
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai', 'suspendu', 'annule']);
+            ->whereNotIn('statut_dynamique', ['acheve', 'acheve_dans_delai', 'acheve_hors_delai', 'suspendu', 'annule']);
 
         $this->scopeAction($query, $user);
 
@@ -434,6 +434,7 @@ class AlertCenterService
             ->whereNotIn('statut_dynamique', [
                 ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
                 ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE,
                 ActionTrackingService::STATUS_SUSPENDU,
                 ActionTrackingService::STATUS_ANNULE,
             ]);

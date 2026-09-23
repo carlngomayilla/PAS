@@ -174,6 +174,7 @@
             'annule' => 'anbg-badge anbg-badge-neutral',
             'acheve_dans_delai' => 'anbg-badge anbg-badge-success',
             'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
+            'acheve' => 'anbg-badge anbg-badge-success',
         ];
         $validationStyles = [
             'non_soumise' => 'anbg-badge anbg-badge-neutral',
@@ -259,7 +260,7 @@
             .' au '
             .(optional($action->date_fin)->format('d/m/Y') ?: '-');
         $stepperStoppedStatuses = ['suspendu', 'annule'];
-        $stepperFinishedStatuses = ['acheve_dans_delai', 'acheve_hors_delai', 'cloturee'];
+        $stepperFinishedStatuses = ['acheve', 'acheve_dans_delai', 'acheve_hors_delai', 'cloturee'];
         $stepperSubmittedStatuses = ['soumise_chef', 'validee_chef', 'soumise_controle', 'correction_demandee', 'correction_controle', 'rejetee_chef', 'validee_controle', 'validee_direction', 'rejetee_direction'];
         $stepperChefApprovedStatuses = ['validee_chef', 'soumise_controle', 'soumise_planification', 'validee_controle', 'validee_planification', 'validee_direction'];
         $stepperValidatedStatuses = ['validee_controle', 'validee_planification', 'validee_direction'];

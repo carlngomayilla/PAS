@@ -283,6 +283,7 @@ class PlatformSimulationService
         $completed = $actions->filter(fn (Action $action): bool => in_array((string) ($action->statut_dynamique ?? ''), [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
         ], true))->count();
 
         return round(($completed / $total) * 100, 2);
@@ -348,6 +349,7 @@ class PlatformSimulationService
                 ActionTrackingService::STATUS_ANNULE,
                 ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
                 ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE,
                 ActionTrackingService::STATUS_CLOTUREE,
             ], true)
             || in_array((string) ($action->statut_dynamique ?? ''), [
@@ -355,6 +357,7 @@ class PlatformSimulationService
                 ActionTrackingService::STATUS_ANNULE,
                 ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
                 ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE,
                 ActionTrackingService::STATUS_CLOTUREE,
             ], true);
     }
