@@ -150,6 +150,10 @@ class ActionStatusService
         $dynamicStatus = strtolower(trim((string) ($action->statut_dynamique ?? $action->statut ?? '')));
         $validationStatus = strtolower(trim((string) ($action->statut_validation ?? '')));
 
+        if ($action->hasHistoricalExecutionToValidate()) {
+            return false;
+        }
+
         if (in_array($validationStatus, self::NON_FINAL_VALIDATION_STATUSES, true)) {
             return false;
         }

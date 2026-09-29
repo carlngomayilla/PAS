@@ -613,6 +613,19 @@
             <p class="action-section-note action-section-note-warning mb-3">Correction demandée par le contrôle. Motif : <strong>{{ $action->controle_comment ?: '—' }}</strong></p>
         @endif
 
+        @if (($v2ActionResponsible ?? false) && $action->hasHistoricalExecutionToValidate())
+            <div class="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
+                <strong>Réalisation antérieure à confirmer.</strong>
+                Les faits et dates historiques restent conservés. Vérifiez les informations, ajoutez le justificatif demandé, puis enregistrez ou soumettez l’action. Les visas du chef, du SCIQ et de la Planification seront datés lorsqu’ils seront réellement donnés.
+                @if ($action->historical_execution_recorded_at)
+                    <span class="mt-1 block text-xs">Reprise saisie le {{ $action->historical_execution_recorded_at->format('d/m/Y à H:i') }}.</span>
+                @endif
+                @if ($action->historical_execution_confirmed_at)
+                    <span class="mt-1 block text-xs">Confirmation du responsable enregistrée le {{ $action->historical_execution_confirmed_at->format('d/m/Y à H:i') }}.</span>
+                @endif
+            </div>
+        @endif
+
         {{-- FORMULAIRE AGENT — action simple (quantitative ou non quantitative).
              Visible tant que l'utilisateur est responsable ; FIGÉ (fieldset disabled)
              dès la soumission, réouvert uniquement après rejet motivé du chef. --}}
@@ -817,15 +830,15 @@
             </div>
         @endif
 
-        @if (($canRecordHistoricalExecutionV2 ?? false) && ! $v2IsValidated)
+        @if (($canRecordHistoricalExecutionV2 ?? false) && ! $v2IsValidated && ! $action->isComposee())
             <div class="mt-4 rounded-lg border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
                 <h3 class="text-base font-black text-indigo-950 dark:text-indigo-100">Reprise d'une réalisation antérieure</h3>
                 <p class="mt-1 max-w-3xl text-sm text-indigo-900/80 dark:text-indigo-200/80">Enregistrez ici une action déjà réalisée au premier trimestre. Les dates indiquées sont les dates réelles ; la saisie et le visa restent datés du jour.</p>
                 <form method="POST" action="{{ route('workspace.actions.historical-execution.store', $action) }}" class="mt-4 grid gap-3 md:grid-cols-2">
                     @csrf
-                    <div><label for="historical-statut">État d'exécution</label><select id="historical-statut" name="statut_execution" required onchange="this.form.date_fin_reelle.required = this.value === 'achevee'; if (this.value !== 'achevee') { this.form.date_fin_reelle.value = ''; }"><option value="en_cours" @selected(old('statut_execution') === 'en_cours')>En cours</option><option value="achevee" @selected(old('statut_execution', 'achevee') === 'achevee')>Achevée</option></select></div>
-                    <div><label for="historical-start">Date réelle de début</label><input id="historical-start" name="date_debut_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_debut_reelle', optional($action->date_debut_reelle)->toDateString()) }}" required>@error('date_debut_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
-                    <div><label for="historical-end">Date réelle de fin <span class="text-xs font-normal text-slate-500">(obligatoire si achevée)</span></label><input id="historical-end" name="date_fin_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_fin_reelle', optional($action->date_fin_reelle)->toDateString()) }}" @required(old('statut_execution', 'achevee') === 'achevee')>@error('date_fin_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
+                    <div><label for="historical-statut">État d'exécution</label><select id="historical-statut" name="statut_execution" required onchange="if (this.value !== 'achevee') { this.form.date_fin_reelle.value = ''; }"><option value="en_cours" @selected(old('statut_execution') === 'en_cours')>En cours</option><option value="achevee" @selected(old('statut_execution', 'achevee') === 'achevee')>Achevée</option></select></div>
+                    <div><label for="historical-start">Date réelle de début <span class="text-xs font-normal text-slate-500">(laisser vide si inconnue)</span></label><input id="historical-start" name="date_debut_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_debut_reelle', optional($action->date_debut_reelle)->toDateString()) }}">@error('date_debut_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
+                    <div><label for="historical-end">Date réelle de fin <span class="text-xs font-normal text-slate-500">(laisser vide si inconnue)</span></label><input id="historical-end" name="date_fin_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_fin_reelle', optional($action->date_fin_reelle)->toDateString()) }}">@error('date_fin_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
                     @if ($action->isQuantitative())
                         <div><label for="historical-quantity">Quantité réalisée</label><input id="historical-quantity" name="quantite_realisee" type="number" min="0" step="0.01" value="{{ old('quantite_realisee', $action->quantite_realisee) }}"></div>
                     @else

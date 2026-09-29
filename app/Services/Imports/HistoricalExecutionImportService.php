@@ -3,6 +3,7 @@
 namespace App\Services\Imports;
 
 use App\Models\Action;
+use App\Models\ActionLog;
 use App\Models\JournalAudit;
 use App\Models\PlanningImport;
 use App\Models\User;
@@ -121,8 +122,14 @@ class HistoricalExecutionImportService
                 : null;
             if (! $action instanceof Action) {
                 $errors[] = 'Action introuvable pour le code '.$code.'.';
+            } elseif ($action->isComposee()) {
+                $errors[] = 'Cette action est composee : importez les faits par sous-action depuis le suivi individuel, pas au niveau du parent.';
+            } elseif ((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE) !== ActionTrackingService::VALIDATION_NON_SOUMISE) {
+                $errors[] = 'Cette action a deja un circuit de validation commence ou termine. La reprise ne peut pas remplacer ses visas.';
+            } elseif ($action->historical_execution_recorded_at !== null && $action->historical_execution_confirmed_at !== null) {
+                $errors[] = 'Cette reprise historique a deja ete confirmee par le responsable et ne peut pas etre remplacee par une nouvelle importation.';
             } elseif ($action->historical_execution_recorded_at !== null) {
-                $warnings[] = 'Cette action possede deja une reprise historique : la ligne la mettra a jour.';
+                $warnings[] = 'Cette action possede deja une reprise historique non confirmee : la ligne la mettra a jour.';
             }
 
             if (! in_array($data['statut_execution'], self::STATUSES, true)) {
@@ -234,6 +241,7 @@ class HistoricalExecutionImportService
                 $action = Action::query()->whereKey((int) ($data['action_id'] ?? 0))->lockForUpdate()->firstOrFail();
                 $before = $action->getAttributes();
                 $status = (string) ($data['statut_execution'] ?? '');
+                $requiresResponsibleConfirmation = $status !== 'non_executee';
                 $progress = (float) ($data['progression_reelle'] ?? 0);
                 $endDate = $data['date_fin_reelle'] ?: null;
                 $dynamicStatus = ActionTrackingService::STATUS_NON_DEMARRE;
@@ -258,9 +266,11 @@ class HistoricalExecutionImportService
                         ? (float) $data['quantite_realisee']
                         : ($status === 'non_executee' ? 0 : $action->quantite_realisee),
                     'progression_reelle' => $progress,
-                    'historical_execution_recorded_at' => now(),
-                    'historical_execution_recorded_by' => $user->id,
-                    'historical_execution_comment' => $data['commentaire_historique'],
+                    'historical_execution_recorded_at' => $requiresResponsibleConfirmation ? now() : null,
+                    'historical_execution_recorded_by' => $requiresResponsibleConfirmation ? $user->id : null,
+                    'historical_execution_comment' => $requiresResponsibleConfirmation ? $data['commentaire_historique'] : null,
+                    'historical_execution_confirmed_at' => null,
+                    'historical_execution_confirmed_by' => null,
                     'statut' => $dynamicStatus,
                     'statut_dynamique' => $dynamicStatus,
                 ])->save();
@@ -268,6 +278,24 @@ class HistoricalExecutionImportService
                 $referenceDate = $endDate !== null ? Carbon::parse($endDate) : Carbon::today();
                 $this->trackingService->refreshActionMetrics($action->fresh(), $referenceDate);
                 $after = $action->fresh()->getAttributes();
+                ActionLog::query()->create([
+                    'action_id' => (int) $action->id,
+                    'niveau' => 'info',
+                    'type_evenement' => $requiresResponsibleConfirmation ? 'reprise_historique_a_confirmer' : 'reprise_historique_non_executee',
+                    'message' => $requiresResponsibleConfirmation
+                        ? 'Execution anterieure reprise par un utilisateur autorise; confirmation et justificatif attendus du responsable.'
+                        : 'Non-execution pour la periode historique enregistree par un utilisateur autorise.',
+                    'details' => [
+                        'statut_execution_declare' => $status,
+                        'date_debut_reelle' => $data['date_debut_reelle'] ?: null,
+                        'date_fin_reelle' => $endDate,
+                        'progression_declaree' => $progress,
+                        'commentaire_historique' => $data['commentaire_historique'],
+                        'historical_execution' => true,
+                    ],
+                    'cible_role' => 'responsable',
+                    'utilisateur_id' => (int) $user->id,
+                ]);
                 JournalAudit::query()->create([
                     'user_id' => (int) $user->id,
                     'module' => self::MODULE,

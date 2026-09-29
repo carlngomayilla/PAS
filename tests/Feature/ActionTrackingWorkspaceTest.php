@@ -13,6 +13,7 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
+use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Workflow\ActionWorkflowService;
 use App\Services\Workflow\DeadlineExtensionChangeSet;
@@ -118,6 +119,129 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertSame('80.0000', (string) $action->quantite_realisee);
         $this->assertSame(100.0, (float) $action->actionKpi?->progression_reelle);
         $this->assertNotNull($action->historical_execution_recorded_at);
+    }
+
+    public function test_historical_execution_accepts_unknown_real_dates_and_keeps_neutral_status(): void
+    {
+        $fixture = $this->createFixture();
+
+        $this->actingAs($fixture['controller'])
+            ->post(route('workspace.actions.historical-execution.store', $fixture['action']), [
+                'statut_execution' => 'achevee',
+                'date_debut_reelle' => '',
+                'date_fin_reelle' => '',
+                'progression' => 100,
+                'commentaire' => 'Réalisation confirmée par le rapport T1.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $fixture['action']));
+
+        $action = $fixture['action']->fresh();
+        $this->assertNull($action->date_debut_reelle);
+        $this->assertNull($action->date_fin_reelle);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertSame('100.00', (string) $action->progression_reelle);
+        $this->assertFalse(app(ActionStatusService::class)->isCompleted($action));
+    }
+
+    public function test_historical_completion_can_be_confirmed_and_submitted_by_its_agent(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->createFixture(['justificatif_obligatoire' => true]);
+
+        $this->actingAs($fixture['controller'])
+            ->post(route('workspace.actions.historical-execution.store', $fixture['action']), [
+                'statut_execution' => 'achevee',
+                'date_debut_reelle' => '',
+                'date_fin_reelle' => '',
+                'quantite_realisee' => 100,
+                'commentaire' => 'Exécution attestée au premier trimestre.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $fixture['action']));
+
+        $imported = $fixture['action']->fresh();
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $imported->statut_dynamique);
+        $this->assertNull($imported->date_fin_reelle);
+        $this->assertNotNull($imported->historical_execution_recorded_at);
+        $this->assertNull($imported->historical_execution_confirmed_at);
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.suivi', $fixture['action']))
+            ->assertOk()
+            ->assertSee('Réalisation antérieure à confirmer.', false)
+            ->assertSee(route('workspace.actions.execution.update', $fixture['action']), false);
+
+        $this->actingAs($fixture['agent'])
+            ->post(route('workspace.actions.execution.update', $fixture['action']), [
+                'quantite_realisee' => 100,
+                'commentaire' => 'Justificatif du premier trimestre joint.',
+                'justificatif' => UploadedFile::fake()->create('pv-premier-trimestre.pdf', 10, 'application/pdf'),
+                'tracking_action' => 'submit',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $fixture['action']));
+
+        $submitted = $fixture['action']->fresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $submitted->statut_validation);
+        $this->assertSame($fixture['agent']->id, (int) $submitted->soumise_par);
+        $this->assertSame($fixture['controller']->id, (int) $submitted->historical_execution_recorded_by);
+        $this->assertSame($fixture['agent']->id, (int) $submitted->historical_execution_confirmed_by);
+        $this->assertNotNull($submitted->historical_execution_confirmed_at);
+        $this->assertNull($submitted->date_fin_reelle);
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $submitted->id,
+            'type_evenement' => 'action_soumise_validation',
+            'utilisateur_id' => $fixture['agent']->id,
+        ]);
+
+        $workflow = app(ActionWorkflowService::class);
+        $submitted = $workflow->reviewAction($submitted, true, null, $fixture['chef']);
+        $controller = User::factory()->create(['role' => User::ROLE_SCIQ]);
+        $submitted = $workflow->reviewActionByController($submitted, true, null, $controller);
+        $planner = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
+        $closed = $workflow->reviewActionByPlanification($submitted, true, null, $planner);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $closed->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $closed->statut_dynamique);
+        $this->assertNull($closed->date_fin_reelle, 'La date de visa ne doit pas remplacer la date réelle inconnue.');
+        $this->assertNotNull($closed->cloture_le, 'La clôture administrative conserve son propre horodatage.');
+    }
+
+    public function test_historical_action_cannot_be_submitted_without_its_required_justificatif(): void
+    {
+        $fixture = $this->createFixture(['justificatif_obligatoire' => true]);
+        $this->actingAs($fixture['controller'])
+            ->post(route('workspace.actions.historical-execution.store', $fixture['action']), [
+                'statut_execution' => 'achevee',
+                'progression' => 100,
+                'commentaire' => 'Exécution attestée au premier trimestre.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $fixture['action']));
+
+        $this->actingAs($fixture['agent'])
+            ->post(route('workspace.actions.execution.update', $fixture['action']), [
+                'quantite_realisee' => 100,
+                'commentaire' => 'Soumission sans pièce jointe.',
+                'tracking_action' => 'submit',
+            ])
+            ->assertSessionHasErrors('general');
+
+        $action = $fixture['action']->fresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, $action->statut_validation);
+        $this->assertNull($action->historical_execution_confirmed_at);
+    }
+
+    public function test_historical_import_is_rejected_for_composite_actions(): void
+    {
+        $fixture = $this->createFixture(['type_action' => Action::TYPE_COMPOSEE]);
+
+        $this->actingAs($fixture['controller'])
+            ->post(route('workspace.actions.historical-execution.store', $fixture['action']), [
+                'statut_execution' => 'achevee',
+                'progression' => 100,
+                'commentaire' => 'Exécution composée à reprendre.',
+            ])
+            ->assertSessionHasErrors('general');
+
+        $this->assertNull($fixture['action']->fresh()->historical_execution_recorded_at);
     }
 
     public function test_action_tracking_tabs_handle_direct_links_errors_and_keyboard_navigation(): void

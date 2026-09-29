@@ -13,6 +13,7 @@ use App\Models\PlanningImport;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Imports\HistoricalExecutionImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,7 +24,7 @@ class HistoricalExecutionImportServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_import_preserves_historical_dates_progress_and_recalculates_kpi(): void
+    public function test_import_preserves_historical_dates_and_progress_without_faking_workflow_validation(): void
     {
         $fixture = $this->fixture();
         $service = app(HistoricalExecutionImportService::class);
@@ -47,7 +48,7 @@ class HistoricalExecutionImportServiceTest extends TestCase
         $this->assertSame('2026-03-28', $action->date_fin_reelle?->toDateString());
         $this->assertSame('100.00', (string) $action->progression_reelle);
         $this->assertSame('100.0000', (string) $action->quantite_realisee);
-        $this->assertSame(ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, $action->statut_dynamique);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
         $this->assertNotNull($action->historical_execution_recorded_at);
         $this->assertSame(100.0, (float) $action->actionKpi?->progression_reelle);
         $this->assertDatabaseHas('journal_audit', [
@@ -90,11 +91,12 @@ class HistoricalExecutionImportServiceTest extends TestCase
         $import = $this->createImport($fixture['user'], $preview, 3);
         $service->execute($import, $fixture['user']);
 
-        $this->assertSame(ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, $fixture['action']->fresh()->statut_dynamique);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $fixture['action']->fresh()->statut_dynamique);
         $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $inProgress->fresh()->statut_dynamique);
         $this->assertSame(ActionTrackingService::STATUS_NON_DEMARRE, $notStarted->fresh()->statut_dynamique);
         $this->assertSame('45.00', (string) $inProgress->fresh()->progression_reelle);
         $this->assertNull($notStarted->fresh()->date_debut_reelle);
+        $this->assertNull($notStarted->fresh()->historical_execution_recorded_at);
     }
 
     public function test_import_accepts_completed_action_without_dates_without_inventing_delay_status(): void
@@ -119,8 +121,9 @@ class HistoricalExecutionImportServiceTest extends TestCase
         $this->assertNull($action->date_debut_reelle);
         $this->assertNull($action->date_fin_reelle);
         $this->assertSame('100.00', (string) $action->progression_reelle);
-        $this->assertSame(ActionTrackingService::STATUS_ACHEVE, $action->statut_dynamique);
-        $this->assertSame(ActionTrackingService::STATUS_ACHEVE, $action->actionKpi?->statut_calcule);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertFalse(app(ActionStatusService::class)->isCompleted($action));
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->actionKpi?->statut_calcule);
         $this->assertContains(ActionTrackingService::STATUS_ACHEVE, ActionTrackingService::completedActionStatuses());
     }
 
@@ -182,6 +185,36 @@ class HistoricalExecutionImportServiceTest extends TestCase
         $this->assertStringContainsString('strictement comprise entre 0 et 100', $preview['rows'][1]['message']);
         $this->assertStringContainsString('ne doit pas avoir de date_fin_reelle', $preview['rows'][2]['message']);
         $this->assertStringContainsString('quantite_realisee est obligatoire', $preview['rows'][3]['message']);
+    }
+
+    public function test_import_rejects_composite_actions_and_actions_with_started_workflows(): void
+    {
+        $fixture = $this->fixture();
+        $composite = $this->createAction($fixture, 'ACT-COMPOSITE-HISTORY', Action::TYPE_COMPOSEE);
+        $submitted = $this->createAction($fixture, 'ACT-ALREADY-SUBMITTED', Action::TYPE_QUANTITATIVE);
+        $submitted->forceFill([
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'soumise_le' => now(),
+            'soumise_par' => $submitted->responsable_id,
+        ])->save();
+
+        $preview = app(HistoricalExecutionImportService::class)->validateSheet($this->sheet([
+            $this->row($composite->code, [
+                'statut_execution' => 'achevee',
+                'progression_reelle' => 100,
+                'commentaire_historique' => 'Action composée à reprendre.',
+            ]),
+            $this->row($submitted->code, [
+                'statut_execution' => 'achevee',
+                'progression_reelle' => 100,
+                'quantite_realisee' => 100,
+                'commentaire_historique' => 'Circuit déjà commencé.',
+            ]),
+        ]));
+
+        $this->assertTrue($preview['has_errors']);
+        $this->assertStringContainsString('composee', implode(' ', $preview['rows'][0]['errors']));
+        $this->assertStringContainsString('deja un circuit de validation commence', implode(' ', $preview['rows'][1]['errors']));
     }
 
     public function test_preview_rejects_unknown_duplicate_future_and_incomplete_rows(): void

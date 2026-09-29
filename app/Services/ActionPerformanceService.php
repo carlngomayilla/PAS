@@ -30,7 +30,9 @@ class ActionPerformanceService
 
     public function calculateRealProgress(Action $action): float
     {
-        if ($action->historical_execution_recorded_at !== null) {
+        if (! $action->isComposee()
+            && $action->hasHistoricalExecutionToValidate()
+            && $action->historical_execution_confirmed_at === null) {
             return $this->boundRate((float) ($action->progression_reelle ?? 0));
         }
 
@@ -380,7 +382,9 @@ class ActionPerformanceService
 
     private function isDeclaredNonQuantifiableActionCompleted(Action $action): bool
     {
-        if ($action->historical_execution_recorded_at !== null) {
+        if (! $action->isComposee()
+            && $action->hasHistoricalExecutionToValidate()
+            && $action->historical_execution_confirmed_at === null) {
             return $action->date_fin_reelle !== null
                 || (float) ($action->progression_reelle ?? 0) >= 100.0;
         }

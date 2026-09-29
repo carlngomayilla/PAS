@@ -678,6 +678,7 @@ class ActionTrackingService
 
         if ($this->actionManagementSettings->autoCompleteWhenTargetReached()
             && $action->date_fin_reelle === null
+            && $action->historical_execution_recorded_at === null
             && $realProgress >= 100.0
             && $this->hasFinalValidation($action)
             && ! in_array((string) ($action->statut ?? ''), [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)) {
@@ -792,7 +793,9 @@ class ActionTrackingService
     private function refreshStructuredActionMetrics(Action $action, Carbon $referenceDate): Action
     {
         $metrics = $this->actionProgressService->compute($action, $referenceDate);
-        $realProgress = $action->historical_execution_recorded_at !== null
+        $realProgress = ! $action->isComposee()
+            && $action->hasHistoricalExecutionToValidate()
+            && $action->historical_execution_confirmed_at === null
             ? (float) ($action->progression_reelle ?? 0)
             : (float) ($metrics['progression_reelle'] ?? 0);
         $theoreticalProgress = (float) ($metrics['progression_theorique'] ?? 0);
@@ -801,6 +804,7 @@ class ActionTrackingService
         if (
             $this->actionManagementSettings->autoCompleteWhenTargetReached()
             && $action->date_fin_reelle === null
+            && $action->historical_execution_recorded_at === null
             && $realProgress >= 100.0
             && $this->hasFinalValidation($action)
             && ! in_array((string) ($action->statut ?? ''), [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)
@@ -813,7 +817,9 @@ class ActionTrackingService
 
         $updates = [
             'date_echeance' => $action->date_echeance ?? $action->date_fin,
-            'quantite_realisee' => $action->historical_execution_recorded_at !== null
+            'quantite_realisee' => ! $action->isComposee()
+                && $action->hasHistoricalExecutionToValidate()
+                && $action->historical_execution_confirmed_at === null
                 ? (float) ($action->quantite_realisee ?? 0)
                 : (float) ($metrics['quantite_realisee'] ?? $action->quantite_realisee ?? 0),
             'progression_reelle' => $realProgress,
@@ -1004,11 +1010,15 @@ class ActionTrackingService
             return self::STATUS_A_CORRIGER;
         }
 
+        if ($action->hasHistoricalExecutionToValidate()) {
+            return self::STATUS_EN_COURS;
+        }
+
         $startDate = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
         $endDate = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
         $actualEnd = $action->date_fin_reelle !== null ? Carbon::parse($action->date_fin_reelle)->endOfDay() : null;
 
-        if ($actualEnd !== null && ($this->hasFinalValidation($action) || $action->historical_execution_recorded_at !== null)) {
+        if ($actualEnd !== null && $this->hasFinalValidation($action)) {
             $realEnd = $action->date_fin_reelle !== null
                 ? Carbon::parse($action->date_fin_reelle)->endOfDay()
                 : $referenceDate->copy()->endOfDay();
@@ -1020,7 +1030,7 @@ class ActionTrackingService
             return self::STATUS_ACHEVE_HORS_DELAI;
         }
 
-        if ($action->historical_execution_recorded_at !== null && $realProgress >= 100.0) {
+        if ($action->historical_execution_recorded_at !== null && $realProgress >= 100.0 && $this->hasFinalValidation($action)) {
             return self::STATUS_ACHEVE;
         }
 

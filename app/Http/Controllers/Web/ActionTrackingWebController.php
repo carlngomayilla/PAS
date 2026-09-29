@@ -10,6 +10,7 @@ use App\Http\Requests\ReviewActionFinancingByDafRequest;
 use App\Http\Requests\ReviewActionFinancingByDgRequest;
 use App\Http\Requests\SubmitActionFinancingRequest;
 use App\Models\Action;
+use App\Models\ActionLog;
 use App\Models\Justificatif;
 use App\Models\SousAction;
 use App\Models\User;
@@ -364,20 +365,31 @@ class ActionTrackingWebController extends Controller
         if (! $this->canReadAction($user, $action)) {
             abort(403, 'Action hors de votre périmètre.');
         }
+        if ($action->isComposee()) {
+            return back()->withErrors(['general' => 'Cette action est composée : la reprise doit être faite sous-action par sous-action.']);
+        }
+        if ((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE) !== ActionTrackingService::VALIDATION_NON_SOUMISE) {
+            return back()->withErrors(['general' => 'Le circuit de validation a déjà commencé. La reprise ne peut pas remplacer ses visas.']);
+        }
+        if ($action->historical_execution_confirmed_at !== null) {
+            return back()->withErrors(['general' => 'Cette reprise a déjà été confirmée par le responsable. Utilisez le circuit de correction pour modifier les faits.']);
+        }
 
         $validated = $request->validate([
             'statut_execution' => ['required', Rule::in(['en_cours', 'achevee'])],
-            'date_debut_reelle' => ['required', 'date', 'before_or_equal:today'],
+            'date_debut_reelle' => ['nullable', 'date', 'before_or_equal:today'],
             'date_fin_reelle' => ['nullable', 'date', 'before_or_equal:today', 'after_or_equal:date_debut_reelle'],
             'quantite_realisee' => ['nullable', 'numeric', 'min:0'],
             'progression' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'commentaire' => ['required', 'string', 'min:5', 'max:5000'],
         ]);
-        if ($validated['statut_execution'] === 'achevee' && empty($validated['date_fin_reelle'])) {
-            return back()->withInput()->withErrors(['date_fin_reelle' => 'La date de fin est obligatoire pour une action achevée.']);
-        }
-        if ($validated['statut_execution'] === 'en_cours' && ! empty($validated['date_fin_reelle'])) {
+        $actualStartDate = $validated['date_debut_reelle'] ?? null;
+        $actualEndDate = $validated['date_fin_reelle'] ?? null;
+        if ($validated['statut_execution'] === 'en_cours' && ! empty($actualEndDate)) {
             return back()->withInput()->withErrors(['date_fin_reelle' => 'Une action en cours ne doit pas avoir de date de fin.']);
+        }
+        if (! empty($actualEndDate) && empty($actualStartDate)) {
+            return back()->withInput()->withErrors(['date_debut_reelle' => 'Une date de début est nécessaire lorsque la date de fin est connue.']);
         }
 
         $quantity = $validated['quantite_realisee'] ?? $action->quantite_realisee;
@@ -388,34 +400,59 @@ class ActionTrackingWebController extends Controller
                 : min(100, max(0, ((float) $quantity / (float) $action->quantite_cible) * 100));
         }
         $progression ??= $validated['statut_execution'] === 'achevee' ? 100 : (float) ($action->progression_reelle ?? 0);
+        if ($validated['statut_execution'] === 'achevee' && (float) $progression !== 100.0) {
+            return back()->withInput()->withErrors(['progression' => 'Une action achevée doit avoir une progression de 100 %.']);
+        }
+        if ($validated['statut_execution'] === 'en_cours' && ((float) $progression <= 0 || (float) $progression >= 100)) {
+            return back()->withInput()->withErrors(['progression' => 'Une action en cours doit avoir une progression strictement comprise entre 0 et 100 %.']);
+        }
 
         $before = $action->only(['statut', 'statut_dynamique', 'progression_reelle', 'quantite_realisee', 'date_fin_reelle']);
-        DB::transaction(function () use ($action, $validated, $user, $quantity, $progression): void {
+        DB::transaction(function () use ($action, $validated, $user, $quantity, $progression, $actualStartDate, $actualEndDate): void {
             $completedOnTime = true;
-            if ($validated['statut_execution'] === 'achevee' && ! empty($validated['date_fin_reelle'])) {
+            if ($validated['statut_execution'] === 'achevee' && ! empty($actualEndDate)) {
                 $deadline = $action->date_echeance ?? $action->date_fin ?? $action->echeance_cible;
                 $completedOnTime = $deadline === null
-                    || Carbon::parse($validated['date_fin_reelle'])->lte(Carbon::parse($deadline));
+                    || Carbon::parse($actualEndDate)->lte(Carbon::parse($deadline));
             }
             $dynamicStatus = $validated['statut_execution'] === 'achevee'
-                ? ($completedOnTime ? ActionTrackingService::STATUS_ACHEVE_DANS_DELAI : ActionTrackingService::STATUS_ACHEVE_HORS_DELAI)
+                ? (empty($actualEndDate)
+                    ? ActionTrackingService::STATUS_ACHEVE
+                    : ($completedOnTime ? ActionTrackingService::STATUS_ACHEVE_DANS_DELAI : ActionTrackingService::STATUS_ACHEVE_HORS_DELAI))
                 : ActionTrackingService::STATUS_EN_COURS;
             $action->forceFill([
-                'date_debut_reelle' => $validated['date_debut_reelle'],
-                'date_fin_reelle' => $validated['date_fin_reelle'] ?? null,
+                'date_debut_reelle' => $actualStartDate,
+                'date_fin_reelle' => $actualEndDate,
                 'quantite_realisee' => $quantity,
                 'progression_reelle' => $progression,
                 'historical_execution_recorded_at' => now(),
                 'historical_execution_recorded_by' => $user->id,
                 'historical_execution_comment' => $validated['commentaire'],
+                'historical_execution_confirmed_at' => null,
+                'historical_execution_confirmed_by' => null,
                 'statut' => $dynamicStatus,
                 'statut_dynamique' => $dynamicStatus,
             ])->save();
+            ActionLog::query()->create([
+                'action_id' => (int) $action->id,
+                'niveau' => 'info',
+                'type_evenement' => 'reprise_historique_a_confirmer',
+                'message' => 'Execution anterieure reprise par un utilisateur autorise; confirmation et justificatif attendus du responsable.',
+                'details' => [
+                    'statut_execution_declare' => $validated['statut_execution'],
+                    'date_debut_reelle' => $actualStartDate,
+                    'date_fin_reelle' => $actualEndDate,
+                    'progression_declaree' => $progression,
+                    'historical_execution' => true,
+                ],
+                'cible_role' => 'responsable',
+                'utilisateur_id' => (int) $user->id,
+            ]);
         });
 
         $trackingService->refreshActionMetrics(
             $action->fresh(),
-            ! empty($validated['date_fin_reelle']) ? Carbon::parse($validated['date_fin_reelle']) : Carbon::today()
+            ! empty($actualEndDate) ? Carbon::parse($actualEndDate) : Carbon::today()
         );
 
         $this->recordAudit($request, 'action', 'record_historical_execution', $action->fresh(), $before, [
@@ -1072,8 +1109,15 @@ class ActionTrackingWebController extends Controller
             ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
         ], true);
         $lifecycleStatus = (string) ($action->statut_dynamique ?: $action->statut ?: '');
+        $isHistoricalWorkflowOpen = $action->historical_execution_recorded_at !== null
+            && $validationIsEditable
+            && in_array($lifecycleStatus, [
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE,
+            ], true);
 
-        return $validationIsEditable && ! in_array($lifecycleStatus, [
+        return $validationIsEditable && ($isHistoricalWorkflowOpen || ! in_array($lifecycleStatus, [
             ActionTrackingService::STATUS_SUSPENDU,
             ActionTrackingService::STATUS_ANNULE,
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
@@ -1082,7 +1126,7 @@ class ActionTrackingWebController extends Controller
             ActionTrackingService::STATUS_CLOTUREE,
             'cloture',
             'archive',
-        ], true);
+        ], true));
     }
 
     private function canTrackAction(User $user, Action $action): bool

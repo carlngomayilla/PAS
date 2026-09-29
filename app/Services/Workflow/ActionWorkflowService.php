@@ -39,6 +39,12 @@ class ActionWorkflowService
     {
         $this->assertActionExecutionEditable($action);
 
+        $isUnconfirmedHistoricalExecution = $action->hasHistoricalExecutionToValidate()
+            && $action->historical_execution_confirmed_at === null;
+        if ($isUnconfirmedHistoricalExecution && ! $actor instanceof User) {
+            throw new \InvalidArgumentException('Le responsable doit confirmer lui-meme la reprise historique.');
+        }
+
         if ($action->isQuantitative() && array_key_exists('quantite_realisee', $data)) {
             $action->quantite_realisee = max(0.0, (float) ($data['quantite_realisee'] ?? 0));
         }
@@ -61,9 +67,10 @@ class ActionWorkflowService
             'seuil_atteint_le' => $thresholdReachedAt,
             'statut' => ActionTrackingService::STATUS_EN_COURS,
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
-            'historical_execution_recorded_at' => null,
-            'historical_execution_recorded_by' => null,
-            'historical_execution_comment' => null,
+            ...($isUnconfirmedHistoricalExecution ? [
+                'historical_execution_confirmed_at' => now(),
+                'historical_execution_confirmed_by' => $actor->id,
+            ] : []),
             // Tant que non soumise, on reste en non_soumise / correction.
             'statut_validation' => in_array((string) $action->statut_validation, [
                 ActionTrackingService::VALIDATION_NON_SOUMISE,
@@ -367,7 +374,8 @@ class ActionWorkflowService
                     'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                     'statut' => ActionTrackingService::STATUS_CLOTUREE,
                     'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
-                    'date_fin_reelle' => $lockedAction->date_fin_reelle ?: now()->toDateString(),
+                    'date_fin_reelle' => $lockedAction->date_fin_reelle
+                        ?: ($lockedAction->historical_execution_recorded_at !== null ? null : now()->toDateString()),
                     'cloture_le' => now(),
                     'cloture_par' => $actor->id,
                 ])->save();
@@ -526,6 +534,28 @@ class ActionWorkflowService
         }
 
         $lifecycleStatus = (string) ($action->statut_dynamique ?: $action->statut ?: '');
+        $isHistoricalWorkflowOpen = $action->historical_execution_recorded_at !== null
+            && in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), [
+                ActionTrackingService::VALIDATION_NON_SOUMISE,
+                ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+                ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+                ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+            ], true)
+            && in_array($lifecycleStatus, [
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE,
+            ], true);
+        if (in_array($lifecycleStatus, [
+            ActionTrackingService::STATUS_SUSPENDU,
+            ActionTrackingService::STATUS_ANNULE,
+            ActionTrackingService::STATUS_CLOTUREE,
+            'cloture',
+            'archive',
+        ], true)) {
+            $isHistoricalWorkflowOpen = false;
+        }
         if (in_array($lifecycleStatus, [
             ActionTrackingService::STATUS_SUSPENDU,
             ActionTrackingService::STATUS_ANNULE,
@@ -535,7 +565,7 @@ class ActionWorkflowService
             ActionTrackingService::STATUS_CLOTUREE,
             'cloture',
             'archive',
-        ], true)) {
+        ], true) && ! $isHistoricalWorkflowOpen) {
             throw new \InvalidArgumentException('Cette action est suspendue, terminee ou cloturee.');
         }
     }

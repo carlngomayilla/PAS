@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TypeIndicateur;
 use App\Services\ActionPerformanceService;
+use App\Services\Actions\ActionTrackingService;
 use App\Support\SchemaIntrospectionCache;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
@@ -197,6 +198,7 @@ class Action extends Model
             'date_debut' => 'date',
             'date_debut_reelle' => 'date',
             'historical_execution_recorded_at' => 'datetime',
+            'historical_execution_confirmed_at' => 'datetime',
             'mode_evaluation' => 'string',
             'type_action' => 'string',
             'type_indicateur' => 'string',
@@ -264,6 +266,19 @@ class Action extends Model
             'modification_unlocked_by' => 'integer',
             'modification_unlock_expires_at' => 'datetime',
         ];
+    }
+
+    public function hasHistoricalExecutionToValidate(): bool
+    {
+        if ($this->historical_execution_recorded_at === null
+            || in_array((string) ($this->statut_validation ?? ''), ActionTrackingService::FINAL_VALIDATION_STATUSES, true)) {
+            return false;
+        }
+
+        return $this->date_debut_reelle !== null
+            || $this->date_fin_reelle !== null
+            || (float) ($this->progression_reelle ?? 0) > 0.0
+            || (float) ($this->quantite_realisee ?? 0) > 0.0;
     }
 
     public function exercice(): BelongsTo
