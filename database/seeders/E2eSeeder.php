@@ -2,19 +2,13 @@
 
 namespace Database\Seeders;
 
-use App\Enums\MeetingStatus;
-use App\Enums\MeetingType;
 use App\Models\Direction;
-use App\Models\Meeting;
-use App\Models\MeetingPlan;
-use App\Models\MeetingReport;
 use App\Models\Service;
 use App\Models\UniteDg;
 use App\Models\User;
 use App\Support\E2eEnvironment;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 
 class E2eSeeder extends Seeder
 {
@@ -78,51 +72,12 @@ class E2eSeeder extends Seeder
             $this->createUser($name, $email, $role, $password, $unitCode ? $generalDirection : null, null, $unitCode ? $units->get($unitCode) : null);
         }
 
-        $chief = $this->createUser('Chef de service E2E', 'chef.service.e2e@example.test', User::ROLE_SERVICE, $password, $mainDirection, $mainService);
-        $director = $this->createUser('Directeur E2E', 'directeur.e2e@example.test', User::ROLE_DIRECTION, $password, $mainDirection);
+        $this->createUser('Chef de service E2E', 'chef.service.e2e@example.test', User::ROLE_SERVICE, $password, $mainDirection, $mainService);
+        $this->createUser('Directeur E2E', 'directeur.e2e@example.test', User::ROLE_DIRECTION, $password, $mainDirection);
         $this->createUser('Agent E2E', 'agent.e2e@example.test', User::ROLE_AGENT, $password, $mainDirection, $mainService);
         $this->createUser('Agent autre service E2E', 'agent.autre.service.e2e@example.test', User::ROLE_AGENT, $password, $outsideDirection, $outsideService);
         $this->createUser('Compte inactif E2E', 'inactif.e2e@example.test', User::ROLE_AGENT, $password, $mainDirection, $mainService, null, false);
 
-        foreach (['chromium', 'firefox', 'mobile-chrome'] as $project) {
-            foreach (['cycle', 'correction', 'téléversement'] as $kind) {
-                $this->createElapsedMeeting("Réunion E2E {$kind} {$project}", $mainDirection, $mainService, $chief, $director);
-            }
-        }
-
-        $protectedMeeting = $this->createElapsedMeeting('Réunion E2E protégée autre service', $mainDirection, $mainService, $chief, $director, MeetingStatus::EnValidationSciq);
-        $protectedFile = $this->pdfFixture('PV protégé E2E');
-        $protectedPath = 'e2e/fixtures/pv-protege.pdf';
-        Storage::disk('local')->put($protectedPath, $protectedFile);
-        MeetingReport::factory()->create([
-            'meeting_id' => $protectedMeeting->id,
-            'file_path' => $protectedPath,
-            'original_file_name' => 'pv-protege-e2e.pdf',
-            'file_size' => strlen($protectedFile),
-            'mime_type' => 'application/pdf',
-            'checksum' => hash('sha256', $protectedFile),
-            'is_encrypted' => false,
-            'status' => MeetingStatus::EnValidationSciq,
-            'summary' => 'Synthèse E2E protégée réservée au périmètre principal.',
-            'uploaded_by' => $chief->id,
-            'uploaded_at' => now()->subHour(),
-        ]);
-
-        Meeting::factory()->create([
-            'direction_id' => $mainDirection->id,
-            'service_id' => $mainService->id,
-            'meeting_type' => MeetingType::Service,
-            'label' => 'Réunion E2E interface',
-            'participant_ids' => [$chief->id, $director->id],
-            'original_scheduled_date' => today()->addDay(),
-            'current_scheduled_date' => today()->addDay(),
-            'scheduled_time' => '10:00',
-            'year' => today()->addDay()->year,
-            'quarter' => MeetingPlan::quarterForMonth(today()->addDay()->month),
-            'month' => today()->addDay()->month,
-            'created_by' => $chief->id,
-            'responsible_id' => $chief->id,
-        ]);
     }
 
     private function createUser(string $name, string $email, string $role, string $password, ?Direction $direction = null, ?Service $service = null, ?UniteDg $unit = null, bool $isActive = true): User
@@ -138,35 +93,5 @@ class E2eSeeder extends Seeder
             'is_active' => $isActive,
             'password_changed_at' => now(),
         ]);
-    }
-
-    private function createElapsedMeeting(string $label, Direction $direction, Service $service, User $chief, User $director, MeetingStatus $status = MeetingStatus::PvAttendu): Meeting
-    {
-        $scheduledDate = today()->subDay();
-
-        return Meeting::factory()->create([
-            'direction_id' => $direction->id,
-            'service_id' => $service->id,
-            'meeting_type' => MeetingType::Service,
-            'label' => $label,
-            'location' => 'Salle de réunion E2E',
-            'agenda' => 'Ordre du jour réservé aux tests navigateur.',
-            'participant_ids' => [$chief->id, $director->id],
-            'original_scheduled_date' => $scheduledDate,
-            'current_scheduled_date' => $scheduledDate,
-            'scheduled_time' => '09:00',
-            'held_at' => $scheduledDate->copy()->setTime(10, 0),
-            'year' => $scheduledDate->year,
-            'quarter' => MeetingPlan::quarterForMonth($scheduledDate->month),
-            'month' => $scheduledDate->month,
-            'status' => $status,
-            'created_by' => $chief->id,
-            'responsible_id' => $chief->id,
-        ]);
-    }
-
-    private function pdfFixture(string $title): string
-    {
-        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Title ({$title}) >>\nendobj\n%%EOF\n";
     }
 }

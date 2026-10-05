@@ -13,8 +13,8 @@
     <section class="showcase-panel app-screen-block" data-keep-empty="1" data-keep-accordion="0">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h1 class="showcase-panel-title">{{ $mappingRequired ? 'Correspondance des colonnes' : 'Previsualisation' }}</h1>
-                <p class="text-sm text-slate-500">{{ $import->filename }} - {{ $import->valid_rows }} lignes valides, {{ $import->error_rows }} erreurs.</p>
+                <h1 class="showcase-panel-title">{{ $mappingRequired ? 'Correspondance des colonnes' : 'Vérifier la répartition avant import' }}</h1>
+                <p class="text-sm text-slate-500">{{ $import->filename }} · {{ $rows->count() }} lignes · {{ $rows->where('status', 'Valide')->count() }} valides · {{ $rows->where('status', 'Avertissement')->count() }} avec avertissement · {{ $import->error_rows }} en erreur.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @if ($import->error_rows > 0)
@@ -31,6 +31,32 @@
 
         @if ($errors->any())
             <div class="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
+        @endif
+
+        @if (! $mappingRequired)
+            <div class="mb-5 grid min-w-0 gap-4 xl:grid-cols-2">
+                @foreach (['axes' => 'Répartition par axe', 'services' => 'Répartition par service'] as $group => $title)
+                    <section class="min-w-0 rounded-lg border border-slate-200 p-3 dark:border-slate-700" aria-labelledby="breakdown-{{ $group }}">
+                        <h2 id="breakdown-{{ $group }}" class="mb-2 text-base font-semibold">{{ $title }}</h2>
+                        <div class="app-table-wrapper overflow-x-auto" tabindex="0" role="region" aria-label="{{ $title }}">
+                            <table class="app-table data-table">
+                                <thead><tr><th scope="col">{{ $group === 'axes' ? 'Axe du fichier' : 'Direction et service' }}</th><th scope="col">Lignes</th><th scope="col">Valides</th><th scope="col">Avertissements</th><th scope="col">Erreurs</th></tr></thead>
+                                <tbody>
+                                    @forelse ($breakdown[$group] as $item)
+                                        <tr>
+                                            <th scope="row"><span class="block text-xs text-slate-500">{{ $item['context'] }}</span>{{ $item['label'] }}</th>
+                                            <td>{{ $item['total'] }}</td><td>{{ $item['valid'] }}</td><td>{{ $item['warnings'] }}</td><td>{{ $item['errors'] }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="5">Aucune ligne à importer.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                @endforeach
+            </div>
+            <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">Comparez les axes et les services avec votre fichier. Les totaux décrivent les lignes analysées ; les créations et mises à jour dépendront du mode choisi. Toute erreur bloque la confirmation.</p>
         @endif
 
         @if ($mappingRequired)
@@ -110,7 +136,7 @@
                     </table>
                 </div>
             @endif
-        @elseif (! $hasErrors)
+        @elseif (! $hasErrors && $rows->isNotEmpty() && in_array($import->status, ['preview_ready', 'preview_errors'], true))
             <form method="POST" action="{{ route('workspace.imports.confirm', $import) }}" class="mb-4 flex flex-col gap-3 rounded border border-[#d8ecf8] bg-[#f8fbfe] p-3 sm:flex-row sm:items-end">
                 @csrf
                 <div class="min-w-[260px]">
@@ -132,6 +158,7 @@
                     <tr>
                         <th>Ligne</th>
                         <th>Statut</th>
+                        <th>Axe et objectif stratégique</th>
                         <th>Direction</th>
                         <th>Service</th>
                         <th>Objectif opérationnel</th>
@@ -145,6 +172,7 @@
                         <tr>
                             <td>{{ $row['line'] ?? '-' }}</td>
                             <td><span class="anbg-badge px-2 py-0.5 text-xs {{ ($row['status'] ?? '') === 'Erreur' ? 'anbg-badge-danger' : (($row['status'] ?? '') === 'Avertissement' ? 'anbg-badge-warning' : 'anbg-badge-success') }}">{{ $row['status'] ?? '-' }}</span></td>
+                            <td><span class="block font-semibold">{{ $data['ordre_axe'] ?? '-' }} — {{ $data['libelle_axe'] ?? '-' }}</span><span class="text-xs text-slate-500">{{ $data['libelle_objectif_strategique'] ?? '-' }}</span></td>
                             <td>{{ $data['direction'] ?? '-' }}</td>
                             <td>{{ $data['service_unite'] ?? '-' }}</td>
                             <td>{{ $data['libelle_objectif_operationnel'] ?? '-' }}</td>

@@ -62,6 +62,7 @@ class PlanningImportWebController extends Controller
         return view('workspace.imports.show', [
             'import' => $import,
             'preview' => $import->preview_payload ?? [],
+            'breakdown' => $this->importService->previewBreakdown($import->preview_payload ?? []),
             'modes' => $this->modes(),
         ]);
     }
@@ -104,7 +105,10 @@ class PlanningImportWebController extends Controller
     {
         $this->authorizeAccess($request);
 
-        return view('workspace.imports.result', ['import' => $import]);
+        return view('workspace.imports.result', [
+            'import' => $import->loadMissing('user:id,name,email,role,custom_role_code'),
+            'breakdown' => $this->importService->previewBreakdown($import->preview_payload ?? []),
+        ]);
     }
 
     public function errors(Request $request, PlanningImport $import): View

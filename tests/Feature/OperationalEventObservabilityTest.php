@@ -75,14 +75,14 @@ class OperationalEventObservabilityTest extends TestCase
             ->with('Queue job timed out.', [
                 'event' => 'queue.job_timed_out',
                 'connection' => 'redis',
-                'queue' => 'ai-imports',
+                'queue' => 'default',
                 'job_id' => 'job-456',
                 'attempts' => 2,
             ]);
 
         (new LogTimedOutQueueJob($logger))->handle(new JobTimedOut(
             'redis',
-            $this->queueJob('ai-imports', 'job-456', 2)
+            $this->queueJob('default', 'job-456', 2)
         ));
     }
 

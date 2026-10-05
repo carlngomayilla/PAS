@@ -211,6 +211,87 @@ class PlanningExcelImportServiceTest extends TestCase
         $this->assertFalse($preview['has_errors']);
     }
 
+    public function test_preview_breakdown_groups_rows_by_axis_and_service_with_quality_counts(): void
+    {
+        $preview = [
+            'rows' => [
+                ['status' => 'Valide', 'data' => ['ordre_axe' => 1, 'libelle_axe' => 'Axe 1', 'direction' => 'DSIC', 'service_unite' => 'SIRS']],
+                ['status' => 'Avertissement', 'data' => ['ordre_axe' => 1, 'libelle_axe' => 'Axe 1', 'direction' => 'DSIC', 'service_unite' => 'SIRS']],
+                ['status' => 'Erreur', 'data' => ['ordre_axe' => 2, 'libelle_axe' => 'Axe 2', 'direction' => 'DAF', 'service_unite' => 'Budget']],
+            ],
+        ];
+
+        $breakdown = app(PlanningExcelImportService::class)->previewBreakdown($preview);
+
+        $this->assertSame([
+            ['context' => '1', 'label' => 'Axe 1', 'total' => 2, 'valid' => 1, 'warnings' => 1, 'errors' => 0],
+            ['context' => '2', 'label' => 'Axe 2', 'total' => 1, 'valid' => 0, 'warnings' => 0, 'errors' => 1],
+        ], $breakdown['axes']);
+        $this->assertSame(2, $breakdown['services'][0]['total']);
+        $this->assertSame(1, $breakdown['services'][1]['errors']);
+    }
+
+    public function test_import_result_shows_batch_control_report_rejected_rows_and_breakdown(): void
+    {
+        $fixture = $this->fixture();
+        $preview = [
+            'rows' => [
+                [
+                    'line' => 2,
+                    'status' => 'Valide',
+                    'data' => [
+                        'ordre_axe' => 1,
+                        'libelle_axe' => 'Axe resultat',
+                        'direction' => 'DSIC',
+                        'service_unite' => 'SIRS',
+                        'libelle_action' => 'Action valide',
+                    ],
+                ],
+                [
+                    'line' => 3,
+                    'status' => 'Erreur',
+                    'message' => 'Service inexistant.',
+                    'data' => [
+                        'ordre_axe' => 2,
+                        'libelle_axe' => 'Axe rejete',
+                        'direction' => 'DSIC',
+                        'service_unite' => 'Service absent',
+                        'libelle_action' => 'Action rejetee',
+                    ],
+                ],
+            ],
+        ];
+        $import = PlanningImport::query()->create([
+            'user_id' => $fixture['admin']->id,
+            'role' => $fixture['admin']->effectiveRoleCode(),
+            'filename' => 'controle-resultat.xlsx',
+            'mode' => PlanningImport::MODE_SKIP_DUPLICATES,
+            'total_rows' => 2,
+            'valid_rows' => 1,
+            'error_rows' => 1,
+            'created_count' => 1,
+            'updated_count' => 0,
+            'skipped_count' => 1,
+            'status' => 'imported',
+            'preview_payload' => $preview,
+            'error_report' => [$preview['rows'][1]],
+            'ip_address' => '127.0.0.1',
+        ]);
+
+        $this->actingAs($fixture['admin'])
+            ->get(route('workspace.imports.result', $import))
+            ->assertOk()
+            ->assertSeeText('Bilan du lot d\'import #'.$import->id)
+            ->assertSee('controle-resultat.xlsx')
+            ->assertSee('Télécharger le rapport de validation')
+            ->assertSee('Ouvrir les lignes rejetées')
+            ->assertSee('Répartition importée par axe')
+            ->assertSee('Axe resultat')
+            ->assertSee('Répartition importée par service')
+            ->assertSee('Service absent')
+            ->assertSee('Voir les PTA');
+    }
+
     public function test_column_mapping_allows_custom_source_headers_before_preview(): void
     {
         $this->fixture();

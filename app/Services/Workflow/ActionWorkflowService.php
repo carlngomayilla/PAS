@@ -12,13 +12,14 @@ use Illuminate\Support\Facades\DB;
 /**
  * Orchestrateur du workflow de suivi V2 (cf. docs/WORKFLOW-SUIVI-V2.md).
  *
- * Cycle : non_demarre → en_cours → chef → controleur → valide / correction.
+ * Cycle : non_demarre → en_cours → chef → planification → SCIQ → valide / correction.
  *
  *   - record*Progress() : enregistrement brouillon (Save). Recalcule la
  *     performance PROVISOIRE. Aucune contrainte.
  *   - submit*()         : soumission au chef (Submit). Vérifie la conformité.
  *   - reviewAction()    : visa du chef et ajustement motive eventuel.
- *   - reviewActionByController() : décision finale et performance officielle.
+ *   - reviewActionByPlanification() : contrôle intermédiaire après le chef.
+ *   - reviewActionByController() : visa SCIQ final et performance officielle.
  *
  * Délègue tout le calcul à ActionPerformanceCalculator (service pur).
  */
@@ -149,6 +150,18 @@ class ActionWorkflowService
 
         $this->log($action, 'action_soumise_validation', 'Action soumise au chef de service.', $actor, [
             'progression_provisoire' => $provisional,
+            // Journal de la version soumise : le statut verrouille ensuite la
+            // saisie agent jusqu'a un retour motive. La table de snapshots
+            // dediee n'est pas necessaire pour la premiere tranche : le journal
+            // immuable conserve deja les faits examines par les valideurs.
+            'execution_snapshot' => [
+                'quantite_realisee' => $action->quantite_realisee,
+                'progression_reelle' => $action->progression_reelle,
+                'commentaire' => $data['commentaire'] ?? null,
+                'difficulte' => $data['difficulte'] ?? null,
+                'has_new_proof' => (bool) ($data['has_new_proof'] ?? false),
+                'submitted_at' => now()->toISOString(),
+            ],
         ]);
 
         return $action->refresh();
@@ -172,7 +185,11 @@ class ActionWorkflowService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ((string) $action->statut_validation !== ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+            $validationStatus = (string) $action->statut_validation;
+            if (! in_array($validationStatus, [
+                ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
+            ], true)) {
                 throw new \InvalidArgumentException('Cette action n est pas en attente de validation du chef.');
             }
 
@@ -184,8 +201,44 @@ class ActionWorkflowService
                 throw new \InvalidArgumentException('Le visa du chef doit etre pose par un autre intervenant que le responsable de l action.');
             }
 
+            if ($validationStatus === ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION) {
+                if (! $approve) {
+                    throw new \InvalidArgumentException('Le Chef doit accepter le retour de la Planification avant de renvoyer l action a l agent.');
+                }
+
+                return $this->applyChefReturnDecision($action, $motif, $actor);
+            }
+
             return $this->applyChefDecision($action, $approve, $motif, $actor, $progressPercent);
         });
+    }
+
+    /**
+     * Accuse réception d'un rejet Planification et ouvre la correction agent.
+     */
+    private function applyChefReturnDecision(Action $action, ?string $motif, ?User $actor): Action
+    {
+        if (trim((string) $motif) === '') {
+            throw new \InvalidArgumentException('Une observation est obligatoire pour accepter le retour de la Planification.');
+        }
+
+        $action->forceFill([
+            'statut_validation' => ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            'statut' => ActionTrackingService::STATUS_A_CORRIGER,
+            'statut_dynamique' => ActionTrackingService::STATUS_A_CORRIGER,
+            'motif_validation_chef' => trim((string) $motif),
+            'evalue_le' => now(),
+            'evalue_par' => $actor?->id,
+        ])->save();
+
+        $this->log($action, 'retour_planification_accepte_chef', 'Le Chef accepte le retour de la Planification et ouvre la correction de l agent.', $actor, [
+            'decision' => 'accepter_rejet',
+            'motif' => trim((string) $motif),
+            'from_status' => ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
+            'to_status' => ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+        ], 'responsable');
+
+        return $action->refresh();
     }
 
     /**
@@ -213,7 +266,7 @@ class ActionWorkflowService
             $action->forceFill([
                 'chef_progress_percent' => $proposed,
                 'chef_adjustment_reason' => $wasAdjusted ? trim((string) $motif) : null,
-                'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
                 'statut' => ActionTrackingService::STATUS_EN_COURS,
                 'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
                 'evalue_le' => now(),
@@ -221,11 +274,11 @@ class ActionWorkflowService
                 'motif_validation_chef' => $motif,
             ])->save();
 
-            $this->log($action, 'action_transmise_controle', 'Action visee par le chef et transmise au controleur.', $actor, [
+            $this->log($action, 'action_transmise_planification', 'Action visee par le chef et transmise a la planification.', $actor, [
                 'progression_calculee' => $provisional,
                 'progression_proposee' => $proposed,
                 'ajustement' => $wasAdjusted,
-            ], 'controleur');
+            ], 'planification');
 
             return $action->refresh();
         }
@@ -246,6 +299,9 @@ class ActionWorkflowService
         return $action->refresh();
     }
 
+    /**
+     * Visa SCIQ final : la Planification doit avoir validé avant cette étape.
+     */
     public function reviewActionByController(
         Action $action,
         bool $approve,
@@ -262,9 +318,14 @@ class ActionWorkflowService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ((string) $lockedAction->statut_validation !== ActionTrackingService::VALIDATION_SOUMISE_CONTROLE) {
-                throw new \InvalidArgumentException('Cette action n est pas en attente de controle.');
+            if (! in_array((string) $lockedAction->statut_validation, [
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_REEXAMEN_SCIQ,
+            ], true)) {
+                throw new \InvalidArgumentException('Cette action n est pas en attente du controle final SCIQ.');
             }
+
+            $fromStatus = (string) $lockedAction->statut_validation;
 
             if ($lockedAction->isResponsible($actor)
                 || (int) ($lockedAction->soumise_par ?? 0) === (int) $actor->id
@@ -274,35 +335,42 @@ class ActionWorkflowService
             }
 
             if ($approve) {
-                // Circuit a 3 visas : le controleur (SCIQ) ne cloture plus l'action,
-                // il la transmet a la planification qui realise la validation finale.
+                // Circuit cible : Chef -> Planification -> SCIQ. Le SCIQ est le
+                // dernier visa et rend la performance officielle.
                 $provisional = (float) ($lockedAction->chef_progress_percent
                     ?? $this->calculator->provisionalPerformance($lockedAction));
 
                 $lockedAction->forceFill([
-                    'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
-                    'statut' => ActionTrackingService::STATUS_EN_COURS,
-                    'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+                    'official_progress_percent' => $provisional,
+                    'progression_reelle' => $provisional,
+                    'statut_performance' => $this->calculator->performanceStatus($provisional),
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+                    'statut' => ActionTrackingService::STATUS_CLOTUREE,
+                    'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
                     'controle_decision' => 'valider',
                     'controle_comment' => $comment,
                     'controle_reviewed_by' => $actor->id,
                     'controle_reviewed_at' => now(),
+                    'date_fin_reelle' => $lockedAction->date_fin_reelle
+                        ?: ($lockedAction->historical_execution_recorded_at !== null ? null : now()->toDateString()),
+                    'cloture_le' => now(),
+                    'cloture_par' => $actor->id,
                 ])->save();
 
                 $this->log(
                     $lockedAction,
-                    'action_transmise_planification',
-                    'Action visee par le controle et transmise a la planification.',
+                    'action_validee_controle',
+                    'Action validee par le SCIQ : cloture officielle.',
                     $actor,
-                    ['performance_provisoire' => $provisional],
-                    'planification'
+                    ['performance_officielle' => $provisional],
+                    'responsable'
                 );
 
                 return $lockedAction->refresh();
             }
 
             $lockedAction->forceFill([
-                'statut_validation' => ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+                'statut_validation' => ActionTrackingService::VALIDATION_RETOUR_SCIQ,
                 'statut' => ActionTrackingService::STATUS_A_CORRIGER,
                 'statut_dynamique' => ActionTrackingService::STATUS_A_CORRIGER,
                 'controle_decision' => 'rejeter',
@@ -322,18 +390,133 @@ class ActionWorkflowService
                     ]);
             }
 
-            $this->log($lockedAction, 'action_rejetee_controle', 'Action renvoyee par le controleur pour correction.', $actor, [
+            $this->log($lockedAction, 'action_rejetee_controle', 'Action renvoyee par le SCIQ pour arbitrage de la planification.', $actor, [
                 'motif' => $comment,
-            ], 'responsable');
+                'decision' => 'retour_sciq',
+                'from_status' => $fromStatus,
+                'to_status' => ActionTrackingService::VALIDATION_RETOUR_SCIQ,
+            ], 'planification');
 
             return $lockedAction->refresh();
         });
     }
 
     /**
-     * Validation finale par la planification : troisieme et dernier visa du
-     * circuit (chef de service -> controle SCIQ -> planification). C'est ce visa
-     * qui cloture officiellement l'action et fige sa performance officielle.
+     * Arbitrage Planification d'un retour SCIQ : accepter le retour vers le
+     * Chef, ou contester et renvoyer le dossier au SCIQ pour réexamen.
+     */
+    public function reviewSciqReturnByPlanification(
+        Action $action,
+        string $decision,
+        ?string $comment,
+        User $actor
+    ): Action {
+        if (! in_array($decision, ['accepter_rejet', 'contester'], true)) {
+            throw new \InvalidArgumentException('La décision Planification doit être accepter_rejet ou contester.');
+        }
+        if (trim((string) $comment) === '') {
+            throw new \InvalidArgumentException('Le motif est obligatoire pour arbitrer le retour SCIQ.');
+        }
+
+        return DB::transaction(function () use ($action, $decision, $comment, $actor): Action {
+            $lockedAction = Action::query()->whereKey($action->getKey())->lockForUpdate()->firstOrFail();
+            if ((string) $lockedAction->statut_validation !== ActionTrackingService::VALIDATION_RETOUR_SCIQ) {
+                throw new \InvalidArgumentException('Cette action n est pas en attente d arbitrage Planification.');
+            }
+
+            $toStatus = $decision === 'accepter_rejet'
+                ? ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION
+                : ActionTrackingService::VALIDATION_REEXAMEN_SCIQ;
+            $lockedAction->forceFill([
+                'statut_validation' => $toStatus,
+                'statut' => $decision === 'accepter_rejet'
+                    ? ActionTrackingService::STATUS_A_CORRIGER
+                    : ActionTrackingService::STATUS_EN_COURS,
+                'statut_dynamique' => $decision === 'accepter_rejet'
+                    ? ActionTrackingService::STATUS_A_CORRIGER
+                    : ActionTrackingService::STATUS_EN_COURS,
+            ])->save();
+
+            $this->log(
+                $lockedAction,
+                $decision === 'accepter_rejet' ? 'retour_sciq_accepte_planification' : 'retour_sciq_conteste_planification',
+                $decision === 'accepter_rejet'
+                    ? 'La Planification accepte le retour SCIQ et le transmet au Chef.'
+                    : 'La Planification conteste le retour SCIQ et demande un réexamen.',
+                $actor,
+                [
+                    'decision' => $decision,
+                    'motif' => trim((string) $comment),
+                    'from_status' => ActionTrackingService::VALIDATION_RETOUR_SCIQ,
+                    'to_status' => $toStatus,
+                ],
+                $decision === 'accepter_rejet' ? 'chef_service' : 'controleur'
+            );
+
+            return $lockedAction->refresh();
+        });
+    }
+
+    /**
+     * Arbitrage Chef d'un retour SCIQ accepté par la Planification.
+     */
+    public function reviewSciqReturnByChef(
+        Action $action,
+        string $decision,
+        ?string $comment,
+        User $actor
+    ): Action {
+        if (! in_array($decision, ['accepter_rejet', 'contester'], true)) {
+            throw new \InvalidArgumentException('La décision Chef doit être accepter_rejet ou contester.');
+        }
+        if (trim((string) $comment) === '') {
+            throw new \InvalidArgumentException('Le motif est obligatoire pour arbitrer le retour SCIQ.');
+        }
+
+        return DB::transaction(function () use ($action, $decision, $comment, $actor): Action {
+            $lockedAction = Action::query()->whereKey($action->getKey())->lockForUpdate()->firstOrFail();
+            if ((string) $lockedAction->statut_validation !== ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION) {
+                throw new \InvalidArgumentException('Cette action n est pas en attente d arbitrage du Chef.');
+            }
+
+            if ($decision !== 'accepter_rejet') {
+                throw new \InvalidArgumentException('Le Chef ne peut pas contester ce retour. Il doit accepter le rejet avant correction agent.');
+            }
+
+            $toStatus = ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE;
+            $lockedAction->forceFill([
+                'statut_validation' => $toStatus,
+                'statut' => $decision === 'accepter_rejet'
+                    ? ActionTrackingService::STATUS_A_CORRIGER
+                    : ActionTrackingService::STATUS_EN_COURS,
+                'statut_dynamique' => $decision === 'accepter_rejet'
+                    ? ActionTrackingService::STATUS_A_CORRIGER
+                    : ActionTrackingService::STATUS_EN_COURS,
+                'motif_validation_chef' => trim((string) $comment),
+            ])->save();
+
+            $this->log(
+                $lockedAction,
+                'retour_sciq_accepte_chef',
+                'Le Chef accepte le retour SCIQ et renvoie l action à l agent.',
+                $actor,
+                [
+                    'decision' => $decision,
+                    'motif' => trim((string) $comment),
+                    'from_status' => ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
+                    'to_status' => $toStatus,
+                ],
+                'responsable'
+            );
+
+            return $lockedAction->refresh();
+        });
+    }
+
+    /**
+     * Visa intermédiaire de la planification : deuxième visa du circuit
+     * (chef de service -> planification -> contrôle SCIQ). La Planification ne
+     * clôture jamais l'action ; elle la transmet au contrôle SCIQ.
      */
     public function reviewActionByPlanification(
         Action $action,
@@ -358,9 +541,8 @@ class ActionWorkflowService
             if ($lockedAction->isResponsible($actor)
                 || (int) ($lockedAction->soumise_par ?? 0) === (int) $actor->id
                 || (int) ($lockedAction->evalue_par ?? 0) === (int) $actor->id
-                || (int) ($lockedAction->controle_reviewed_by ?? 0) === (int) $actor->id
             ) {
-                throw new \InvalidArgumentException('La validation finale doit etre realisee par un autre intervenant.');
+                throw new \InvalidArgumentException('La validation planification doit etre realisee par un autre intervenant.');
             }
 
             if ($approve) {
@@ -368,32 +550,25 @@ class ActionWorkflowService
                     ?? $this->calculator->provisionalPerformance($lockedAction));
 
                 $lockedAction->forceFill([
-                    'official_progress_percent' => $official,
-                    'progression_reelle' => $official,
-                    'statut_performance' => $this->calculator->performanceStatus($official),
-                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
-                    'statut' => ActionTrackingService::STATUS_CLOTUREE,
-                    'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
-                    'date_fin_reelle' => $lockedAction->date_fin_reelle
-                        ?: ($lockedAction->historical_execution_recorded_at !== null ? null : now()->toDateString()),
-                    'cloture_le' => now(),
-                    'cloture_par' => $actor->id,
+                    'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                    'statut' => ActionTrackingService::STATUS_EN_COURS,
+                    'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
                 ])->save();
 
                 $this->log(
                     $lockedAction,
-                    'action_validee_planification',
-                    'Action validee par la planification : cloture officielle.',
+                    'action_transmise_controle',
+                    'Action validee par la planification et transmise au SCIQ pour visa final.',
                     $actor,
-                    ['performance_officielle' => $official],
-                    'responsable'
+                    ['performance_provisoire' => $official],
+                    'controleur'
                 );
 
                 return $lockedAction->refresh();
             }
 
             $lockedAction->forceFill([
-                'statut_validation' => ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+                'statut_validation' => ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
                 'statut' => ActionTrackingService::STATUS_A_CORRIGER,
                 'statut_dynamique' => ActionTrackingService::STATUS_A_CORRIGER,
             ])->save();
@@ -412,10 +587,15 @@ class ActionWorkflowService
             $this->log(
                 $lockedAction,
                 'action_rejetee_planification',
-                'Action renvoyee par la planification pour correction.',
+                'Action renvoyee par la Planification au Chef pour arbitrage avant correction.',
                 $actor,
-                ['motif' => $comment],
-                'responsable'
+                [
+                    'motif' => $comment,
+                    'decision' => 'rejeter',
+                    'from_status' => ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
+                    'to_status' => ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
+                ],
+                'chef_service'
             );
 
             return $lockedAction->refresh();

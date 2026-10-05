@@ -36,15 +36,6 @@ class RolePermissionSettings
             'planning.write.service' => ['group' => 'Planification', 'label' => 'Écrire en service', 'description' => 'Modifier la planification de son service.', 'sensitive' => false],
             'planning.strategic.manage' => ['group' => 'Planification', 'label' => 'Piloter le stratégique', 'description' => 'Gérer les elements stratégiques et validations avancees.', 'sensitive' => true],
             'pta.control' => ['group' => 'Pilotage', 'label' => 'Controler le Suivi PTA', 'description' => 'Acceder a la page officielle Suivi PTA, aux details et aux exports.', 'sensitive' => true],
-            'ai_pta_import.view' => ['group' => 'IA & Imports', 'label' => 'Voir imports IA PTA', 'description' => 'Acceder au module IA d import PTA.', 'sensitive' => false],
-            'ai_pta_import.upload' => ['group' => 'IA & Imports', 'label' => 'Charger PTA IA', 'description' => 'Deposer un fichier PTA pour extraction IA.', 'sensitive' => false],
-            'ai_pta_import.analyze' => ['group' => 'IA & Imports', 'label' => 'Analyser PTA IA', 'description' => 'Lancer extraction, normalisation et validation IA.', 'sensitive' => true],
-            'ai_pta_import.preview' => ['group' => 'IA & Imports', 'label' => 'Previsualiser PTA IA', 'description' => 'Voir les lignes extraites avant import.', 'sensitive' => false],
-            'ai_pta_import.correct' => ['group' => 'IA & Imports', 'label' => 'Corriger PTA IA', 'description' => 'Modifier ou ignorer les lignes invalides.', 'sensitive' => true],
-            'ai_pta_import.validate' => ['group' => 'IA & Imports', 'label' => 'Valider PTA IA', 'description' => 'Valider les lignes normalisees avant import.', 'sensitive' => true],
-            'ai_pta_import.import' => ['group' => 'IA & Imports', 'label' => 'Importer PTA IA', 'description' => 'Executer l import final apres validation humaine.', 'sensitive' => true],
-            'ai_pta_import.export' => ['group' => 'IA & Imports', 'label' => 'Exporter PTA IA', 'description' => 'Telecharger le classeur normalise et les erreurs.', 'sensitive' => false],
-            'ai_pta_import.history' => ['group' => 'IA & Imports', 'label' => 'Historique imports IA', 'description' => 'Consulter l historique des imports IA PTA.', 'sensitive' => false],
             'reporting.read' => ['group' => 'Pilotage', 'label' => 'Voir le reporting', 'description' => 'Accéder au hub reporting et aux exports.', 'sensitive' => false],
             'ai_reports.view' => ['group' => 'Rapports IA', 'label' => 'Voir rapports IA', 'description' => 'Acceder aux rapports generes par IA.', 'sensitive' => false],
             'ai_reports.generate' => ['group' => 'Rapports IA', 'label' => 'Generer rapports IA', 'description' => 'Generer un brouillon de rapport depuis les metriques Laravel.', 'sensitive' => true],
@@ -223,7 +214,6 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 ...$this->aiReportPermissions(),
                 'alerts.read',
@@ -270,7 +260,6 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 ...$this->aiReportPermissions(),
                 'alerts.read',
@@ -289,7 +278,6 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 ...$this->aiReportPermissions(),
                 'alerts.read',
@@ -301,7 +289,6 @@ class RolePermissionSettings
             User::ROLE_DIRECTION => [
                 'planning.read',
                 'planning.write.direction',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 'ai_reports.view',
                 'ai_reports.generate',
@@ -314,7 +301,6 @@ class RolePermissionSettings
             User::ROLE_SERVICE => [
                 'planning.read',
                 'planning.write.service',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 'ai_reports.view',
                 'ai_reports.generate',
@@ -327,7 +313,6 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE => [
                 'planning.read',
                 'planning.write.service',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 'ai_reports.view',
                 'ai_reports.generate',
@@ -376,7 +361,6 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 ...$this->aiReportPermissions(),
                 'alerts.read',
@@ -404,7 +388,6 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 ...$this->aiReportPermissions(),
                 'alerts.read',
@@ -425,7 +408,6 @@ class RolePermissionSettings
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 ...$this->aiReportPermissions(),
                 'alerts.read',
@@ -444,7 +426,6 @@ class RolePermissionSettings
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 ...$this->aiReportPermissions(),
                 'alerts.read',
@@ -471,7 +452,6 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE_DGA => [
                 'planning.read',
                 'planning.write.service',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 'ai_reports.view',
                 'ai_reports.generate',
@@ -499,7 +479,6 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE_CABINET => [
                 'planning.read',
                 'planning.write.service',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 'ai_reports.view',
                 'ai_reports.generate',
@@ -513,7 +492,6 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE_UCAS => [
                 'planning.read',
                 'planning.write.service',
-                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
                 'ai_reports.view',
                 'ai_reports.generate',
@@ -619,7 +597,6 @@ class RolePermissionSettings
             'planning.write.service',
             'planning.strategic.manage',
             'pta.control',
-            ...$this->aiPtaImportPermissions(),
             'reporting.read',
             ...$this->aiReportPermissions(),
             'alerts.read',
@@ -635,24 +612,6 @@ class RolePermissionSettings
         $this->resolved = null;
         $this->tableAvailable = null;
         SchemaIntrospectionCache::flush();
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function aiPtaImportPermissions(): array
-    {
-        return [
-            'ai_pta_import.view',
-            'ai_pta_import.upload',
-            'ai_pta_import.analyze',
-            'ai_pta_import.preview',
-            'ai_pta_import.correct',
-            'ai_pta_import.validate',
-            'ai_pta_import.import',
-            'ai_pta_import.export',
-            'ai_pta_import.history',
-        ];
     }
 
     /**

@@ -48,7 +48,7 @@ class HorizonConfigurationTest extends TestCase
     {
         $this->assertSame('horizon_meta', config('horizon.use'));
         $this->assertSame(
-            ['redis:notifications', 'redis:exports', 'redis:ai-imports', 'redis:default'],
+            ['redis:notifications', 'redis:exports', 'redis:default'],
             array_keys((array) config('horizon.waits'))
         );
         $this->assertContains(

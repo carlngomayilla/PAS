@@ -29,6 +29,11 @@ class PlanningClosureWorkflowTest extends TestCase
         $fixture = $this->planningFixture();
 
         $this->actingAs($superAdmin)
+            ->get(route('workspace.pao.index', ['statut' => $fixture['pao']->statut]))
+            ->assertOk()
+            ->assertSee('PAO filtrés');
+
+        $this->actingAs($superAdmin)
             ->from(route('workspace.pao.index'))
             ->post(route('workspace.pao.close', $fixture['pao']), [
                 'motif' => 'Cloture fin exercice',
@@ -72,12 +77,22 @@ class PlanningClosureWorkflowTest extends TestCase
         $this->assertSame(Pas::STATUS_CLOTURE, $fixture['pas']->fresh()->statut);
 
         $this->actingAs($superAdmin)
+            ->get(route('workspace.pas.index', ['statut' => Pas::STATUS_CLOTURE]))
+            ->assertOk()
+            ->assertSee(route('workspace.pas.archive', $fixture['pas']), false)
+            ->assertSee('PAS filtrés');
+
+        $this->actingAs($superAdmin)
             ->post(route('workspace.pas.archive', $fixture['pas']), [
                 'motif' => 'Archivage manuel apres cloture',
             ])
             ->assertRedirect(route('workspace.pas.index'));
 
         $this->assertSame(Pas::STATUS_ARCHIVE, $fixture['pas']->fresh()->statut);
+        $this->actingAs($superAdmin)
+            ->get(route('workspace.pas.index', ['statut' => Pas::STATUS_ARCHIVE]))
+            ->assertOk()
+            ->assertDontSee(route('workspace.pas.archive', $fixture['pas']), false);
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'pas',
             'action' => 'archive',

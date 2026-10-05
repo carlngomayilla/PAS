@@ -42,7 +42,6 @@ return [
         'windows_ocr_max_pages' => (int) env('AI_PTA_WINDOWS_OCR_MAX_PAGES', 0),
         'windows_ocr_render_width' => (int) env('AI_PTA_WINDOWS_OCR_RENDER_WIDTH', 2600),
         'windows_ocr_timeout' => (int) env('AI_PTA_WINDOWS_OCR_TIMEOUT', 300),
-        'import_queue' => env('AI_PTA_IMPORT_QUEUE', 'ai-imports'),
         'import_job_timeout' => (int) env('AI_PTA_IMPORT_JOB_TIMEOUT', 1200),
         'import_memory_limit' => env('AI_PTA_IMPORT_MEMORY_LIMIT', env('AI_PTA_EXCEL_MEMORY_LIMIT', '512M')),
         'excel_memory_limit' => env('AI_PTA_EXCEL_MEMORY_LIMIT', '512M'),

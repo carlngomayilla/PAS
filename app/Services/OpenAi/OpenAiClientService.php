@@ -42,7 +42,7 @@ class OpenAiClientService
         string $input,
         array $jsonSchema,
         ?User $user = null,
-        string $module = 'ai_import',
+        string $module = 'ai_report',
         ?string $model = null,
         bool $highCapability = false
     ): array {

@@ -5,12 +5,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\Web\ActionTrackingWebController;
 use App\Http\Controllers\Web\ActionWebController;
-use App\Http\Controllers\Web\AiImportController;
-use App\Http\Controllers\Web\AiImportReviewController;
-use App\Http\Controllers\Web\AiPtaImportController;
-use App\Http\Controllers\Web\AiPtaImportHistoryController;
-use App\Http\Controllers\Web\AiPtaImportPreviewController;
-use App\Http\Controllers\Web\AiPtaImportValidationController;
 use App\Http\Controllers\Web\AiReportController;
 use App\Http\Controllers\Web\AiReportExportController;
 use App\Http\Controllers\Web\AiReportGenerationController;
@@ -27,7 +21,6 @@ use App\Http\Controllers\Web\HistoricalExecutionImportWebController;
 use App\Http\Controllers\Web\InstitutionalReportWebController;
 use App\Http\Controllers\Web\KpiMesureWebController;
 use App\Http\Controllers\Web\KpiWebController;
-use App\Http\Controllers\Web\MeetingWebController;
 use App\Http\Controllers\Web\MonitoringWebController;
 use App\Http\Controllers\Web\NotificationWebController;
 use App\Http\Controllers\Web\PaoWebController;
@@ -149,43 +142,22 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::get('/workspace/mes-taches', [PersonalTaskWebController::class, 'index'])
             ->name('workspace.tasks.index');
 
-        Route::prefix('/workspace/reunions')->name('workspace.meetings.')->group(function (): void {
-            Route::get('/', [MeetingWebController::class, 'index'])->name('index');
-            Route::post('/objectifs', [MeetingWebController::class, 'storePlan'])->name('plans.store');
-            Route::post('/', [MeetingWebController::class, 'store'])->name('store');
-            Route::get('/{meeting}', [MeetingWebController::class, 'show'])->whereNumber('meeting')->name('show');
-            Route::post('/{meeting}/reporter', [MeetingWebController::class, 'postpone'])->whereNumber('meeting')->name('postpone');
-            Route::post('/{meeting}/annuler', [MeetingWebController::class, 'cancel'])->whereNumber('meeting')->name('cancel');
-            Route::post('/{meeting}/pv', [MeetingWebController::class, 'submitReport'])->whereNumber('meeting')->name('reports.store');
-            Route::post('/{meeting}/pv/{meetingReport}/viser', [MeetingWebController::class, 'reviewReport'])
-                ->whereNumber(['meeting', 'meetingReport'])
-                ->name('reports.review');
-            Route::get('/{meeting}/pv/{meetingReport}/telecharger', [MeetingWebController::class, 'downloadReport'])
-                ->whereNumber(['meeting', 'meetingReport'])
-                ->middleware('throttle:api-downloads')
-                ->name('reports.download');
-        });
+        foreach (['reunions', 'ai-imports'] as $retiredModule) {
+            Route::any('/workspace/'.$retiredModule.'/{path?}', static function (): never {
+                abort(410, 'Ce module a été retiré de l’application.');
+            })->where('path', '.*');
+        }
 
         Route::get('/workspace/rapports', [InstitutionalReportWebController::class, 'index'])
             ->name('workspace.reports.index');
         Route::post('/workspace/rapports', [InstitutionalReportWebController::class, 'store'])
             ->name('workspace.reports.store');
-        Route::get('/workspace/rapports/export/{format}', [InstitutionalReportWebController::class, 'export'])
-            ->name('workspace.reports.export');
         Route::get('/workspace/rapports/{institutionalReport}', [InstitutionalReportWebController::class, 'show'])
             ->name('workspace.reports.show');
         Route::post('/workspace/rapports/{institutionalReport}/soumettre', [InstitutionalReportWebController::class, 'submit'])
             ->name('workspace.reports.submit');
         Route::post('/workspace/rapports/{institutionalReport}/corriger', [InstitutionalReportWebController::class, 'resubmit'])
             ->name('workspace.reports.resubmit');
-        Route::post('/workspace/rapports/{institutionalReport}/reporter', [InstitutionalReportWebController::class, 'postpone'])
-            ->name('workspace.reports.postpone');
-        Route::post('/workspace/rapports/{institutionalReport}/annuler', [InstitutionalReportWebController::class, 'cancel'])
-            ->name('workspace.reports.cancel');
-        Route::post('/workspace/rapports/{institutionalReport}/decisions', [InstitutionalReportWebController::class, 'storeDecision'])
-            ->name('workspace.reports.decisions.store');
-        Route::patch('/workspace/rapports/{institutionalReport}/decisions/{decision}', [InstitutionalReportWebController::class, 'updateDecision'])
-            ->name('workspace.reports.decisions.update');
         Route::post('/workspace/rapports/{institutionalReport}/verification', [InstitutionalReportWebController::class, 'review'])
             ->name('workspace.reports.review');
         Route::get('/workspace/rapports/{institutionalReport}/pieces/{justificatif}/telecharger', [InstitutionalReportWebController::class, 'download'])
@@ -308,27 +280,6 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::get('imports-excel/{import}/erreurs', [PlanningImportWebController::class, 'errors'])->name('imports.errors');
             Route::get('imports-excel/{import}/rapport-erreurs', [PlanningImportWebController::class, 'errorReport'])->name('imports.error-report');
             Route::delete('imports-excel/{import}', [PlanningImportWebController::class, 'destroy'])->name('imports.destroy');
-
-            Route::prefix('ai-imports')->name('ai-imports.')->group(function (): void {
-                Route::get('/', [AiImportController::class, 'index'])->name('index');
-                Route::post('/upload', [AiImportController::class, 'store'])->name('upload');
-                Route::post('/{session}/analyze', [AiImportController::class, 'analyze'])->whereNumber('session')->name('analyze');
-                Route::get('/{session}/review', [AiImportReviewController::class, 'show'])->whereNumber('session')->name('review');
-                Route::patch('/{session}/rows/{row}', [AiImportReviewController::class, 'updateRow'])->whereNumber(['session', 'row'])->name('rows.update');
-                Route::post('/{session}/validate', [AiImportReviewController::class, 'validateSession'])->whereNumber('session')->name('validate');
-                Route::post('/{session}/import', [AiImportReviewController::class, 'executeImport'])->whereNumber('session')->name('import');
-                Route::get('/{session}/excel', [AiImportController::class, 'downloadExcel'])->whereNumber('session')->name('excel');
-
-                Route::get('/pta', [AiPtaImportController::class, 'index'])->name('pta.index');
-                Route::post('/pta/upload', [AiPtaImportController::class, 'upload'])->name('pta.upload');
-                Route::post('/pta/{batch}/analyze', [AiPtaImportController::class, 'analyze'])->name('pta.analyze');
-                Route::get('/pta/{batch}/preview', [AiPtaImportPreviewController::class, 'show'])->name('pta.preview');
-                Route::patch('/pta/{batch}/rows/{row}', [AiPtaImportValidationController::class, 'updateRow'])->name('pta.rows.update');
-                Route::post('/pta/{batch}/validate', [AiPtaImportValidationController::class, 'validateBatch'])->name('pta.validate');
-                Route::post('/pta/{batch}/import', [AiPtaImportValidationController::class, 'import'])->name('pta.import');
-                Route::get('/pta/{batch}/excel', [AiPtaImportController::class, 'downloadExcel'])->name('pta.excel');
-                Route::get('/history', [AiPtaImportHistoryController::class, 'index'])->name('history');
-            });
 
             Route::prefix('ai-reports')->name('ai-reports.')->group(function (): void {
                 Route::get('/', [AiReportController::class, 'index'])->name('index');

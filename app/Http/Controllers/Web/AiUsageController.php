@@ -16,7 +16,7 @@ class AiUsageController extends Controller
 
     public function index(Request $request): View
     {
-        abort_unless($request->user()?->hasPermission('ai_reports.view') || $request->user()?->hasPermission('ai_pta_import.view'), 403);
+        abort_unless($request->user()?->hasPermission('ai_reports.view'), 403);
 
         $logs = AiUsageLog::query()->with('user:id,name,email')->latest()->paginate(25);
 

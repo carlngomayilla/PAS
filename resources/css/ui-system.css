@@ -62,7 +62,7 @@ html.dark .dashboard-flow-tone {
 
 /* 1. Aucun bouton/lien d'un tableau ne doit se casser lettre par lettre
       (« Ex/pl/or/er », « Dét/ails », « Mod/ifi/er »). */
-:where(.app-table, .data-table, .dashboard-table) td :where(.btn, .btn-sm, a, button, summary),
+:where(.app-table, .data-table, .dashboard-table) td :where(.app-btn, .btn, .btn-sm, a[role="button"], button, summary),
 :where(.app-table, .data-table, .dashboard-table) th :where(.btn, .btn-sm, button) {
     white-space: nowrap !important;
     word-break: keep-all !important;
@@ -975,6 +975,51 @@ html.dark body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.
     }
 }
 
+/*
+ * Dark institutional surfaces must keep their text and links readable.
+ * Some legacy dashboard rules are loaded before this system layer and can
+ * otherwise reintroduce light cards or light text when the theme is toggled.
+ */
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-tab-active {
+    background: #2563a0 !important;
+    color: #f8fafc !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-tab-inactive {
+    background: #152b40 !important;
+    color: #d7e5ee !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-tab-inactive:hover {
+    background: #1b344a !important;
+    color: #f8fafc !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-priority-summary a {
+    color: #93c5fd !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-priority-item {
+    background: #162033 !important;
+    color: #f8fafc !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-priority-label {
+    color: #f8fafc !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-priority-meta {
+    color: #cbd5e1 !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .dashboard-priority-value {
+    color: #86efac !important;
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .showcase-panel-title {
+    color: #bfdbfe !important;
+}
+
 /* ==========================================================================
    Institutional design system v2
    Single semantic layer for the authenticated experience.
@@ -1561,18 +1606,19 @@ body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-tabl
     font-size: 0.84rem !important;
 }
 
-body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) thead th {
+html:root body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) thead th {
     padding: 0.8rem 0.9rem !important;
-    border-color: color-mix(in srgb, var(--ui-border) 42%, transparent) !important;
-    background: var(--ui-navy) !important;
-    color: #ffffff !important;
+    border-color: var(--ui-border-strong) !important;
+    background: var(--ui-surface-muted) !important;
+    color: var(--ui-text) !important;
     font-size: 0.78rem !important;
     font-weight: 680 !important;
     letter-spacing: 0.01em !important;
+    white-space: normal;
 }
 
-html.dark body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) thead th {
-    background: #0c344f !important;
+html.dark body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) thead th {
+    background: var(--ui-surface-muted) !important;
 }
 
 body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) tbody td {
@@ -1586,8 +1632,24 @@ body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-tabl
     background: var(--ui-surface-subtle) !important;
 }
 
-body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:hover td {
+body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:hover td,
+html:root body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:focus-within td {
     background: var(--ui-brand-soft) !important;
+}
+
+body[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:focus-within td:first-child {
+    box-shadow: inset 3px 0 0 var(--ui-brand);
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] :where(.app-table, .data-table, .dashboard-table, .data-table-controls, .enhanced-table-footer) :where(a, button, input, select, summary):focus-visible {
+    outline: 2px solid var(--ui-brand) !important;
+    outline-offset: 2px;
+}
+
+body[data-ui-version="institutional-v2"] :where(.app-table-wrapper, .table-wrap) {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    scrollbar-color: var(--ui-border-strong) var(--ui-surface-subtle);
 }
 
 body[data-ui-version="institutional-v2"] :where(.enhanced-table-footer, .data-table-results-count, .data-table-controls__label) {

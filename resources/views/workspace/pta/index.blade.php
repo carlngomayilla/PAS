@@ -12,12 +12,13 @@
             ->unique('id')
             ->sortBy('code')
             ->values();
+        $contextFilters = array_filter(collect($filters)->except(['statut', 'without_action'])->all(), static fn ($value): bool => $value !== null && $value !== '');
         $summaryCards = [
-            ['label' => 'Total PTA',            'value' => $ps['total'] ?? $rows->total(),   'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'En cours',             'value' => $ps['en_cours'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Controle SCIQ',        'value' => $ps['controle_sciq'] ?? 0,        'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'controle_sciq']), 'badge' => null, 'badge_tone' => (($ps['controle_sciq'] ?? 0) > 0 ? 'warning' : 'neutral')],
-            ['label' => 'Clotures',             'value' => $ps['clotures'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'cloture']),  'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Sans action',          'value' => $ps['sans_action'] ?? 0,          'meta' => null, 'href' => route('workspace.pta.index', ['without_action' => 1]),    'badge' => null, 'badge_tone' => ($ps['sans_action'] ?? 0) > 0 ? 'warning' : 'neutral'],
+            ['label' => 'Total PTA',            'value' => $ps['total'] ?? $rows->total(),   'meta' => null, 'href' => route('workspace.pta.index', $contextFilters),                             'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'En cours',             'value' => $ps['en_cours'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', array_merge($contextFilters, ['statut' => 'en_cours'])), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Controle SCIQ',        'value' => $ps['controle_sciq'] ?? 0,        'meta' => null, 'href' => route('workspace.pta.index', array_merge($contextFilters, ['statut' => 'controle_sciq'])), 'badge' => null, 'badge_tone' => (($ps['controle_sciq'] ?? 0) > 0 ? 'warning' : 'neutral')],
+            ['label' => 'Clotures',             'value' => $ps['clotures'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', array_merge($contextFilters, ['statut' => 'cloture'])),  'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Sans action',          'value' => $ps['sans_action'] ?? 0,          'meta' => null, 'href' => route('workspace.pta.index', array_merge($contextFilters, ['without_action' => 1])),    'badge' => null, 'badge_tone' => ($ps['sans_action'] ?? 0) > 0 ? 'warning' : 'neutral'],
         ];
         $workflowSteps = [
             ['status' => 'en_cours', 'label' => 'En cours', 'count' => $ps['en_cours'] ?? 0],
@@ -61,7 +62,7 @@
                 <p class="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Workflow valide</p>
                 <div class="mt-4 space-y-3">
                     @foreach ($workflowSteps as $step)
-                        <a href="{{ route('workspace.pta.index', ['statut' => $step['status']]) }}" class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-[#3996d3] hover:text-[#17324a]">
+                        <a href="{{ route('workspace.pta.index', array_merge($contextFilters, ['statut' => $step['status']])) }}" class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-[#3996d3] hover:text-[#17324a]">
                             <span>{{ $loop->iteration }}. {{ $step['label'] }}</span>
                             <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{{ $step['count'] }}</span>
                         </a>
@@ -87,6 +88,11 @@
     <section class="showcase-toolbar mb-4 app-screen-block">
         <div><h2 class="showcase-panel-title">Filtres</h2></div>
         <form method="GET" action="{{ route('workspace.pta.index') }}" class="mt-4" data-auto-filter-form>
+            <p class="mb-4 text-sm font-semibold text-slate-600 dark:text-slate-300">Exercice appliqué : {{ $filters['exercice'] === 'all' ? 'Tous les exercices' : $filters['exercice'] }}</p>
+            <input type="hidden" name="exercice" value="{{ $filters['exercice'] }}">
+            @if ($filters['objectif_operationnel_id'] !== null)
+                <input type="hidden" name="objectif_operationnel_id" value="{{ $filters['objectif_operationnel_id'] }}">
+            @endif
             <div class="showcase-filter-grid">
                 <div>
                     <label for="q">Recherche</label>

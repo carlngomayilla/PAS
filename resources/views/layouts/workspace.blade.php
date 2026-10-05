@@ -9,9 +9,7 @@
         str_starts_with($routeName, 'workspace.actions.financements') => 'Financements DAF',
         str_starts_with($routeName, 'workspace.actions.suivi') => 'Suivi des actions',
         str_starts_with($routeName, 'workspace.actions.') => 'Suivi des actions',
-        str_starts_with($routeName, 'workspace.meetings.') => 'Réunions & PV',
-        str_starts_with($routeName, 'workspace.imports.')
-            || str_starts_with($routeName, 'workspace.ai-imports.') => 'Imports',
+        str_starts_with($routeName, 'workspace.imports.') => 'Imports',
         $routeName === 'workspace.reporting'
             || str_starts_with($routeName, 'workspace.reporting.')
             || str_starts_with($routeName, 'workspace.ai-reports.') => 'Reporting',

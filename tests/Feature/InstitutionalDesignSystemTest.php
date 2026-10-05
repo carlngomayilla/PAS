@@ -47,6 +47,18 @@ class InstitutionalDesignSystemTest extends TestCase
         $this->assertStringContainsString('table[data-mobile-cards]', $styles);
     }
 
+    public function test_table_style_contract_keeps_linked_labels_wrappable_and_keyboard_rows_visible(): void
+    {
+        $styles = (string) file_get_contents(resource_path('css/ui-system.css'));
+
+        $this->assertStringNotContainsString('td :where(.btn, .btn-sm, a, button, summary)', $styles);
+        $this->assertStringContainsString('td :where(.app-btn, .btn, .btn-sm, a[role="button"], button, summary)', $styles);
+        $this->assertStringContainsString('tbody tr:focus-within td:first-child', $styles);
+        $this->assertStringContainsString('outline: 2px solid var(--ui-brand) !important;', $styles);
+        $this->assertStringContainsString('overscroll-behavior-x: contain;', $styles);
+        $this->assertStringContainsString('html.dark body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] :where(table.app-table, table.data-table, table.dashboard-table) thead th', $styles);
+    }
+
     public function test_dashboard_is_decision_first_and_uses_progressive_disclosure(): void
     {
         $commandCenter = (string) file_get_contents(resource_path('views/dashboard/partials/command-center.blade.php'));

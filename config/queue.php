@@ -100,10 +100,6 @@ return [
             'job_timeout' => 900,
             'supervisor_timeout' => 960,
         ],
-        'ai-imports' => [
-            'job_timeout' => 1260,
-            'supervisor_timeout' => 1320,
-        ],
         'default' => [
             'job_timeout' => 600,
             'supervisor_timeout' => 660,

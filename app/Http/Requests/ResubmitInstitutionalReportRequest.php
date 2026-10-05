@@ -17,8 +17,7 @@ class ResubmitInstitutionalReportRequest extends FormRequest
     {
         return $this->user() instanceof User
             && $this->route('institutionalReport') instanceof InstitutionalReport
-            && (app(InstitutionalReportingService::class)->canAmend($this->user(), $this->route('institutionalReport'))
-                || app(InstitutionalReportingService::class)->canPublishMeetingMinutes($this->user(), $this->route('institutionalReport')));
+            && app(InstitutionalReportingService::class)->canAmend($this->user(), $this->route('institutionalReport'));
     }
 
     /**
@@ -30,9 +29,6 @@ class ResubmitInstitutionalReportRequest extends FormRequest
     {
         return [
             'summary' => ['nullable', 'string', 'max:5000'],
-            'held_at' => ['nullable', 'date', 'after_or_equal:scheduled_at'],
-            'actual_agenda' => ['nullable', 'string', 'max:5000'],
-            'decisions' => ['nullable', 'string', 'max:10000'],
             'recommendations' => ['nullable', 'string', 'max:5000'],
             'difficulties' => ['nullable', 'string', 'max:5000'],
             'observations' => ['nullable', 'string', 'max:5000'],

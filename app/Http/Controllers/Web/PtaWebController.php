@@ -65,7 +65,8 @@ class PtaWebController extends Controller
         $query = Pta::query();
 
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
-        app(ExerciceContext::class)->applyToPta($query);
+        $exerciceContext = app(ExerciceContext::class);
+        $exerciceContext->applyToPta($query);
 
         $query->when(
             $request->filled('pao_id'),
@@ -145,6 +146,7 @@ class PtaWebController extends Controller
             'canWrite' => $this->canWrite($user),
             'canControlPta' => $this->canControlPta($user),
             'filters' => [
+                'exercice' => $exerciceContext->selectedYear() ?? 'all',
                 'q' => (string) $request->string('q'),
                 'pao_id' => $request->filled('pao_id') ? (int) $request->integer('pao_id') : null,
                 'objectif_operationnel_id' => $request->filled('objectif_operationnel_id') ? (int) $request->integer('objectif_operationnel_id') : null,

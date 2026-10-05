@@ -253,6 +253,11 @@ class WebWorkspaceTest extends TestCase
             ->get('/workspace/reporting')
             ->assertOk()
             ->assertSee("Centre d'export et de diffusion")
+            ->assertSee('Contexte du reporting')
+            ->assertSee('Période')
+            ->assertSee('Périmètre')
+            ->assertSee('Métriques applicatives PAS / PAO / PTA / Actions')
+            ->assertSee('Date de calcul')
             ->assertDontSee('Analytique disponible')
             ->assertDontSee('dashboard-report-status-unit-chart', false);
     }

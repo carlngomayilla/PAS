@@ -16,17 +16,6 @@ class RolePermissionMatrixTest extends TestCase
     public function test_default_role_permissions_match_corrected_matrix(): void
     {
         $settings = app(RolePermissionSettings::class);
-        $aiImportPermissions = [
-            'ai_pta_import.view',
-            'ai_pta_import.upload',
-            'ai_pta_import.analyze',
-            'ai_pta_import.preview',
-            'ai_pta_import.correct',
-            'ai_pta_import.validate',
-            'ai_pta_import.import',
-            'ai_pta_import.export',
-            'ai_pta_import.history',
-        ];
         $aiReportPermissions = [
             'ai_reports.view',
             'ai_reports.generate',
@@ -56,7 +45,6 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiReportPermissions,
                 'alerts.read',
@@ -98,7 +86,6 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiReportPermissions,
                 'alerts.read',
@@ -121,7 +108,6 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_CHEF_UNITE_CABINET => [
                 'planning.read',
                 'planning.write.service',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiOperationalReports,
                 'alerts.read',
@@ -134,7 +120,6 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiReportPermissions,
                 'alerts.read',
@@ -150,7 +135,6 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiReportPermissions,
                 'alerts.read',
@@ -162,7 +146,6 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_CHEF_UNITE_DGA => [
                 'planning.read',
                 'planning.write.service',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiOperationalReports,
                 'alerts.read',
@@ -179,7 +162,6 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_CHEF_UNITE_UCAS => [
                 'planning.read',
                 'planning.write.service',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiOperationalReports,
                 'alerts.read',
@@ -196,7 +178,6 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiReportPermissions,
                 'alerts.read',
@@ -208,7 +189,6 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_DIRECTION => [
                 'planning.read',
                 'planning.write.direction',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiOperationalReports,
                 'alerts.read',
@@ -218,7 +198,6 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_SERVICE => [
                 'planning.read',
                 'planning.write.service',
-                ...$aiImportPermissions,
                 'reporting.read',
                 ...$aiOperationalReports,
                 'alerts.read',
@@ -255,25 +234,25 @@ class RolePermissionMatrixTest extends TestCase
     public function test_workspace_modules_match_corrected_visibility_matrix_for_all_profiles(): void
     {
         $expected = [
-            User::ROLE_SUPER_ADMIN => ['pilotage', 'super_admin', 'imports_excel', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'reports'],
-            User::ROLE_ADMIN_FONCTIONNEL => ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'reports'],
-            User::ROLE_DG => ['pilotage', 'mes_taches', 'reports_echeance', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'ai_reports', 'notifications', 'reports'],
+            User::ROLE_SUPER_ADMIN => ['pilotage', 'super_admin', 'imports_excel', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'institutional_reports'],
+            User::ROLE_ADMIN_FONCTIONNEL => ['pilotage', 'super_admin', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'institutional_reports'],
+            User::ROLE_DG => ['pilotage', 'mes_taches', 'reports_echeance', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'ai_reports', 'notifications', 'institutional_reports'],
             // Fusion modules 2026-05-28 : 'mes_actions' supprime — fusionne avec 'execution'
             // (label "Action") qui couvre les deux vues via les onglets de la page.
-            User::ROLE_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_CHEF_UNITE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_CHEF_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications', 'reports'],
-            User::ROLE_CHEF_UNITE_CABINET => ['financement', 'pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications', 'reports'],
-            User::ROLE_CHEF_UNITE_UCAS => ['pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_DIRECTION => ['financement', 'pilotage', 'mes_taches', 'pao', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'services_agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_SERVICE => ['financement', 'pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications', 'reports'],
-            User::ROLE_AGENT => ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications', 'reports'],
-            User::ROLE_AUDITEUR => ['pilotage', 'reporting', 'notifications', 'reports'],
-            User::ROLE_INVITE_LECTURE => ['pilotage', 'reporting', 'notifications', 'reports'],
+            User::ROLE_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_CHEF_UNITE_SCIQ => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_CHEF_PLANIFICATION => ['financement', 'pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications', 'institutional_reports'],
+            User::ROLE_CHEF_UNITE_CABINET => ['financement', 'pilotage', 'mes_taches', 'pta', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications', 'institutional_reports'],
+            User::ROLE_CHEF_UNITE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_DIRECTION => ['financement', 'pilotage', 'mes_taches', 'pao', 'pta', 'execution', 'reports_echeance', 'services_agents', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_SERVICE => ['financement', 'pilotage', 'mes_taches', 'pta', 'execution', 'reports_echeance', 'agents', 'reporting', 'ai_reports', 'notifications', 'institutional_reports'],
+            User::ROLE_AGENT => ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications', 'institutional_reports'],
+            User::ROLE_AUDITEUR => ['pilotage', 'reporting', 'notifications', 'institutional_reports'],
+            User::ROLE_INVITE_LECTURE => ['pilotage', 'reporting', 'notifications', 'institutional_reports'],
         ];
 
         foreach ($expected as $role => $modules) {
@@ -348,7 +327,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertTrue((bool) $ossa->is_agent);
         $this->assertEqualsCanonicalizing(
             // Fusion 2026-05-28 : mes_actions remplace par execution (label "Action").
-            ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications', 'reports'],
+            ['pilotage', 'mes_taches', 'execution', 'reports_echeance', 'corrections', 'notifications', 'institutional_reports'],
             collect($ossa->workspaceModules())->pluck('code')->all()
         );
     }
@@ -369,7 +348,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertNull($admin->direction_id);
         $this->assertNull($admin->service_id);
         $this->assertEqualsCanonicalizing(
-            ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'reports'],
+            ['pilotage', 'super_admin', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications', 'institutional_reports'],
             collect($admin->workspaceModules())->pluck('code')->all()
         );
     }

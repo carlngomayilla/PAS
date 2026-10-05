@@ -21,6 +21,26 @@ class PtaAdministrativeDetailTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_pta_filters_and_workflow_links_preserve_the_exercise_and_operational_objective(): void
+    {
+        $fixture = $this->createFixture();
+        $context = [
+            'exercice' => 2026,
+            'objectif_operationnel_id' => $fixture['operational_objective']->id,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+        ];
+
+        $this->actingAs($fixture['admin'])
+            ->get(route('workspace.pta.index', $context))
+            ->assertOk()
+            ->assertSee('Exercice appliqué : 2026')
+            ->assertSee('name="exercice" value="2026"', false)
+            ->assertSee('name="objectif_operationnel_id" value="'.$fixture['operational_objective']->id.'"', false)
+            ->assertSee(route('workspace.pta.index', $context + ['statut' => 'controle_sciq']))
+            ->assertSee(route('workspace.pta.index', $context + ['without_action' => 1]));
+    }
+
     public function test_global_reader_sees_the_complete_pta_detail_and_governed_action_links(): void
     {
         $fixture = $this->createFixture();
@@ -29,6 +49,7 @@ class PtaAdministrativeDetailTest extends TestCase
             ->get(route('workspace.pta.show', $fixture['pta']))
             ->assertOk()
             ->assertSee('Fiche administrative PTA')
+            ->assertSee(route('workspace.actions.index', ['pta_id' => $fixture['pta']->id, 'exercice' => 2026]))
             ->assertSee('Du PAS au PTA')
             ->assertSee('Tableau des actions et sous-actions')
             ->assertSee($fixture['strategic_objective']->libelle)

@@ -789,6 +789,46 @@ class PlanningExcelImportService
             ->toString();
     }
 
+    /**
+     * @param  array<string, mixed>  $preview
+     * @return array{axes: list<array<string, mixed>>, services: list<array<string, mixed>>}
+     */
+    public function previewBreakdown(array $preview): array
+    {
+        $groups = ['axes' => [], 'services' => []];
+
+        foreach ($preview['rows'] ?? [] as $row) {
+            $data = $row['data'] ?? [];
+            $labels = [
+                'axes' => [
+                    'context' => trim((string) ($data['ordre_axe'] ?? '')) ?: 'Ordre absent',
+                    'label' => trim((string) ($data['libelle_axe'] ?? '')) ?: 'Axe non renseigné',
+                ],
+                'services' => [
+                    'context' => trim((string) ($data['direction'] ?? '')) ?: 'Direction non renseignée',
+                    'label' => trim((string) ($data['service_unite'] ?? '')) ?: 'Service non renseigné',
+                ],
+            ];
+
+            foreach ($labels as $type => $label) {
+                $key = json_encode($label, JSON_THROW_ON_ERROR);
+                $groups[$type][$key] ??= $label + ['total' => 0, 'valid' => 0, 'warnings' => 0, 'errors' => 0];
+                $groups[$type][$key]['total']++;
+                $status = match ($row['status'] ?? '') {
+                    'Valide' => 'valid',
+                    'Avertissement' => 'warnings',
+                    default => 'errors',
+                };
+                $groups[$type][$key][$status]++;
+            }
+        }
+
+        return [
+            'axes' => array_values($groups['axes']),
+            'services' => array_values($groups['services']),
+        ];
+    }
+
     public function execute(PlanningImport $import, string $mode, User $user, ?string $ipAddress = null): PlanningImport
     {
         if (! $this->canImport($user)) {

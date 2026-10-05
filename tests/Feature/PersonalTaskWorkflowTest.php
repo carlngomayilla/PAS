@@ -120,11 +120,11 @@ class PersonalTaskWorkflowTest extends TestCase
         );
     }
 
-    public function test_planification_receives_final_control_task_after_chef_visa(): void
+    public function test_sciq_receives_final_control_task_after_planification_visa(): void
     {
         $fixture = $this->planningFixture();
         $controller = User::factory()->create([
-            'role' => User::ROLE_PLANIFICATION,
+            'role' => User::ROLE_SCIQ,
             'password_changed_at' => now(),
         ]);
         $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action a controler');
@@ -146,7 +146,7 @@ class PersonalTaskWorkflowTest extends TestCase
         $this->actingAs($controller)
             ->get(route('workspace.tasks.index'))
             ->assertOk()
-            ->assertSee('Controle final')
+            ->assertSee('Validation finale SCIQ')
             ->assertSee('Action a controler');
     }
 

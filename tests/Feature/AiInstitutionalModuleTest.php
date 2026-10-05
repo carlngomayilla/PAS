@@ -2,13 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\AiImportSession;
 use App\Models\AiUsageLog;
 use App\Services\AiReporting\MonthlyReportService;
 use App\Services\OpenAi\OpenAiUsageBillingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesAiPtaFixtures;
 use Tests\TestCase;
 
@@ -16,48 +14,6 @@ class AiInstitutionalModuleTest extends TestCase
 {
     use CreatesAiPtaFixtures;
     use RefreshDatabase;
-
-    public function test_generic_ai_import_fails_closed_without_openai(): void
-    {
-        $this->createAiReferential();
-        Storage::fake('local');
-        config([
-            'queue.default' => 'sync',
-            'services.openai_responses.key' => null,
-        ]);
-
-        $response = $this->actingAs($this->createAiUser())
-            ->post(route('workspace.ai-imports.upload'), [
-                'file' => $this->validPtaCsv(),
-                'document_type' => 'PTA',
-            ]);
-
-        $response->assertSessionHasErrors('openai');
-        $this->assertSame(AiImportSession::STATUS_FAILED, AiImportSession::query()->firstOrFail()->status);
-        $this->assertDatabaseCount('ai_import_rows', 0);
-    }
-
-    public function test_generic_ai_import_does_not_fallback_when_openai_fails(): void
-    {
-        $this->createAiReferential();
-        Storage::fake('local');
-        config([
-            'queue.default' => 'sync',
-            'services.openai_responses.key' => 'test-openai-key',
-        ]);
-        Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'failure']], 500)]);
-
-        $response = $this->actingAs($this->createAiUser())
-            ->post(route('workspace.ai-imports.upload'), [
-                'file' => $this->invalidPtaCsv(),
-                'document_type' => 'PTA',
-            ]);
-
-        $session = AiImportSession::query()->firstOrFail();
-        $response->assertSessionHasErrors('openai');
-        $this->assertSame(AiImportSession::STATUS_FAILED, $session->status);
-        $this->assertDatabaseCount('ai_import_rows', 0);
-    }
 
     public function test_openai_usage_billing_records_estimated_cost(): void
     {
@@ -69,7 +25,7 @@ class AiInstitutionalModuleTest extends TestCase
 
         $user = $this->createAiUser();
         $billing = app(OpenAiUsageBillingService::class);
-        $log = $billing->record($user, 'ai_import', 'pas_pao_pta_import', 'gpt-test', 1000, 2000, 'resp_test');
+        $log = $billing->record($user, 'ai_report', 'monthly_report', 'gpt-test', 1000, 2000, 'resp_test');
 
         $this->assertSame(3000, $log->total_tokens);
         $this->assertSame('0.005000', $log->total_cost_usd);

@@ -6,8 +6,6 @@ use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\DeadlineExtensionRequest;
 use App\Models\Delegation;
-use App\Models\InstitutionalMeetingDecision;
-use App\Models\InstitutionalReport;
 use App\Models\JournalAudit;
 use App\Models\Pao;
 use App\Models\Pas;
@@ -16,6 +14,7 @@ use App\Models\SousAction;
 use App\Models\UniteDg;
 use App\Models\User;
 use App\Notifications\WorkspaceModuleNotification;
+use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertRoutingService;
 use App\Services\Governance\DelegationService;
 use App\Services\NotificationPolicySettings;
@@ -120,8 +119,8 @@ class WorkspaceNotificationService
     }
 
     /**
-     * 3e visa du circuit : l'action a ete visee par le controle et attend la
-     * validation finale (cloture) de la planification.
+     * 2e visa du circuit : l'action a ete visee par le chef et attend le
+     * controle intermediaire de la Planification.
      */
     public function notifyActionSubmittedToPlanification(Action $action, ?User $actor = null): void
     {
@@ -142,8 +141,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $planificationRecipients,
             [
-                'title' => 'Action à valider (validation finale)',
-                'message' => sprintf('L\'action « %s » a été visée par le contrôle et attend votre validation finale.', (string) $action->libelle),
+                'title' => 'Action à valider par la Planification',
+                'message' => sprintf('L\'action « %s » a été visée par le chef et attend votre contrôle de cohérence.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -163,8 +162,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $this->agentRecipient($action),
             [
-                'title' => 'Action transmise à la planification',
-                'message' => sprintf('Votre action « %s » a été visée par le contrôle et attend la validation finale de la planification.', (string) $action->libelle),
+                'title' => 'Action transmise à la Planification',
+                'message' => sprintf('Votre action « %s » a été visée par le chef et attend le contrôle de la Planification.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -182,7 +181,7 @@ class WorkspaceNotificationService
     }
 
     /**
-     * Decision finale de la planification : cloture ou renvoi en correction.
+     * Decision de la planification : transmission au SCIQ ou renvoi en correction.
      */
     public function notifyActionReviewedByPlanification(Action $action, bool $approved, ?User $actor = null): void
     {
@@ -192,13 +191,62 @@ class WorkspaceNotificationService
 
         $action->loadMissing('pta:id,direction_id,service_id');
 
+        $validationStatus = (string) ($action->statut_validation ?? '');
+        if ($validationStatus === ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION) {
+            $chefRecipients = $this->mergeRecipients(
+                $this->serviceUsers((int) ($action->pta?->direction_id ?? 0), (int) ($action->pta?->service_id ?? 0), [User::ROLE_SERVICE]),
+                $this->unitChiefRecipientsForAction($action)
+            );
+            $this->dispatchEvent(
+                'action_reviewed_by_direction',
+                $chefRecipients,
+                [
+                    'title' => 'Retour Planification à arbitrer par le Chef',
+                    'message' => sprintf('L action « %s » a été renvoyée par la Planification. Le Chef doit confirmer le retour avant correction agent.', (string) $action->libelle),
+                    'module' => 'actions',
+                    'entity_type' => 'action',
+                    'entity_id' => $action->id,
+                    'url' => route('workspace.actions.suivi', $action),
+                    'icon' => 'arrow-left',
+                    'status' => 'warning',
+                    'priority' => 'high',
+                ],
+                ['action_label' => (string) $action->libelle, 'actor_name' => (string) ($actor?->name ?? '')],
+                $actor?->id
+            );
+
+            return;
+        }
+
+        if ($validationStatus === ActionTrackingService::VALIDATION_REEXAMEN_SCIQ) {
+            $this->dispatchEvent(
+                'action_reviewed_by_direction',
+                $this->globalUsers([User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_SUPER_ADMIN]),
+                [
+                    'title' => 'Réexamen SCIQ demandé',
+                    'message' => sprintf('La Planification conteste le retour sur l action « %s ». Le SCIQ doit réexaminer le dossier.', (string) $action->libelle),
+                    'module' => 'actions',
+                    'entity_type' => 'action',
+                    'entity_id' => $action->id,
+                    'url' => route('workspace.actions.suivi', $action),
+                    'icon' => 'rotate-ccw',
+                    'status' => 'info',
+                    'priority' => 'high',
+                ],
+                ['action_label' => (string) $action->libelle, 'actor_name' => (string) ($actor?->name ?? '')],
+                $actor?->id
+            );
+
+            return;
+        }
+
         $this->dispatchEvent(
             'action_reviewed_by_direction',
             $this->agentRecipient($action),
             [
-                'title' => $approved ? 'Action clôturée' : 'Action à corriger',
+                'title' => $approved ? 'Action transmise au SCIQ' : 'Action à corriger',
                 'message' => $approved
-                    ? sprintf('Votre action « %s » a été validée par la planification : elle est officiellement clôturée.', (string) $action->libelle)
+                    ? sprintf('Votre action « %s » a été contrôlée par la planification et attend le visa final du SCIQ.', (string) $action->libelle)
                     : sprintf('Votre action « %s » a été renvoyée en correction par la planification.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
@@ -216,6 +264,7 @@ class WorkspaceNotificationService
         );
     }
 
+    /** Notification de la file SCIQ après le visa Planification. */
     public function notifyActionSubmittedToController(Action $action, ?User $actor = null): void
     {
         if (! $this->notificationPolicySettings->eventEnabled('action_submitted_to_direction')) {
@@ -239,8 +288,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $directionRecipients,
             [
-                'title' => 'Action à contrôler',
-                'message' => sprintf('L\'action « %s » a reçu le visa du chef et attend votre contrôle final.', (string) $action->libelle),
+                'title' => 'Action à valider par le SCIQ',
+                'message' => sprintf('L\'action « %s » a reçu les visas du chef et de la Planification et attend votre validation finale.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -260,8 +309,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $this->agentRecipient($action),
             [
-                'title' => 'Action transmise au contrôle',
-                'message' => sprintf('Votre action « %s » a reçu le visa du chef et attend la décision du contrôleur.', (string) $action->libelle),
+                'title' => 'Action transmise au SCIQ',
+                'message' => sprintf('Votre action « %s » a reçu les visas requis et attend la validation finale du SCIQ.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -295,17 +344,19 @@ class WorkspaceNotificationService
         $agentRecipients = $this->agentRecipient($action);
 
         if ($approved) {
-            $directionRecipients = $this->mergeRecipients(
-                $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
-                $this->delegationService->delegatedDirectionReviewers($directionId)
-            );
+            $planificationRecipients = $this->globalUsers([
+                User::ROLE_PLANIFICATION,
+                User::ROLE_CHEF_PLANIFICATION,
+                User::ROLE_ADMIN_FONCTIONNEL,
+                User::ROLE_SUPER_ADMIN,
+            ]);
 
             $this->dispatchEvent(
                 'action_reviewed_by_chef',
-                $directionRecipients,
+                $planificationRecipients,
                 [
                     'title' => 'Visa chef enregistré',
-                    'message' => sprintf('L\'action « %s » a reçu le visa du chef de service et part au contrôle final.', (string) $action->libelle),
+                    'message' => sprintf('L\'action « %s » a reçu le visa du chef de service et attend le contrôle de la Planification.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -327,7 +378,7 @@ class WorkspaceNotificationService
                 $agentRecipients,
                 [
                     'title' => 'Visa chef enregistré',
-                    'message' => sprintf('Votre action « %s » a reçu le visa du chef et attend maintenant le contrôle final.', (string) $action->libelle),
+                    'message' => sprintf('Votre action « %s » a reçu le visa du chef et attend maintenant le contrôle de la Planification.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -393,12 +444,19 @@ class WorkspaceNotificationService
         );
         $serviceRecipients = $this->mergeRecipients($serviceRecipients, $this->unitChiefRecipientsForAction($action));
         $serviceRecipients = $this->mergeRecipients($serviceRecipients, $this->agentRecipient($action));
+        $serviceRecipients = $this->mergeRecipients($serviceRecipients, $this->globalUsers([
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN,
+        ]));
         if ($approved) {
             $this->dispatchEvent(
                 'action_reviewed_by_direction',
                 $serviceRecipients,
                 [
-                    'title' => 'Action validée par le contrôle',
+                    'title' => 'Action achevée par le SCIQ',
                     'message' => sprintf('L\'action « %s » est validée, clôturée et comptabilisée dans les statistiques officielles.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
@@ -410,7 +468,7 @@ class WorkspaceNotificationService
                 ],
                 [
                     'action_label' => (string) $action->libelle,
-                    'decision' => 'Action validée par la direction',
+                    'decision' => 'Action validée par le SCIQ',
                     'actor_name' => (string) ($actor?->name ?? ''),
                 ],
                 $actor?->id
@@ -423,8 +481,8 @@ class WorkspaceNotificationService
             'action_reviewed_by_direction',
             $serviceRecipients,
             [
-                'title' => 'Correction demandée par le contrôle',
-                'message' => sprintf('L\'action « %s » doit être corrigée puis resoumise au chef. Consultez le motif du contrôleur.', (string) $action->libelle),
+                'title' => 'Correction demandée par le SCIQ',
+                'message' => sprintf('L\'action « %s » doit être corrigée puis resoumise au chef. Consultez le motif du SCIQ.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -435,7 +493,7 @@ class WorkspaceNotificationService
             ],
             [
                 'action_label' => (string) $action->libelle,
-                'decision' => 'Action renvoyée par la direction pour correction',
+                'decision' => 'Action renvoyée par le SCIQ pour correction',
                 'actor_name' => (string) ($actor?->name ?? ''),
             ],
             $actor?->id
@@ -1625,141 +1683,6 @@ class WorkspaceNotificationService
         );
     }
 
-    public function notifyMeetingScheduled(InstitutionalReport $meeting, ?User $actor = null): void
-    {
-        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->scheduled_at === null) {
-            return;
-        }
-
-        $this->dispatchEvent(
-            'meeting_scheduled',
-            $this->meetingParticipantRecipients($meeting),
-            $this->meetingPayload(
-                $meeting,
-                'Réunion programmée',
-                sprintf('La réunion « %s » est programmée le %s.', (string) $meeting->title, $meeting->scheduled_at->format('d/m/Y à H:i')),
-                'calendar-plus',
-                'info',
-                'normal'
-            ),
-            $this->meetingReplacements($meeting, $actor),
-            $actor?->id
-        );
-    }
-
-    public function notifyMeetingPostponed(InstitutionalReport $meeting, ?User $actor = null): void
-    {
-        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->scheduled_at === null) {
-            return;
-        }
-
-        $this->dispatchEvent(
-            'meeting_postponed',
-            $this->meetingParticipantRecipients($meeting),
-            $this->meetingPayload(
-                $meeting,
-                'Réunion reportée',
-                sprintf('La réunion « %s » est reportée au %s. Motif : %s', (string) $meeting->title, $meeting->scheduled_at->format('d/m/Y à H:i'), (string) $meeting->postponement_reason),
-                'calendar-clock',
-                'warning',
-                'high'
-            ),
-            $this->meetingReplacements($meeting, $actor),
-            $actor?->id
-        );
-    }
-
-    public function notifyMeetingReminder(InstitutionalReport $meeting, int $daysBefore): void
-    {
-        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->scheduled_at === null || $meeting->held_at !== null) {
-            return;
-        }
-
-        $this->dispatchEvent(
-            'meeting_reminder',
-            $this->meetingParticipantRecipients($meeting),
-            $this->meetingPayload(
-                $meeting,
-                'Rappel de réunion',
-                sprintf('La réunion « %s » se tiendra dans %d jour(s), le %s.', (string) $meeting->title, $daysBefore, $meeting->scheduled_at->format('d/m/Y à H:i')),
-                'bell-ring',
-                $daysBefore <= 1 ? 'warning' : 'info',
-                $daysBefore <= 1 ? 'high' : 'normal'
-            ),
-            $this->meetingReplacements($meeting, null)
-        );
-    }
-
-    public function notifyMeetingMinutesPublished(InstitutionalReport $meeting, ?User $actor = null): void
-    {
-        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->held_at === null) {
-            return;
-        }
-
-        $this->dispatchEvent(
-            'meeting_minutes_published',
-            $this->meetingRecipientsWithControls($meeting),
-            $this->meetingPayload(
-                $meeting,
-                'PV de réunion disponible',
-                sprintf('Le procès-verbal de la réunion « %s » est disponible. Consultez le dossier pour télécharger la copie.', (string) $meeting->title),
-                'file-check',
-                'success',
-                'normal'
-            ),
-            $this->meetingReplacements($meeting, $actor)
-        );
-    }
-
-    public function notifyMeetingCancelled(InstitutionalReport $meeting, ?User $actor = null): void
-    {
-        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING) {
-            return;
-        }
-
-        $this->dispatchEvent(
-            'meeting_cancelled',
-            $this->meetingParticipantRecipients($meeting),
-            $this->meetingPayload(
-                $meeting,
-                'Réunion annulée',
-                sprintf('La réunion « %s » est annulée. Motif : %s', (string) $meeting->title, (string) $meeting->cancellation_reason),
-                'calendar-x',
-                'warning',
-                'high'
-            ),
-            $this->meetingReplacements($meeting, $actor),
-            $actor?->id
-        );
-    }
-
-    public function notifyMeetingDecisionAssigned(InstitutionalReport $meeting, InstitutionalMeetingDecision $decision, ?User $actor = null): void
-    {
-        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $decision->responsible_id === null) {
-            return;
-        }
-
-        $recipient = User::query()->find($decision->responsible_id);
-        if (! $recipient instanceof User) {
-            return;
-        }
-
-        $this->dispatchEvent(
-            'meeting_decision_assigned',
-            collect([$recipient]),
-            $this->meetingPayload(
-                $meeting,
-                'Décision de réunion à suivre',
-                sprintf('Vous êtes responsable de la décision suivante : %s', (string) $decision->description),
-                'list-checks',
-                'info',
-                $decision->priority === 'critical' ? 'urgent' : 'normal'
-            ),
-            $this->meetingReplacements($meeting, $actor),
-            $actor?->id
-        );
-    }
-
     public function notifyDelegationCreated(Delegation $delegation, ?User $actor = null): void
     {
         if (! $this->notificationPolicySettings->eventEnabled('delegation_created')) {
@@ -1926,104 +1849,6 @@ class WorkspaceNotificationService
     }
 
     /** @return Collection<int, User> */
-    private function meetingParticipantRecipients(InstitutionalReport $meeting): Collection
-    {
-        $participantIds = collect($meeting->participant_ids ?? [])
-            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
-            ->map(fn (mixed $id): int => (int) $id)
-            ->when($meeting->responsible_id !== null, fn (Collection $ids): Collection => $ids->push((int) $meeting->responsible_id))
-            ->unique()
-            ->values()
-            ->all();
-
-        if ($participantIds !== []) {
-            return User::query()->whereIn('id', $participantIds)->get();
-        }
-
-        return $this->meetingDistributionRecipients($meeting);
-    }
-
-    /** @return Collection<int, User> */
-    private function meetingDistributionRecipients(InstitutionalReport $meeting): Collection
-    {
-        if ($meeting->service_id !== null) {
-            return User::query()
-                ->where('direction_id', $meeting->direction_id)
-                ->where('service_id', $meeting->service_id)
-                ->get();
-        }
-
-        return User::query()
-            ->where('direction_id', $meeting->direction_id)
-            ->get();
-    }
-
-    /** @return Collection<int, User> */
-    private function meetingRecipientsWithControls(InstitutionalReport $meeting): Collection
-    {
-        $controlRecipients = User::query()
-            ->whereIn('role', [
-                User::ROLE_SCIQ,
-                User::ROLE_SCIQ_SUIVI_GLOBAL,
-                User::ROLE_CHEF_UNITE_SCIQ,
-                User::ROLE_PLANIFICATION,
-                User::ROLE_CHEF_PLANIFICATION,
-            ])
-            ->get();
-
-        return $this->mergeRecipients($this->meetingDistributionRecipients($meeting), $controlRecipients);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function meetingPayload(
-        InstitutionalReport $meeting,
-        string $title,
-        string $message,
-        string $icon,
-        string $status,
-        string $priority
-    ): array {
-        return [
-            'title' => $title,
-            'message' => $message,
-            'module' => 'institutional_reports',
-            'entity_type' => 'institutional_report',
-            'entity_id' => $meeting->id,
-            'url' => route('workspace.reports.show', $meeting),
-            'icon' => $icon,
-            'status' => $status,
-            'priority' => $priority,
-            'notification_type' => 'evenement',
-            'categorie' => 'reunion',
-            'niveau' => $status,
-            'direction_id' => $meeting->direction_id,
-            'service_id' => $meeting->service_id,
-            'meta' => [
-                'event' => 'meeting',
-                'meeting_id' => (int) $meeting->id,
-                'meeting_title' => (string) $meeting->title,
-                'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
-                'held_at' => $meeting->held_at?->toIso8601String(),
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, scalar|null>
-     */
-    private function meetingReplacements(InstitutionalReport $meeting, ?User $actor): array
-    {
-        return [
-            'meeting_title' => (string) $meeting->title,
-            'meeting_date' => $meeting->scheduled_at?->format('d/m/Y H:i'),
-            'actor_name' => $actor?->name,
-            'postponement_reason' => $meeting->postponement_reason,
-            'cancellation_reason' => $meeting->cancellation_reason,
-        ];
-    }
-
     private function controlRecipients(): EloquentCollection
     {
         return $this->globalUsers([

@@ -22,7 +22,6 @@ class DynamicFilterFormsTest extends TestCase
             'rétention' => ['workspace/governance/retention.blade.php'],
             'délégations' => ['workspace/governance/delegations/index.blade.php'],
             'demandes suppression' => ['workspace/governance/deletion-requests/index.blade.php'],
-            'réunions' => ['workspace/meetings/index.blade.php'],
             'reporting' => ['workspace/monitoring/reporting.blade.php'],
             'notifications' => ['workspace/notifications/index.blade.php'],
             'PAO' => ['workspace/pao/index.blade.php'],

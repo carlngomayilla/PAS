@@ -127,6 +127,7 @@ class ActionTrackingWebController extends Controller
             && ($action->isResponsible($user) || $user->isAgent());
         $canReviewByChef = $this->canReviewByChef($user, $action);
         $canReviewByController = $this->canReviewByController($user);
+        $canReviewByPlanification = $this->canReviewByPlanification($user);
         $canRecordHistoricalExecution = $this->canRecordHistoricalExecution($user);
         $canRequestDeadlineExtension = $user->can('requestDeadlineExtension', $action);
         $canReviewDeadlineExtensionByChef = $user->can('reviewDeadlineExtensionByChef', $action);
@@ -144,6 +145,7 @@ class ActionTrackingWebController extends Controller
             'track_sub_actions' => $canTrackSubActions,
             'review_chef' => $canReviewByChef,
             'review_controller' => $canReviewByController,
+            'review_planification' => $canReviewByPlanification,
             'request_deadline' => $canRequestDeadlineExtension,
             'review_deadline_chef' => $canReviewDeadlineExtensionByChef,
             'review_deadline_director' => $canReviewDeadlineExtensionByDirector,
@@ -597,7 +599,7 @@ class ActionTrackingWebController extends Controller
         }
 
         $validated = $request->validate([
-            'decision' => ['required', Rule::in(['valider', 'rejeter'])],
+            'decision' => ['required', Rule::in(['valider', 'rejeter', 'accepter_rejet', 'contester'])],
             'sous_action_id' => ['nullable', 'integer', 'exists:sous_actions,id'],
             'motif' => ['nullable', 'string', 'max:5000'],
             'progress_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -622,6 +624,28 @@ class ActionTrackingWebController extends Controller
                     'source' => $source === 'personal_tasks' ? 'personal_tasks' : 'action_tracking',
                     'parent_action_id' => (int) $action->id,
                     'decision' => $approve ? 'valider' : 'rejeter',
+                    'motif' => $validated['motif'] ?? null,
+                ],
+            ]);
+        } elseif ((string) $action->statut_validation === ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION) {
+            $before = $action->toArray();
+            try {
+                $workflow->reviewSciqReturnByChef(
+                    $action,
+                    $validated['decision'],
+                    $validated['motif'] ?? null,
+                    $user
+                );
+            } catch (InvalidArgumentException $exception) {
+                return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+            }
+            $reviewed = $action->fresh();
+            $this->recordAudit($request, 'action', 'review_sciq_return_chef', $reviewed, $before, [
+                ...$reviewed->toArray(),
+                'audit_context' => [
+                    'intervention_processed' => true,
+                    'source' => $source === 'personal_tasks' ? 'personal_tasks' : 'action_tracking',
+                    'decision' => $validated['decision'],
                     'motif' => $validated['motif'] ?? null,
                 ],
             ]);
@@ -652,7 +676,7 @@ class ActionTrackingWebController extends Controller
 
         $notificationService->notifyActionReviewedByChef($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $approve, $user);
         if ($approve && $subActionId === null) {
-            $notificationService->notifyActionSubmittedToController($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $user);
+            $notificationService->notifyActionSubmittedToPlanification($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $user);
         }
 
         $redirect = $source === 'personal_tasks'
@@ -661,7 +685,7 @@ class ActionTrackingWebController extends Controller
 
         return $redirect
             ->with('success', $approve
-                ? ($subActionId === null ? 'Visa du chef enregistre. Action transmise au controleur.' : 'Validation enregistree.')
+                ? ($subActionId === null ? 'Visa du chef enregistre. Action transmise a la planification.' : 'Validation enregistree.')
                 : 'Renvoi pour correction enregistre.');
     }
 
@@ -710,23 +734,15 @@ class ActionTrackingWebController extends Controller
             $user
         );
 
-        if ($approve) {
-            // 3e visa : la planification doit savoir qu'une action l'attend.
-            $notificationService->notifyActionSubmittedToPlanification(
-                $reviewed->loadMissing('pta:id,direction_id,service_id'),
-                $user
-            );
-        }
-
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', $approve
-                ? 'Visa de controle enregistre. L action est transmise a la planification pour validation finale.'
-                : 'Correction demandee par le controleur.');
+            ? 'Validation finale SCIQ enregistree. L action est officiellement achevee.'
+            : 'Correction demandee par le SCIQ.');
     }
 
     /**
-     * Validation finale (cloture) par la planification — 3e visa du circuit.
+     * Visa intermédiaire de la planification — 2e visa du circuit.
      */
     public function reviewByPlanification(
         Request $request,
@@ -745,14 +761,23 @@ class ActionTrackingWebController extends Controller
         }
 
         $validated = $request->validate([
-            'decision' => ['required', Rule::in(['valider', 'rejeter'])],
+            'decision' => ['required', Rule::in(['valider', 'rejeter', 'accepter_rejet', 'contester'])],
             'motif' => ['nullable', 'string', 'max:5000'],
         ]);
         $approve = $validated['decision'] === 'valider';
         $before = $action->toArray();
 
         try {
-            $workflow->reviewActionByPlanification($action, $approve, $validated['motif'] ?? null, $user);
+            if ((string) $action->statut_validation === ActionTrackingService::VALIDATION_RETOUR_SCIQ) {
+                $workflow->reviewSciqReturnByPlanification(
+                    $action,
+                    $validated['decision'],
+                    $validated['motif'] ?? null,
+                    $user
+                );
+            } else {
+                $workflow->reviewActionByPlanification($action, $approve, $validated['motif'] ?? null, $user);
+            }
         } catch (InvalidArgumentException $exception) {
             return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
         }
@@ -761,7 +786,9 @@ class ActionTrackingWebController extends Controller
         $this->recordAudit(
             $request,
             'action',
-            $approve ? 'review_planification_validate' : 'review_planification_reject',
+            $approve || $validated['decision'] === 'accepter_rejet'
+                ? 'review_planification_validate'
+                : 'review_planification_reject',
             $reviewed,
             $before,
             [
@@ -769,7 +796,7 @@ class ActionTrackingWebController extends Controller
                 'audit_context' => [
                     'intervention_processed' => true,
                     'task_type' => 'validation_planification',
-                    'decision' => $approve ? 'valider' : 'rejeter',
+                    'decision' => $validated['decision'],
                     'motif' => $validated['motif'] ?? null,
                 ],
             ]
@@ -780,11 +807,17 @@ class ActionTrackingWebController extends Controller
             $approve,
             $user
         );
+        if ($approve) {
+            $notificationService->notifyActionSubmittedToController(
+                $reviewed->loadMissing('pta:id,direction_id,service_id'),
+                $user
+            );
+        }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', $approve
-                ? 'Validation finale enregistree. L action est cloturee.'
+                ? 'Visa de la planification enregistre. L action est transmise au SCIQ pour validation finale.'
                 : 'Action renvoyee en correction par la planification.');
     }
 
@@ -1176,9 +1209,13 @@ class ActionTrackingWebController extends Controller
 
     private function canReviewByController(User $user): bool
     {
-        return app(PlanningModificationLockService::class)->canGivePlanifAvis($user)
-            || $user->isSuperAdmin()
-            || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
+        return $user->hasRole(
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN
+        );
     }
 
     /** Profils autorisés à saisir une réalisation antérieure. */
@@ -1194,7 +1231,7 @@ class ActionTrackingWebController extends Controller
     }
 
     /**
-     * Troisieme visa du circuit : validation finale (cloture) par la planification.
+     * Deuxieme visa du circuit : controle intermediaire par la planification.
      */
     private function canReviewByPlanification(User $user): bool
     {

@@ -3,7 +3,6 @@
 namespace App\Services\Ai;
 
 use App\Models\AiGeneratedReport;
-use App\Models\AiImportRow;
 use App\Models\AiTrainingExample;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
@@ -14,18 +13,6 @@ class PtaTrainingDatasetService
         private readonly AiPromptService $prompts
     ) {}
 
-    public function recordCorrection(AiImportRow $row, ?User $user = null): AiTrainingExample
-    {
-        return AiTrainingExample::query()->create([
-            'task' => AiTrainingExample::TASK_CORRECTION,
-            'input_text' => json_encode($row->raw_payload ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'expected_json' => $row->normalized_payload ?? [],
-            'source' => 'human_correction',
-            'is_validated' => true,
-            'validated_by' => $user?->id,
-        ]);
-    }
-
     public function recordValidatedReport(AiGeneratedReport $report, ?User $user = null): AiTrainingExample
     {
         return AiTrainingExample::query()->create([
@@ -33,18 +20,6 @@ class PtaTrainingDatasetService
             'input_text' => json_encode($report->metrics_snapshot ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'expected_text' => $report->validated_content ?? $report->ai_draft,
             'source' => 'validated_report',
-            'is_validated' => true,
-            'validated_by' => $user?->id,
-        ]);
-    }
-
-    public function recordValidatedImportRow(AiImportRow $row, ?User $user = null): AiTrainingExample
-    {
-        return AiTrainingExample::query()->create([
-            'task' => AiTrainingExample::TASK_PTA_EXTRACTION,
-            'input_text' => json_encode($row->raw_payload ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'expected_json' => $row->normalized_payload ?? [],
-            'source' => 'validated_import',
             'is_validated' => true,
             'validated_by' => $user?->id,
         ]);

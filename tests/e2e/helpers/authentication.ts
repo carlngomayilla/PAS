@@ -30,25 +30,3 @@ export async function logout(page: Page): Promise<void> {
     await loggedOut;
     await expect(page).toHaveURL(/\/login$/);
 }
-
-export async function openMeetings(page: Page): Promise<void> {
-    if (requiresDirectSidebarNavigation(page)) {
-        await page.goto('/workspace/reunions');
-        await expect(page).toHaveURL(/\/workspace\/reunions\/?$/);
-
-        return;
-    }
-
-    const link = page.getByRole('link', { name: 'Réunions & PV', exact: true });
-    if (await link.isVisible()) {
-        await link.scrollIntoViewIfNeeded();
-        await expect(link).toHaveAttribute('href', /\/workspace\/reunions$/);
-        await Promise.all([
-            page.waitForURL(url => url.pathname === '/workspace/reunions', { timeout: 120_000, waitUntil: 'commit' }),
-            link.click(),
-        ]);
-    } else {
-        await page.goto('/workspace/reunions');
-    }
-    await expect(page).toHaveURL(/\/workspace\/reunions\/?$/);
-}

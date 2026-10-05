@@ -71,16 +71,16 @@ class DashboardShellPolishTest extends TestCase
         $tabs = (string) file_get_contents(resource_path('views/components/ui/module-tabs.blade.php'));
         $styles = (string) file_get_contents(resource_path('css/anbg-glass.css'));
 
-        $this->assertStringContainsString("\$visibleImportModuleCodes = collect(['imports_excel', 'ai_imports'])", $sidebar);
+        $this->assertStringContainsString("'module_codes' => ['imports_excel']", $sidebar);
         $this->assertStringContainsString("\$visibleReportingModuleCodes = collect(['reporting', 'ai_reports'])", $sidebar);
         $this->assertStringContainsString("'code' => 'imports'", $sidebar);
-        $this->assertStringContainsString("'label' => 'Imports'", $sidebar);
+        $this->assertStringContainsString("'label' => 'Imports Excel'", $sidebar);
         $this->assertStringContainsString("'label' => 'Reporting'", $sidebar);
         $this->assertStringNotContainsString("'label' => \$moduleLabel('ai_imports', 'IA & Imports')", $sidebar);
         $this->assertStringNotContainsString("'label' => \$moduleLabel('ai_reports', 'Rapports IA')", $sidebar);
 
         $this->assertStringContainsString('Import Excel', $layout);
-        $this->assertStringContainsString('Import assisté par IA', $layout);
+        $this->assertStringNotContainsString('Import assisté par IA', $layout);
         $this->assertStringContainsString('Reporting institutionnel', $layout);
         $this->assertStringContainsString('Reporting assisté par IA', $layout);
         $this->assertStringContainsString('<x-ui.module-tabs', $layout);

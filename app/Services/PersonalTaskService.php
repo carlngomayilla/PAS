@@ -2,12 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\MeetingStatus;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\DeadlineExtensionRequest;
 use App\Models\DeletionRequest;
-use App\Models\Meeting;
 use App\Models\PlanningUnlockRequest;
 use App\Models\Pta;
 use App\Models\SousAction;
@@ -15,7 +13,6 @@ use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertRoutingService;
 use App\Services\Analytics\AnalyticsCacheVersionService;
-use App\Services\Meetings\MeetingAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -29,8 +26,7 @@ class PersonalTaskService
         private readonly UserWorkspaceService $workspaceService,
         private readonly AlertRoutingService $alertRoutingService,
         private readonly PersonalScoreService $personalScoreService,
-        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService,
-        private readonly MeetingAccessService $meetingAccess
+        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService
     ) {}
 
     /**
@@ -107,8 +103,6 @@ class PersonalTaskService
                 'validation_planification',
                 'controle_pta',
                 'controle_modification',
-                'meeting_validation_sciq',
-                'meeting_validation_planification',
             ])
             ->count();
     }
@@ -193,7 +187,6 @@ class PersonalTaskService
             ->merge($this->actionAlertTasks($user, $role))
             ->merge($this->planningUnlockTasks($user, $role))
             ->merge($this->deletionRequestTasks($user, $role))
-            ->merge($this->meetingTasks($user))
             ->unique('key')
             ->sortBy(fn (array $task): string => sprintf(
                 '%d-%d-%012d-%s',
@@ -203,86 +196,6 @@ class PersonalTaskService
                 (string) ($task['title'] ?? '')
             ))
             ->values();
-    }
-
-    /** @return Collection<int, array<string, mixed>> */
-    private function meetingTasks(User $user): Collection
-    {
-        $tasks = collect();
-
-        if ($this->meetingAccess->canScheduleAny($user)) {
-            $meetings = Meeting::query()
-                ->whereIn('status', [MeetingStatus::PvAttendu->value, MeetingStatus::ACorriger->value])
-                ->with(['direction:id,libelle', 'service:id,libelle', 'responsible:id,name', 'currentReport'])
-                ->orderBy('current_scheduled_date')
-                ->get();
-            $meetings = $meetings->filter(
-                fn (Meeting $meeting): bool => $this->meetingAccess->canScheduleForMeeting($user, $meeting)
-            );
-
-            $tasks = $tasks->merge($meetings->map(function (Meeting $meeting): array {
-                $isCorrection = $meeting->status === MeetingStatus::ACorriger;
-                $receivedAt = $isCorrection
-                    ? $this->carbon($meeting->currentReport?->updated_at)
-                    : $meeting->scheduledAt();
-                $deadline = $receivedAt?->copy()->addHours(48);
-
-                return $this->task(
-                    key: 'meeting-owner:'.$meeting->id,
-                    type: $isCorrection ? 'meeting_correction' : 'meeting_pv',
-                    title: $isCorrection ? 'Corriger le PV de réunion' : 'Déposer le PV de réunion',
-                    subject: $meeting->label,
-                    context: $meeting->structureLabel(),
-                    responsible: $meeting->responsible?->name,
-                    receivedAt: $receivedAt,
-                    deadlineAt: $deadline,
-                    url: route('workspace.meetings.show', $meeting),
-                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                    scoreImpact: 'Le retard de dépôt ou de correction du PV est imputable au responsable de la réunion.'
-                );
-            }));
-        }
-
-        $reviewStatuses = [];
-        if ($this->meetingAccess->isSciq($user) || $this->meetingAccess->isAdministrator($user)) {
-            $reviewStatuses[] = MeetingStatus::EnValidationSciq->value;
-        }
-        if ($this->meetingAccess->isPlanification($user) || $this->meetingAccess->isAdministrator($user)) {
-            $reviewStatuses[] = MeetingStatus::EnValidationPlanification->value;
-        }
-
-        if ($reviewStatuses !== []) {
-            $reviews = Meeting::query()
-                ->whereIn('status', array_values(array_unique($reviewStatuses)))
-                ->with(['direction:id,libelle', 'service:id,libelle', 'responsible:id,name', 'currentReport.approvals'])
-                ->orderBy('updated_at')
-                ->get()
-                ->filter(fn (Meeting $meeting): bool => $meeting->currentReport !== null
-                    && $this->meetingAccess->canReviewReport($user, $meeting->currentReport));
-
-            $tasks = $tasks->merge($reviews->map(function (Meeting $meeting): array {
-                $isSciq = $meeting->status === MeetingStatus::EnValidationSciq;
-                $receivedAt = $this->carbon($meeting->currentReport?->uploaded_at)
-                    ?? $this->carbon($meeting->updated_at);
-                $deadline = $receivedAt?->copy()->addHours(48);
-
-                return $this->task(
-                    key: 'meeting-review:'.$meeting->id.':'.$meeting->status->value,
-                    type: $isSciq ? 'meeting_validation_sciq' : 'meeting_validation_planification',
-                    title: $isSciq ? 'Contrôler un PV de réunion' : 'Poser le visa final du PV',
-                    subject: $meeting->label,
-                    context: $meeting->structureLabel(),
-                    responsible: $meeting->responsible?->name,
-                    receivedAt: $receivedAt,
-                    deadlineAt: $deadline,
-                    url: route('workspace.meetings.show', $meeting),
-                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                    scoreImpact: 'Le délai de traitement du visa est imputable au niveau de contrôle concerné.'
-                );
-            }));
-        }
-
-        return $tasks->values();
     }
 
     /**
@@ -305,6 +218,8 @@ class PersonalTaskService
                     ->orWhereNotIn('statut_validation', [
                         ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                         ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                        ActionTrackingService::VALIDATION_RETOUR_SCIQ,
+                        ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
                         ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                         ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                         ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
@@ -434,19 +349,23 @@ class PersonalTaskService
 
         return Action::query()
             ->with(['pta:id,direction_id,service_id,titre', 'pta.service:id,libelle', 'responsable:id,name'])
-            ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)
+            ->whereIn('statut_validation', [
+                ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
+            ])
             ->whereHas('pta', fn (Builder $query) => $this->scopeToUserUnit($query, $user))
             ->latest('soumise_le')
             ->get()
             ->map(function (Action $action): array {
                 $received = $this->carbon($action->soumise_le) ?? $this->carbon($action->updated_at);
                 $deadline = $received?->copy()->addHours(48);
+                $isReturn = (string) $action->statut_validation === ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION;
 
                 return [
                     ...$this->task(
                         key: 'chef-validation:'.$action->id,
                         type: 'validation_chef',
-                        title: 'Validation chef',
+                        title: $isReturn ? 'Arbitrage Chef — retour SCIQ' : 'Validation chef',
                         subject: (string) $action->libelle,
                         context: $this->actionContext($action),
                         responsible: $action->responsable?->name,
@@ -454,7 +373,7 @@ class PersonalTaskService
                         deadlineAt: $deadline,
                         url: route('workspace.actions.suivi', $action).'#action-validation',
                         criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                        scoreImpact: 'Retard de validation impute au valideur, pas a l agent.'
+                        scoreImpact: 'Retard de décision impute au Chef, pas a l agent.'
                     ),
                     // A42 — Validation inline depuis Mes taches (cf. actions.review).
                     'can_validate' => true,
@@ -515,8 +434,8 @@ class PersonalTaskService
     }
 
     /**
-     * 3e visa : actions visees par le controle et en attente de la validation
-     * finale (cloture) par la planification.
+     * 2e visa : actions visees par le chef et en attente du contrôle de
+     * cohérence par la planification.
      *
      * @return Collection<int, array<string, mixed>>
      */
@@ -535,17 +454,22 @@ class PersonalTaskService
 
         return Action::query()
             ->with(['pta:id,direction_id,service_id,titre', 'pta.service:id,libelle', 'responsable:id,name'])
-            ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION)
+            ->whereIn('statut_validation', [
+                ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
+                ActionTrackingService::VALIDATION_RETOUR_SCIQ,
+            ])
             ->latest('controle_reviewed_at')
             ->get()
             ->map(function (Action $action): array {
                 $received = $this->carbon($action->controle_reviewed_at) ?? $this->carbon($action->updated_at);
                 $deadline = $received?->copy()->addHours(48);
 
+                $isReturn = (string) $action->statut_validation === ActionTrackingService::VALIDATION_RETOUR_SCIQ;
+
                 return $this->task(
                     key: 'planification-validation:'.$action->id,
                     type: 'validation_planification',
-                    title: 'Validation finale (cloture)',
+                    title: $isReturn ? 'Arbitrage Planification — retour SCIQ' : 'Validation Planification',
                     subject: (string) $action->libelle,
                     context: $this->actionContext($action),
                     responsible: $action->responsable?->name,
@@ -563,13 +487,22 @@ class PersonalTaskService
      */
     private function controllerValidationTasks(User $user, string $role): Collection
     {
-        if (! in_array($role, ['sciq_planif', 'super_admin'], true)) {
+        if (! $user->hasRole(
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN
+        )) {
             return collect();
         }
 
         return Action::query()
             ->with(['pta:id,direction_id,service_id,titre', 'pta.service:id,libelle', 'responsable:id,name'])
-            ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CONTROLE)
+            ->whereIn('statut_validation', [
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_REEXAMEN_SCIQ,
+            ])
             ->latest('evalue_le')
             ->get()
             ->map(function (Action $action): array {
@@ -579,7 +512,9 @@ class PersonalTaskService
                 return $this->task(
                     key: 'controller-validation:'.$action->id,
                     type: 'validation_controleur',
-                    title: 'Controle final',
+                    title: (string) $action->statut_validation === ActionTrackingService::VALIDATION_REEXAMEN_SCIQ
+                        ? 'Réexamen SCIQ'
+                        : 'Validation finale SCIQ',
                     subject: (string) $action->libelle,
                     context: $this->actionContext($action),
                     responsible: $action->responsable?->name,
@@ -587,7 +522,7 @@ class PersonalTaskService
                     deadlineAt: $deadline,
                     url: route('workspace.actions.suivi', $action).'#action-validation',
                     criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                    scoreImpact: 'Retard impute au controleur, pas au RMO.'
+                    scoreImpact: 'Retard impute au SCIQ, pas au RMO.'
                 );
             });
     }
@@ -1073,9 +1008,8 @@ class PersonalTaskService
     {
         return match ($type) {
             'execution_action', 'execution_sous_action' => 'execution',
-            'correction_action', 'correction_financement', 'complement_suppression', 'meeting_correction' => 'corrections',
-            'validation_chef', 'validation_sous_action_chef', 'validation_controleur', 'validation_planification', 'meeting_validation_sciq', 'meeting_validation_planification' => 'validations',
-            'meeting_pv' => 'execution',
+            'correction_action', 'correction_financement', 'complement_suppression' => 'corrections',
+            'validation_chef', 'validation_sous_action_chef', 'validation_controleur', 'validation_planification' => 'validations',
             'financement_rmo', 'financement_daf', 'financement_dg' => 'financements',
             'alerte_action' => 'alertes',
             'decision_suppression', 'decision_modification_dg', 'controle_modification' => 'decisions',

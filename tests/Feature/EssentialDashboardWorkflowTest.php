@@ -40,13 +40,61 @@ class EssentialDashboardWorkflowTest extends TestCase
         $this->createAction($fixture);
 
         $this->actingAs($fixture['admin'])
-            ->get(route('workspace.pilotage'))
+            ->get(route('workspace.pilotage', [
+                'exercice' => now()->year,
+                'direction_id' => $fixture['direction']->id,
+                'service_id' => $fixture['service']->id,
+            ]))
             ->assertOk()
             ->assertSee('Pilotage PAS/PAO/PTA')
+            ->assertSee('Contexte repris du dashboard')
+            ->assertSee('Dashboard filtré')
+            ->assertSee('Ouvrir la liste filtrée des actions')
             ->assertSee('PAS dashboard')
             ->assertSee('PAO dashboard')
             ->assertSee('PTA dashboard')
+            ->assertSee('1 sur 1 action(s) affichée(s)')
+            ->assertSee('Voir toutes les actions de ce PTA')
             ->assertSee('Action dashboard');
+    }
+
+    public function test_pilotage_average_progress_is_weighted_by_action_count(): void
+    {
+        $fixture = $this->createPlanningFixture();
+        $this->createAction($fixture, [
+            'libelle' => 'Action terminee pour moyenne',
+            'progression_reelle' => 100,
+        ]);
+        $secondService = Service::query()->create([
+            'direction_id' => $fixture['direction']->id,
+            'code' => 'SER-DASH-2',
+            'libelle' => 'Service dashboard secondaire',
+            'actif' => true,
+        ]);
+        $secondPta = Pta::query()->create([
+            'pao_id' => $fixture['pao']->id,
+            'objectif_operationnel_id' => $fixture['objectif_operationnel']->id,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $secondService->id,
+            'titre' => 'PTA dashboard secondaire',
+            'statut' => Pta::STATUS_EN_COURS,
+        ]);
+
+        foreach (range(1, 3) as $index) {
+            $this->createAction($fixture, [
+                'pta_id' => $secondPta->id,
+                'libelle' => 'Action non demarree '.$index,
+                'progression_reelle' => 0,
+            ]);
+        }
+
+        $this->actingAs($fixture['admin'])
+            ->get(route('workspace.pilotage', [
+                'exercice' => now()->year,
+                'direction_id' => $fixture['direction']->id,
+            ]))
+            ->assertOk()
+            ->assertSee('25.0%');
     }
 
     public function test_dashboard_page_renders_essential_view(): void
@@ -61,6 +109,12 @@ class EssentialDashboardWorkflowTest extends TestCase
             ->assertSee('Tableaux')
             ->assertSee('Graphiques')
             ->assertDontSee('Vue détaillée')
+            ->assertSee('Contexte appliqué')
+            ->assertSee('Dashboard filtré sur le périmètre courant')
+            ->assertSee('Voir les actions du périmètre')
+            ->assertSee('Reporting filtré')
+            ->assertSee('Suivi PTA filtré')
+            ->assertSee('Validation planification')
             ->assertSee('Vue synthétique des axes')
             ->assertSee('Suivi PTA')
             ->assertSee('Axe dashboard sans action')
@@ -308,9 +362,9 @@ class EssentialDashboardWorkflowTest extends TestCase
     /**
      * @param  array<string, mixed>  $fixture
      */
-    private function createAction(array $fixture): Action
+    private function createAction(array $fixture, array $overrides = []): Action
     {
-        return Action::query()->create([
+        return Action::query()->create(array_merge([
             'pta_id' => $fixture['pta']->id,
             'pao_id' => $fixture['pao']->id,
             'objectif_operationnel_id' => $fixture['objectif_operationnel']->id,
@@ -333,6 +387,6 @@ class EssentialDashboardWorkflowTest extends TestCase
             'progression_theorique' => 50,
             'seuil_alerte_progression' => 10,
             'financement_requis' => false,
-        ]);
+        ], $overrides));
     }
 }

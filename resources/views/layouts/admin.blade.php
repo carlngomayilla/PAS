@@ -37,20 +37,13 @@
     $moduleFamilyTabsLabel = null;
     $moduleFamilyTabs = [];
 
-    if (request()->routeIs('workspace.imports.*', 'workspace.ai-imports.*')) {
-        $moduleFamilyTabsLabel = 'Modes d’import';
+    if (request()->routeIs('workspace.imports.*')) {
+        $moduleFamilyTabsLabel = 'Imports';
         if ($layoutModuleCodes->contains('imports_excel')) {
             $moduleFamilyTabs[] = [
                 'label' => 'Import Excel',
                 'href' => route('workspace.imports.index'),
                 'active' => request()->routeIs('workspace.imports.*'),
-            ];
-        }
-        if ($layoutModuleCodes->contains('ai_imports')) {
-            $moduleFamilyTabs[] = [
-                'label' => 'Import assisté par IA',
-                'href' => route('workspace.ai-imports.pta.index'),
-                'active' => request()->routeIs('workspace.ai-imports.*'),
             ];
         }
     } elseif (request()->routeIs('workspace.reporting', 'workspace.reporting.*', 'workspace.ai-reports.*')) {

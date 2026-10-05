@@ -15,10 +15,6 @@ Schedule::command('alertes:notifier --refresh-metrics')
     ->dailyAt('07:30')
     ->onOneServer()
     ->withoutOverlapping(60);
-Schedule::command('meetings:send-reminders')
-    ->dailyAt('08:00')
-    ->onOneServer()
-    ->withoutOverlapping(60);
 Schedule::command('anbg:planning-auto-archive --execute')
     ->dailyAt('03:30')
     ->onOneServer()
@@ -39,7 +35,7 @@ if (class_exists(SnapshotCommand::class)) {
 }
 
 if (class_exists(MonitorCommand::class)) {
-    Schedule::command('queue:monitor redis:notifications,redis:exports,redis:ai-imports,redis:default --max=100')
+    Schedule::command('queue:monitor redis:notifications,redis:exports,redis:default --max=100')
         ->everyMinute()
         ->onOneServer()
         ->withoutOverlapping(5)

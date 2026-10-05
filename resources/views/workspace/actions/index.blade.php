@@ -4,13 +4,36 @@
     @php
         $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
         $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
-        $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
+        $validationStatusLabel = static function (string $status): string {
+            return [
+                'realisee_a_soumettre' => 'Réalisée à soumettre',
+                'attente_validation_chef' => 'En attente du Chef',
+                'retour_chef' => 'Retour du Chef',
+                'attente_validation_planification' => 'En attente de la Planification',
+                'retour_planification' => 'Retour de la Planification',
+                'attente_validation_sciq' => 'En attente du SCIQ',
+                'retour_sciq' => 'Retour du SCIQ',
+            'reexamen_sciq' => 'Réexamen SCIQ',
+                'achevee_validee' => 'Achevée et validée',
+            ][$status] ?? \App\Support\UiLabel::validationStatus($status);
+        };
         $financingStatusOptions = is_array($financingStatusOptions ?? null) ? $financingStatusOptions : \App\Models\Action::financingStatusOptions();
         $currentViewMode = (string) ($filters['vue'] ?? '');
         $showDualActionTabs = (bool) ($showDualActionTabs ?? false);
         $showActionValidationTab = (bool) ($showActionValidationTab ?? false);
         $isFinalControlQueue = (bool) ($isFinalControlQueue ?? false);
         $canReadAudit = (bool) ($canReadAudit ?? false);
+        $actionRowCards = is_array($actionRowCards ?? null) ? $actionRowCards : [];
+        $pasAxeOptions = collect($pasAxeOptions ?? []);
+        $directionOptions = collect($directionOptions ?? []);
+        $serviceOptions = collect($serviceOptions ?? []);
+        $optionLabel = static fn ($option): string => trim(implode(' - ', array_filter([
+            (string) ($option->code ?? ''),
+            (string) ($option->libelle ?? ''),
+        ]))) ?: (string) ($option->titre ?? $option->name ?? $option->id ?? '-');
+        $pasAxeLabels = $pasAxeOptions->mapWithKeys(fn ($option): array => [(int) $option->id => $optionLabel($option)]);
+        $directionLabels = $directionOptions->mapWithKeys(fn ($option): array => [(int) $option->id => $optionLabel($option)]);
+        $serviceLabels = $serviceOptions->mapWithKeys(fn ($option): array => [(int) $option->id => $optionLabel($option)]);
         $isValidationTab = $currentViewMode === 'validations';
         $viewModeLabel = match ($currentViewMode) {
             'pilotage' => 'Actions pilotées',
@@ -42,7 +65,7 @@
             }
 
             $validationStatus = (string) ($row->statut_validation ?? '');
-            $isReleased = in_array($validationStatus, ['validee_controle', 'validee_planification', 'validee_direction'], true);
+            $isReleased = in_array($validationStatus, ['validee_controle', 'validee_planification', 'validee_direction', 'achevee_validee'], true);
 
             return ! $isReleased;
         };
@@ -101,8 +124,35 @@
             'soumise_controle'   => 'anbg-badge anbg-badge-info',
             'correction_controle'=> 'anbg-badge anbg-badge-warning',
             'validee_controle'   => 'anbg-badge anbg-badge-success',
+            'soumise_planification' => 'anbg-badge anbg-badge-info',
+            'correction_planification' => 'anbg-badge anbg-badge-warning',
+            'validee_planification' => 'anbg-badge anbg-badge-success',
             'rejetee_direction'  => 'anbg-badge anbg-badge-danger',
             'validee_direction'  => 'anbg-badge anbg-badge-success',
+            'realisee_a_soumettre' => 'anbg-badge anbg-badge-warning',
+            'attente_validation_chef' => 'anbg-badge anbg-badge-warning',
+            'retour_chef' => 'anbg-badge anbg-badge-danger',
+            'attente_validation_planification' => 'anbg-badge anbg-badge-info',
+            'retour_planification' => 'anbg-badge anbg-badge-warning',
+            'attente_validation_sciq' => 'anbg-badge anbg-badge-info',
+            'retour_sciq' => 'anbg-badge anbg-badge-warning',
+            'achevee_validee' => 'anbg-badge anbg-badge-success',
+        ];
+        $validationQueues = is_array($validationQueues ?? null) ? $validationQueues : [];
+        $currentValidationQueue = (string) ($currentValidationQueue ?? '');
+        $validationQueueDisplayLabels = [
+            'planification' => 'Planification · À valider',
+            'planification_rejets' => 'Planification · Retours SCIQ',
+            'sciq' => 'SCIQ · Contrôles finaux',
+            'sciq_reexamen' => 'SCIQ · Réexamens',
+            'chef' => 'Chef · À valider',
+            'chef_rejets' => 'Chef · Retours Planification',
+        ];
+        $rowToneStyles = [
+            'success' => 'anbg-badge anbg-badge-success',
+            'warning' => 'anbg-badge anbg-badge-warning',
+            'info' => 'anbg-badge anbg-badge-info',
+            'neutral' => 'anbg-badge anbg-badge-neutral',
         ];
         $summaryCards = [
             ['label' => 'Total actions', 'value' => $summaryTotal, 'meta' => null, 'href' => route('workspace.actions.index'), 'badge' => null, 'badge_tone' => 'neutral', 'used' => $summaryTotal > 0],
@@ -215,6 +265,28 @@
                             <span class="ml-1 rounded-full bg-white/25 px-2 py-0.5 text-[11px] font-bold">{{ $pendingValidationCount }}</span>
                         @endif
                     </a>
+                    @if ($isValidationTab && $validationQueues !== [])
+                        <nav class="flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900" aria-label="Files de validation">
+                            @foreach ($validationQueues as $queueKey => $queue)
+                                @php
+                                    $queue = is_array($queue) ? $queue : [];
+                                    $queueLabel = (string) ($queue['label'] ?? $validationQueueDisplayLabels[(string) $queueKey] ?? ucfirst((string) $queueKey));
+                                    $queueUrl = (string) ($queue['url'] ?? route('workspace.actions.index', ['vue' => 'validations', 'validation_queue' => $queueKey]));
+                                    $queueCount = $queue['count'] ?? null;
+                                @endphp
+                                <a
+                                    class="whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-bold {{ $currentValidationQueue === (string) $queueKey ? 'bg-white text-[#17324a] shadow-sm dark:bg-slate-800 dark:text-slate-100' : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-800/70' }}"
+                                    href="{{ $queueUrl }}"
+                                    @if ($currentValidationQueue === (string) $queueKey) aria-current="page" @endif
+                                >
+                                    {{ $queueLabel }}
+                                    @if ($queueCount !== null)
+                                        <span class="ml-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] dark:bg-slate-700">{{ $queueCount }}</span>
+                                    @endif
+                                </a>
+                            @endforeach
+                        </nav>
+                    @endif
                 @endif
                 @if ($isValidationTab && $isFinalControlQueue)
                     <a class="btn btn-sm btn-secondary rounded-xl px-3 py-1.5" href="{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}">Alertes & anomalies</a>
@@ -294,6 +366,51 @@
                     </select>
                 </div>
                 <div>
+                    <label for="pas_axe_id">Axe stratégique</label>
+                    <select id="pas_axe_id" name="pas_axe_id">
+                        <option value="">Tous</option>
+                        @foreach ($pasAxeOptions as $axe)
+                            <option value="{{ $axe->id }}" @selected($filters['pas_axe_id'] === $axe->id)>
+                                {{ $optionLabel($axe) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="direction_id">Direction</label>
+                    <select id="direction_id" name="direction_id">
+                        <option value="">Toutes</option>
+                        @foreach ($directionOptions as $direction)
+                            <option value="{{ $direction->id }}" @selected($filters['direction_id'] === $direction->id)>
+                                {{ $optionLabel($direction) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="service_id">Service</label>
+                    <select id="service_id" name="service_id">
+                        <option value="">Tous</option>
+                        @foreach ($serviceOptions as $service)
+                            <option value="{{ $service->id }}" @selected($filters['service_id'] === $service->id)>
+                                {{ $optionLabel($service) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="annee">Année</label>
+                    <input id="annee" name="annee" type="number" min="2000" max="2100" value="{{ $filters['annee'] }}" placeholder="2026">
+                </div>
+                <div>
+                    <label for="mois_demarrage">Mois de démarrage</label>
+                    <input id="mois_demarrage" name="mois_demarrage" type="month" value="{{ $filters['mois_demarrage'] }}">
+                </div>
+                <div>
+                    <label for="week_start">Semaine suivie</label>
+                    <input id="week_start" name="week_start" type="date" value="{{ $filters['week_start'] }}">
+                </div>
+                <div>
                     <label for="statut">Statut dynamique</label>
                     <select id="statut" name="statut">
                         <option value="">Tous</option>
@@ -306,7 +423,7 @@
                     <label for="statut_validation">Validation</label>
                     @if ($isValidationTab)
                         <input type="hidden" name="statut_validation" value="{{ $filters['statut_validation'] }}">
-                        <input id="statut_validation" type="text" value="{{ $isFinalControlQueue ? 'Transmise au contrôle final' : 'En attente chef' }}" readonly>
+                        <input id="statut_validation" type="text" value="{{ $validationQueueDisplayLabels[$currentValidationQueue] ?? \App\Support\UiLabel::validationStatus($filters['statut_validation']) }}" readonly>
                     @else
                         <select id="statut_validation" name="statut_validation">
                             <option value="">Toutes</option>
@@ -350,7 +467,7 @@
                     </select>
                 </div>
             </div>
-            @foreach (['direction_id', 'service_id', 'pas_objectif_id', 'annee', 'mois_demarrage', 'week_start'] as $hiddenFilter)
+            @foreach (['pas_objectif_id'] as $hiddenFilter)
                 @if (!empty($filters[$hiddenFilter]))
                     <input type="hidden" name="{{ $hiddenFilter }}" value="{{ $filters[$hiddenFilter] }}">
                 @endif
@@ -361,8 +478,9 @@
             @php
                 $activeChips = array_filter([
                     $filters['without_kpi'] ? ['label' => 'Sans indicateur',       'color' => '#F9B13C', 'remove' => 'without_kpi'] : null,
-                    $filters['direction_id'] ? ['label' => 'Direction #'.$filters['direction_id'], 'color' => '#3996D3', 'remove' => 'direction_id'] : null,
-                    $filters['service_id']   ? ['label' => 'Service #'.$filters['service_id'],     'color' => '#1C203D', 'remove' => 'service_id'] : null,
+                    $filters['pas_axe_id'] ? ['label' => 'Axe : '.($pasAxeLabels->get((int) $filters['pas_axe_id']) ?? '#'.$filters['pas_axe_id']), 'color' => '#8FC043', 'remove' => 'pas_axe_id'] : null,
+                    $filters['direction_id'] ? ['label' => 'Direction : '.($directionLabels->get((int) $filters['direction_id']) ?? '#'.$filters['direction_id']), 'color' => '#3996D3', 'remove' => 'direction_id'] : null,
+                    $filters['service_id']   ? ['label' => 'Service : '.($serviceLabels->get((int) $filters['service_id']) ?? '#'.$filters['service_id']),     'color' => '#1C203D', 'remove' => 'service_id'] : null,
                     $filters['pas_objectif_id'] ? ['label' => 'Objectif #'.$filters['pas_objectif_id'], 'color' => '#8FC043', 'remove' => 'pas_objectif_id'] : null,
                     $filters['annee']        ? ['label' => 'Année '.$filters['annee'],              'color' => '#F9B13C', 'remove' => 'annee'] : null,
                     $filters['mois_demarrage'] ? ['label' => 'Démarrage '.$filters['mois_demarrage'], 'color' => '#6B7280', 'remove' => 'mois_demarrage'] : null,
@@ -376,7 +494,7 @@
                 <div class="mt-4 flex flex-wrap items-center gap-2">
                     <span class="text-xs font-semibold text-[#667085]">Filtres actifs :</span>
                     @foreach ($activeChips as $chip)
-                        <a href="{{ request()->fullUrlWithQuery([$chip['remove'] => '']) }}" class="active-filter-chip" title="Retirer ce filtre">
+                        <a href="{{ request()->fullUrlWithQuery([$chip['remove'] => '', 'page' => null]) }}" class="active-filter-chip" title="Retirer ce filtre" aria-label="Retirer le filtre {{ $chip['label'] }}">
                             <span class="active-filter-chip-dot" style="background: {{ $chip['color'] }};"></span>
                             {{ $chip['label'] }}
                             <span class="active-filter-chip-remove" aria-hidden="true">×</span>
@@ -707,8 +825,10 @@
                         <th>Responsable</th>
                         <th>Échéance</th>
                         <th>Statut</th>
+                        <th>Justificatif</th>
                         <th>{{ $isExecutorAgentInterface ? 'Execution' : 'Progression' }}</th>
                         <th>Validation</th>
+                        <th>Prochaine étape</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -724,6 +844,19 @@
                             // encore (rendu par defaut : '0.00').
                             $kpiConformite = null;
                             $justificatifsTotal = (int) ($row->justificatifs_total ?? 0);
+                            $rowCard = $actionRowCards[(int) $row->id] ?? [
+                                'proof_label' => $justificatifsTotal > 0 ? $justificatifsTotal.' pièce(s) jointe(s)' : 'Selon exécution',
+                                'proof_tone' => $justificatifsTotal > 0 ? 'success' : 'neutral',
+                                'next_label' => 'Faire le suivi',
+                                'next_hint' => 'Ouvrir la fiche action.',
+                                'next_anchor' => '#action-validation',
+                                'next_tone' => 'neutral',
+                            ];
+                            $rowAxis = $row->objectifOperationnel?->pasAxe
+                                ?? $row->pta?->objectifOperationnel?->pasAxe
+                                ?? $row->pta?->pao?->pasObjectif?->pasAxe;
+                            $rowDirection = $row->pta?->direction;
+                            $rowService = $row->pta?->service;
                             $modeEvaluationLabel = $row->mode_evaluation_label ?? 'Par sous-actions';
                             $statusClass = $statusStyles[$row->statut_dynamique ?: 'non_demarre'] ?? $statusStyles['non_demarre'];
                             $progressValue = max(0, min(100, (float) ($row->progression_reelle ?? 0)));
@@ -737,12 +870,50 @@
                                 ? ((float) $kpiPerformance >= 80 ? 'text-[#8fc043]' : ((float) $kpiPerformance >= 60 ? 'text-[#f9b13c]' : 'text-red-500'))
                                 : 'text-slate-400';
                             $hideRowMetrics = $hideExecutorMetricsFor($row);
+                            $rowValidationStatus = (string) ($row->statut_validation ?: 'non_soumise');
+                            $rowNextStep = match ($rowValidationStatus) {
+                                'soumise_chef', 'attente_validation_chef' => [
+                                    'label' => 'Visa chef attendu',
+                                    'hint' => 'La réalisation attend le contrôle hiérarchique.',
+                                    'tone' => 'warning',
+                                ],
+                                'validee_chef', 'soumise_planification', 'attente_validation_planification' => [
+                                    'label' => 'Validation Planification attendue',
+                                    'hint' => 'La Planification vérifie la cohérence avant transmission au SCIQ.',
+                                    'tone' => 'info',
+                                ],
+                                'soumise_controle', 'attente_validation_sciq' => [
+                                    'label' => 'Contrôle SCIQ attendu',
+                                    'hint' => 'Le SCIQ donne le dernier visa et clôture l’action.',
+                                    'tone' => 'info',
+                                ],
+                                'correction_demandee', 'rejetee_chef', 'retour_chef', 'correction_planification', 'retour_planification', 'correction_controle', 'retour_sciq' => [
+                                    'label' => 'Correction à traiter',
+                                    'hint' => 'Répondre au motif puis soumettre une nouvelle version.',
+                                    'tone' => 'warning',
+                                ],
+                                'validee_controle', 'validee_planification', 'validee_direction', 'achevee_validee' => [
+                                    'label' => 'Action achevée',
+                                    'hint' => 'Résultat officiellement validé et consultable.',
+                                    'tone' => 'success',
+                                ],
+                                default => [
+                                    'label' => $rowCard['next_label'] ?? 'Renseigner l’avancement',
+                                    'hint' => $rowCard['next_hint'] ?? 'Ouvrir la fiche action.',
+                                    'tone' => $rowCard['next_tone'] ?? 'neutral',
+                                ],
+                            };
                         @endphp
                         <tr>
                             <td class="min-w-[260px]">
                                 <div class="font-semibold text-slate-900">{{ $row->libelle }}</div>
                                 <p class="mt-1 text-xs font-medium text-slate-500">
                                     ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }} · PTA : {{ $row->pta?->titre ?? '-' }}
+                                </p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Axe : {{ $rowAxis ? $optionLabel($rowAxis) : '-' }}
+                                    · Direction : {{ $rowDirection ? $optionLabel($rowDirection) : '-' }}
+                                    · Service : {{ $rowService ? $optionLabel($rowService) : '-' }}
                                 </p>
                                 @if ($row->description)
                                     <p class="mt-1 max-w-sm text-sm text-slate-500">{{ $row->description }}</p>
@@ -768,8 +939,13 @@
                                 <span class="{{ $statusClass }} px-3">
                                     {{ $actionStatusLabel($row->statut_dynamique ?: 'non_demarre') }}
                                 </span>
-                                <p class="mt-2 text-xs text-slate-500">
-                                    Justificatif : {{ $justificatifsTotal > 0 ? $justificatifsTotal.' pièce(s)' : 'aucun' }}
+                            </td>
+                            <td class="min-w-[170px]">
+                                <span class="{{ $rowToneStyles[$rowCard['proof_tone'] ?? 'neutral'] ?? $rowToneStyles['neutral'] }} px-3">
+                                    {{ $rowCard['proof_label'] ?? 'Selon exécution' }}
+                                </span>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    {{ $row->justificatif_obligatoire ? 'Preuve obligatoire' : 'Preuve selon dossier' }}
                                 </p>
                             </td>
                             <td class="min-w-[180px]">
@@ -795,7 +971,6 @@
                                 @endif
                             </td>
                             <td>
-                                @php $rowValidationStatus = $row->statut_validation ?: 'non_soumise'; @endphp
                                 <span class="{{ $validationStyles[$rowValidationStatus] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
                                     {{ $validationStatusLabel($rowValidationStatus) }}
                                 </span>
@@ -804,6 +979,17 @@
                                         Performance {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 0).'%' : '-' }}
                                     </p>
                                 @endunless
+                            </td>
+                            <td class="min-w-[210px]">
+                                <a
+                                    class="{{ $rowToneStyles[$rowNextStep['tone'] ?? 'neutral'] ?? $rowToneStyles['neutral'] }} px-3 no-underline"
+                                    href="{{ route('workspace.actions.suivi', $row) }}{{ $rowCard['next_anchor'] ?? '#action-validation' }}"
+                                >
+                                    {{ $rowNextStep['label'] ?? 'Faire le suivi' }}
+                                </a>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    {{ $rowNextStep['hint'] ?? 'Ouvrir la fiche action.' }}
+                                </p>
                             </td>
                             <td>
                                 <div class="row-actions">
@@ -818,7 +1004,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7">
+                            <td colspan="9">
                                 <x-ui.empty-state
                                     title="Aucune action trouvée"
                                     message="Aucune action ne correspond aux filtres courants."

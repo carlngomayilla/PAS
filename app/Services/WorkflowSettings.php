@@ -137,7 +137,7 @@ class WorkflowSettings
 
     public function actionFinalStage(): string
     {
-        return 'planification';
+        return 'sciq';
     }
 
     /**
@@ -156,12 +156,12 @@ class WorkflowSettings
             'rejection_comment_required' => $this->rejectionCommentRequired(),
             'submission_target' => $submissionTarget,
             'final_stage' => $finalStage,
-            'chain_label' => 'Agent -> Chef de service -> Controle SCIQ -> Planification',
-            'submission_help_text' => 'L action est visee par le chef de service, contrôlée par SCIQ, puis validée définitivement par Planification.',
+            'chain_label' => 'Agent -> Chef de service -> Planification -> SCIQ',
+            'submission_help_text' => 'L action est visee par le chef de service, contrôlée par la Planification, puis validée définitivement par SCIQ.',
             'submission_button_label' => 'Soumettre',
-            'service_review_button_label' => 'Viser et transmettre au controle',
-            'service_review_success_text' => 'Visa du chef enregistre. L action est transmise au controleur.',
-            'final_statistics_hint' => 'Oui après validation finale par Planification.',
+            'service_review_button_label' => 'Viser et transmettre à la Planification',
+            'service_review_success_text' => 'Visa du chef enregistré. L’action est transmise à la Planification.',
+            'final_statistics_hint' => 'Oui après validation finale par le SCIQ.',
         ];
     }
 

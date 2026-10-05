@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * Tests du cycle de suivi V2 : saisie → visa chef → contrôle SCIQ → Planification.
+ * Tests du cycle de suivi V2 : saisie → visa Chef → Planification → contrôle SCIQ.
  * Voir docs/WORKFLOW-SUIVI-V2.md.
  */
 class WorkflowV2CycleTest extends TestCase
@@ -46,21 +46,21 @@ class WorkflowV2CycleTest extends TestCase
         $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
         $this->assertEquals(0.0, (float) $action->official_progress_percent, 'Toujours pas officielle après submit.');
 
-        // VISA chef → transmet au controle sans officialiser.
+        // VISA Chef → transmet à la Planification sans officialiser.
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
-        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
-        $this->assertEquals(0.0, (float) $action->official_progress_percent);
-        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut);
-
-        // CONTROLE SCIQ → transmet à Planification sans officialiser.
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
         $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION, $action->statut_validation);
         $this->assertEquals(0.0, (float) $action->official_progress_percent);
         $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut);
 
-        // PLANIFICATION finale → officialise et clôture.
+        // VISA Planification → transmet au contrôle SCIQ sans officialiser.
         $action = $workflow->reviewActionByPlanification($action, true, null, $fixture['planification']);
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertEquals(0.0, (float) $action->official_progress_percent);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut);
+
+        // VISA SCIQ final → officialise et clôture.
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->statut_validation);
         $this->assertEquals(90.0, (float) $action->official_progress_percent);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
     }
@@ -97,13 +97,6 @@ class WorkflowV2CycleTest extends TestCase
 
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
-        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
-        $this->assertNull($action->date_fin_reelle);
-        $this->assertNull($action->cloture_le);
-
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
-
         $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
         $this->assertNull($action->date_fin_reelle);
@@ -111,7 +104,14 @@ class WorkflowV2CycleTest extends TestCase
 
         $action = $workflow->reviewActionByPlanification($action, true, null, $fixture['planification']);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertNull($action->date_fin_reelle);
+        $this->assertNull($action->cloture_le);
+
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut_dynamique);
         $this->assertNotNull($action->date_fin_reelle);
         $this->assertNotNull($action->cloture_le);
@@ -166,14 +166,26 @@ class WorkflowV2CycleTest extends TestCase
         }
 
         $action = $workflow->reviewAction($action->fresh(), true, 'Piece partiellement conforme', $fixture['chef'], 72);
-        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION, $action->statut_validation);
         $this->assertSame('72.00', (string) $action->chef_progress_percent);
         $this->assertSame('Piece partiellement conforme', $action->chef_adjustment_reason);
 
+        $action = $workflow->reviewActionByPlanification($action, true, 'Controle de coherence.', $fixture['planification']);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+
         $action = $workflow->reviewActionByController($action, false, 'Completer la preuve', $fixture['controller']);
-        $this->assertSame(ActionTrackingService::VALIDATION_CORRECTION_CONTROLE, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_RETOUR_SCIQ, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_A_CORRIGER, $action->statut);
         $this->assertSame('Completer la preuve', $action->controle_comment);
+
+        $action = $workflow->reviewSciqReturnByPlanification(
+            $action,
+            'accepter_rejet',
+            'Retour justifie.',
+            $fixture['planification']
+        );
+        $action = $workflow->reviewAction($action, true, 'Retour accepte par le Chef.', $fixture['chef']);
+        $this->assertSame(ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE, $action->statut_validation);
 
         $this->actingAs($fixture['agent'])
             ->post(route('workspace.actions.execution.update', $action), [
@@ -192,7 +204,7 @@ class WorkflowV2CycleTest extends TestCase
         ]);
     }
 
-    public function test_controller_endpoint_transmits_action_and_planification_endpoint_closes_it(): void
+    public function test_planification_then_controller_endpoints_close_the_action(): void
     {
         $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
         $workflow = app(ActionWorkflowService::class);
@@ -204,29 +216,28 @@ class WorkflowV2CycleTest extends TestCase
             ->post(route('workspace.actions.control.review', $action), ['decision' => 'valider'])
             ->assertForbidden();
 
-        $this->actingAs($fixture['controller'])
-            ->post(route('workspace.actions.control.review', $action), [
-                'decision' => 'valider',
-                'motif' => 'Controle conforme.',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION, $action->fresh()->statut_validation);
-
-        $this->actingAs($fixture['controller'])
-            ->from(route('workspace.actions.suivi', $action))
-            ->post(route('workspace.actions.control.review', $action), ['decision' => 'valider'])
-            ->assertRedirect(route('workspace.actions.suivi', $action))
-            ->assertSessionHasErrors('general');
-
         $this->actingAs($fixture['planification'])
             ->post(route('workspace.actions.planification.review', $action), [
                 'decision' => 'valider',
-                'motif' => 'Validation finale conforme.',
+                'motif' => 'Controle de coherence.',
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $action->fresh()->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->fresh()->statut_validation);
+
+        $this->actingAs($fixture['chef'])
+            ->from(route('workspace.actions.suivi', $action))
+            ->post(route('workspace.actions.control.review', $action), ['decision' => 'valider'])
+            ->assertForbidden();
+
+        $this->actingAs($fixture['controller'])
+            ->post(route('workspace.actions.control.review', $action), [
+                'decision' => 'valider',
+                'motif' => 'Controle final conforme.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->fresh()->statut_validation);
     }
 
     public function test_composite_action_requires_parent_validation_after_all_sub_actions_validated(): void
@@ -271,19 +282,19 @@ class WorkflowV2CycleTest extends TestCase
 
         $action = $workflow->reviewAction($action, true, null, $fixture['parentReviewer']);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
-        $this->assertNotSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
-        $this->assertEquals(0.0, (float) $action->official_progress_percent);
-
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
-
         $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION, $action->statut_validation);
         $this->assertNotSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
         $this->assertEquals(0.0, (float) $action->official_progress_percent);
 
         $action = $workflow->reviewActionByPlanification($action, true, null, $fixture['planification']);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertNotSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
+        $this->assertEquals(0.0, (float) $action->official_progress_percent);
+
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
         $this->assertEquals(80.0, (float) $action->official_progress_percent);
     }
@@ -310,6 +321,7 @@ class WorkflowV2CycleTest extends TestCase
         $workflow->submitSubAction($subAction->fresh(), ['has_new_proof' => false], $fixture['agent']);
         $workflow->reviewSubAction($subAction->fresh(), true, null, $fixture['chef']);
         $action = $workflow->reviewAction($action->fresh(), true, null, $fixture['parentReviewer']);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $fixture['planification']);
         $workflow->reviewActionByController($action, false, 'Reprendre le livrable', $fixture['controller']);
 
         $subAction->refresh();
@@ -340,8 +352,8 @@ class WorkflowV2CycleTest extends TestCase
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 90], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
         $action = $workflow->reviewActionByPlanification($action, true, null, $fixture['planification']);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
 
         $this->actingAs($fixture['agent'])
             ->get(route('workspace.actions.suivi', $action))
@@ -473,7 +485,7 @@ class WorkflowV2CycleTest extends TestCase
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
-        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->fresh()->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION, $action->fresh()->statut_validation);
     }
 
     public function test_unit_chief_cannot_open_action_from_another_service(): void
@@ -583,7 +595,8 @@ class WorkflowV2CycleTest extends TestCase
 
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 75], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
-        $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $workflow->reviewActionByPlanification($action, true, null, $fixture['planification']);
 
         Action::query()->create([
             'pta_id' => $fixture['action']->pta_id,
@@ -615,6 +628,7 @@ class WorkflowV2CycleTest extends TestCase
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 80], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $fixture['planification']);
         $action->forceFill(['responsable_id' => $fixture['controller']->id])->save();
 
         $this->expectException(\InvalidArgumentException::class);
@@ -633,8 +647,8 @@ class WorkflowV2CycleTest extends TestCase
         $agent = User::factory()->create(['role' => User::ROLE_AGENT, 'direction_id' => $direction->id, 'service_id' => $service->id]);
         $chef = User::factory()->create(['role' => User::ROLE_SERVICE, 'direction_id' => $direction->id, 'service_id' => $service->id]);
         $parentReviewer = User::factory()->create(['role' => User::ROLE_SERVICE, 'direction_id' => $direction->id, 'service_id' => $service->id]);
-        $controller = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
-        $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
+        $controller = User::factory()->create(['role' => User::ROLE_SCIQ]);
+        $planification = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
 
         $pas = Pas::query()->create(['titre' => 'PAS WF', 'periode_debut' => 2026, 'periode_fin' => 2030]);
         $pao = Pao::query()->create(['pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO WF', 'annee' => 2026]);

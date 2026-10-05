@@ -14,7 +14,6 @@ use App\Models\FinancialTransaction;
 use App\Models\Justificatif;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
-use App\Models\Meeting;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\PaoObjectifOperationnel;
@@ -28,7 +27,6 @@ use App\Models\User;
 use App\Observers\ActionObserver;
 use App\Observers\PlanningCacheObserver;
 use App\Policies\ActionPolicy;
-use App\Policies\MeetingPolicy;
 use App\Policies\PaoPolicy;
 use App\Policies\PasPolicy;
 use App\Services\ActionCalculationSettings;
@@ -133,7 +131,6 @@ class AppServiceProvider extends ServiceProvider
         User::observe(PlanningCacheObserver::class);
 
         Gate::policy(Action::class, ActionPolicy::class);
-        Gate::policy(Meeting::class, MeetingPolicy::class);
         Gate::policy(Pas::class, PasPolicy::class);
         Gate::policy(Pao::class, PaoPolicy::class);
         $dashboardAccess = $this->app->make(DashboardAccessService::class);

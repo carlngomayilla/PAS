@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Controller;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\Dashboard\DashboardFilterContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -14,8 +16,13 @@ class PilotageHierarchyController extends Controller
 {
     use AuthorizesPlanningScope;
 
+    public function __construct(
+        private readonly DashboardFilterContext $dashboardFilterContext,
+    ) {}
+
     public function __invoke(Request $request): View
     {
+        $this->dashboardFilterContext->useRequest($request);
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
@@ -39,6 +46,25 @@ class PilotageHierarchyController extends Controller
             ->orderByDesc('id');
 
         $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+        $actionRouteFilters = $this->dashboardFilterContext->actionRouteFilters($user);
+        $dashboardRouteFilters = $this->dashboardFilterContext->dashboardRouteFilters($user);
+        $directionContext = $this->dashboardFilterContext->directionContext($user);
+        $synthesisFilters = $this->dashboardFilterContext->synthesisFilters();
+
+        if (($actionRouteFilters['annee'] ?? null) !== null) {
+            $ptaQuery->whereHas(
+                'pao',
+                fn (Builder $query): Builder => $query->where('annee', (int) $actionRouteFilters['annee'])
+            );
+        }
+
+        if (($actionRouteFilters['direction_id'] ?? null) !== null) {
+            $ptaQuery->where('direction_id', (int) $actionRouteFilters['direction_id']);
+        }
+
+        if (($actionRouteFilters['service_id'] ?? null) !== null) {
+            $ptaQuery->where('service_id', (int) $actionRouteFilters['service_id']);
+        }
 
         $ptas = $ptaQuery->limit(120)->get();
         $tree = $ptas
@@ -51,7 +77,7 @@ class PilotageHierarchyController extends Controller
                     'pas' => $first?->pao?->pas,
                     'ptas_count' => $pasPtas->count(),
                     'actions_count' => (int) $pasPtas->sum('actions_count'),
-                    'average_progress' => round((float) $pasPtas->avg('actions_avg_progression_reelle'), 1),
+                    'average_progress' => $this->weightedAverageProgress($pasPtas),
                     'paos' => $pasPtas
                         ->groupBy(fn (Pta $pta): int => (int) ($pta->pao?->id ?? 0))
                         ->map(function ($paoPtas): array {
@@ -62,7 +88,7 @@ class PilotageHierarchyController extends Controller
                                 'pao' => $first?->pao,
                                 'ptas_count' => $paoPtas->count(),
                                 'actions_count' => (int) $paoPtas->sum('actions_count'),
-                                'average_progress' => round((float) $paoPtas->avg('actions_avg_progression_reelle'), 1),
+                                'average_progress' => $this->weightedAverageProgress($paoPtas),
                                 'ptas' => $paoPtas->values(),
                             ];
                         })
@@ -78,8 +104,30 @@ class PilotageHierarchyController extends Controller
                 'pao_total' => $tree->sum(fn (array $pas): int => $pas['paos']->count()),
                 'pta_total' => $ptas->count(),
                 'actions_total' => (int) $ptas->sum('actions_count'),
-                'average_progress' => round((float) $ptas->avg('actions_avg_progression_reelle'), 1),
+                'average_progress' => $this->weightedAverageProgress($ptas),
             ],
+            'actionRouteFilters' => $actionRouteFilters,
+            'dashboardRouteFilters' => $dashboardRouteFilters,
+            'directionContext' => $directionContext,
+            'synthesisFilters' => $synthesisFilters,
+            'periodLabel' => (string) ($synthesisFilters['periode_label'] ?? 'Toutes périodes'),
         ]);
+    }
+
+    /**
+     * @param  Collection<int, Pta>  $ptas
+     */
+    private function weightedAverageProgress(Collection $ptas): float
+    {
+        $actionsCount = (int) $ptas->sum('actions_count');
+        if ($actionsCount <= 0) {
+            return 0.0;
+        }
+
+        $weightedProgress = $ptas->sum(
+            static fn (Pta $pta): float => (float) ($pta->actions_avg_progression_reelle ?? 0) * (int) $pta->actions_count
+        );
+
+        return round($weightedProgress / $actionsCount, 1);
     }
 }

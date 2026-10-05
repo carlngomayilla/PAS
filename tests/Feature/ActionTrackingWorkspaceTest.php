@@ -37,6 +37,10 @@ class ActionTrackingWorkspaceTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertSee('Justificatif', false)
+            ->assertSee('Prochaine étape', false)
+            ->assertSee('Selon exécution')
+            ->assertSee('Renseigner l’avancement')
             ->assertSee('Faire le suivi', false)
             ->assertSee("Report de l'action", false)
             ->assertSee(route('workspace.actions.suivi', $fixture['action']), false)
@@ -47,6 +51,64 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertSame(1, substr_count($response->getContent(), "Report de l'action"));
     }
 
+    public function test_actions_table_highlights_required_proof_status(): void
+    {
+        $fixture = $this->createFixture(['justificatif_obligatoire' => true]);
+
+        $this->actingAs($fixture['chef'])
+            ->get(route('workspace.actions.index'))
+            ->assertOk()
+            ->assertSee('Pièce obligatoire manquante')
+            ->assertSee('Preuve obligatoire')
+            ->assertSee('Renseigner l’avancement');
+    }
+
+    public function test_removing_an_action_filter_resets_pagination_and_keeps_the_layout(): void
+    {
+        $fixture = $this->createFixture(['libelle' => 'Action filtre pagination']);
+
+        $response = $this->actingAs($fixture['chef'])
+            ->get(route('workspace.actions.index', ['q' => 'pagination', 'page' => 2, 'layout' => 'list']));
+
+        $response->assertOk();
+
+        $document = new \DOMDocument;
+        @$document->loadHTML(mb_convert_encoding($response->getContent(), 'HTML-ENTITIES', 'UTF-8'));
+        $links = (new \DOMXPath($document))->query('//a[contains(@class, "active-filter-chip")]');
+        $this->assertCount(1, $links);
+        $link = $links->item(0);
+        parse_str((string) parse_url($link->getAttribute('href'), PHP_URL_QUERY), $query);
+        $this->assertArrayNotHasKey('page', $query);
+        $this->assertSame('list', $query['layout']);
+        $this->assertSame('', $query['q'] ?? '');
+        $this->assertStringContainsString('pagination', $link->getAttribute('aria-label'));
+
+        $this->get($link->getAttribute('href'))
+            ->assertOk()
+            ->assertSee('Action filtre pagination');
+    }
+
+    public function test_actions_table_filters_by_axis_direction_and_service(): void
+    {
+        $visibleFixture = $this->createFixture(['libelle' => 'Action filtre visible']);
+        $hiddenFixture = $this->createFixture(['libelle' => 'Action filtre masquee']);
+
+        $this->actingAs($visibleFixture['controller'])
+            ->get(route('workspace.actions.index', [
+                'pas_axe_id' => $visibleFixture['axis']->id,
+                'direction_id' => $visibleFixture['direction']->id,
+                'service_id' => $visibleFixture['service']->id,
+            ]))
+            ->assertOk()
+            ->assertSee('Axe stratégique')
+            ->assertSee('Direction')
+            ->assertSee('Service')
+            ->assertSee('Action filtre visible')
+            ->assertDontSee('Action filtre masquee');
+
+        $this->assertNotSame($visibleFixture['axis']->id, $hiddenFixture['axis']->id);
+    }
+
     public function test_agent_workspace_shows_operational_command_and_complete_hierarchy(): void
     {
         $fixture = $this->createFixture();
@@ -55,6 +117,9 @@ class ActionTrackingWorkspaceTest extends TestCase
             ->get(route('workspace.actions.suivi', $fixture['action']))
             ->assertOk()
             ->assertSee('Poste de traitement', false)
+            ->assertSee('Points de controle avant validation', false)
+            ->assertSee('Resultat declare', false)
+            ->assertSee('Circuit officiel', false)
             ->assertSee('Faire le suivi', false)
             ->assertSee('PAS Suivi 2026-2030')
             ->assertSee('AXE-01 - Qualite de service')
@@ -72,6 +137,18 @@ class ActionTrackingWorkspaceTest extends TestCase
 
         $this->assertSame(7, substr_count($response->getContent(), 'data-action-tab-panel'));
         $this->assertSame(1, substr_count($response->getContent(), 'action-detail-tab-panel is-active'));
+    }
+
+    public function test_action_workspace_shows_missing_required_execution_proof(): void
+    {
+        $fixture = $this->createFixture(['justificatif_obligatoire' => true]);
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.suivi', $fixture['action']))
+            ->assertOk()
+            ->assertSee('Justificatif d&#039;execution', false)
+            ->assertSee('Piece obligatoire manquante', false)
+            ->assertSee('#action-justificatifs', false);
     }
 
     public function test_historical_execution_form_is_limited_to_sciq_and_planning_profiles(): void
@@ -194,12 +271,12 @@ class ActionTrackingWorkspaceTest extends TestCase
 
         $workflow = app(ActionWorkflowService::class);
         $submitted = $workflow->reviewAction($submitted, true, null, $fixture['chef']);
-        $controller = User::factory()->create(['role' => User::ROLE_SCIQ]);
-        $submitted = $workflow->reviewActionByController($submitted, true, null, $controller);
         $planner = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
-        $closed = $workflow->reviewActionByPlanification($submitted, true, null, $planner);
+        $submitted = $workflow->reviewActionByPlanification($submitted, true, null, $planner);
+        $controller = User::factory()->create(['role' => User::ROLE_SCIQ]);
+        $closed = $workflow->reviewActionByController($submitted, true, null, $controller);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $closed->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $closed->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $closed->statut_dynamique);
         $this->assertNull($closed->date_fin_reelle, 'La date de visa ne doit pas remplacer la date réelle inconnue.');
         $this->assertNotNull($closed->cloture_le, 'La clôture administrative conserve son propre horodatage.');
@@ -295,13 +372,16 @@ class ActionTrackingWorkspaceTest extends TestCase
         );
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $planification = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
+        $sciq = User::factory()->create(['role' => User::ROLE_SCIQ]);
 
-        $this->actingAs($fixture['controller'])
+        $this->actingAs($sciq)
             ->get(route('workspace.actions.suivi', $action))
             ->assertOk()
-            ->assertSee('Controle final', false)
-            ->assertSeeText("Valider ou renvoyer l'execution")
-            ->assertSee('Ouvrir le controle', false);
+            ->assertSee('Contrôle final SCIQ', false)
+            ->assertSeeText('Clôturer par le SCIQ')
+            ->assertSee('Ouvrir la validation finale', false);
     }
 
     public function test_agent_actions_table_releases_metrics_only_after_final_control(): void
@@ -322,11 +402,9 @@ class ActionTrackingWorkspaceTest extends TestCase
             ->assertDontSee('85%', false);
 
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
-        // Circuit a 3 visas : le controle transmet, la planification cloture.
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
-
         $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
         $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
 
         $this->actingAs($fixture['agent'])
             ->get(route('workspace.actions.index', ['vue' => 'mes_actions']))
@@ -354,12 +432,11 @@ class ActionTrackingWorkspaceTest extends TestCase
         );
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
-
         $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
         $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut_dynamique);
 
         // Le recalcul des metriques ne doit pas rouvrir l'action.
@@ -401,9 +478,9 @@ class ActionTrackingWorkspaceTest extends TestCase
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
 
-        // L'action attend le controle : la planification ne peut pas cloturer.
-        $this->expectException(\InvalidArgumentException::class);
-        $workflow->reviewActionByPlanification($action, true, null, $planification);
+        // La Planification transmet au SCIQ ; elle ne clôture pas l'action.
+        $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
     }
 
     public function test_the_responsible_cannot_sign_off_their_own_action_as_chief(): void
@@ -427,6 +504,8 @@ class ActionTrackingWorkspaceTest extends TestCase
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $planification = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
 
         // Le chef qui a vise ne peut pas ensuite poser le visa de controle.
         $this->expectException(\InvalidArgumentException::class);
@@ -441,6 +520,8 @@ class ActionTrackingWorkspaceTest extends TestCase
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $planification = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
         $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
 
         // Le controleur qui a transmis ne peut pas realiser la cloture finale.
@@ -457,13 +538,14 @@ class ActionTrackingWorkspaceTest extends TestCase
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 40], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
         $action = $workflow->reviewActionByPlanification($action, false, 'Preuve insuffisante', $planification);
 
         $this->assertSame(
-            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+            ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION,
             $action->statut_validation
         );
+
+        $action = $workflow->reviewAction($action, true, 'Retour Planification confirmé.', $fixture['chef']);
 
         // Le responsable doit pouvoir corriger puis resoumettre : sans cela
         // l'action restait gelee definitivement.
@@ -486,8 +568,8 @@ class ActionTrackingWorkspaceTest extends TestCase
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 100], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
-        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
         $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
 
         // Une action cloturee ne se rejoue pas.
         $this->expectException(\InvalidArgumentException::class);
@@ -676,7 +758,7 @@ class ActionTrackingWorkspaceTest extends TestCase
 
     /**
      * @param  array<string, mixed>  $actionOverrides
-     * @return array{action: Action, agent: User, chef: User, controller: User, service: Service}
+     * @return array{action: Action, agent: User, chef: User, controller: User, direction: Direction, service: Service, axis: PasAxe}
      */
     private function createFixture(array $actionOverrides = []): array
     {
@@ -760,7 +842,7 @@ class ActionTrackingWorkspaceTest extends TestCase
             'justificatif_obligatoire' => false,
         ], $actionOverrides));
 
-        return compact('action', 'agent', 'chef', 'controller', 'service');
+        return compact('action', 'agent', 'chef', 'controller', 'direction', 'service', 'axis');
     }
 
     private function createSubAction(Action $action, User $agent, string $label): SousAction

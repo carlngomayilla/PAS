@@ -2,12 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\InstitutionalMeetingDecision;
 use App\Models\InstitutionalReport;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -22,12 +20,6 @@ class InstitutionalReportingService
     public function canSubmit(User $user): bool
     {
         return $this->canView($user) && ! $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE);
-    }
-
-    public function canScheduleMeeting(User $user): bool
-    {
-        return $this->canSubmit($user)
-            && $user->hasRole(User::ROLE_SERVICE, User::ROLE_DIRECTION);
     }
 
     public function canViewReport(User $user, InstitutionalReport $report): bool
@@ -54,59 +46,6 @@ class InstitutionalReportingService
             && in_array($report->status, [InstitutionalReport::STATUS_DRAFT, InstitutionalReport::STATUS_RETURNED], true);
     }
 
-    public function canPostponeMeeting(User $user, InstitutionalReport $report): bool
-    {
-        if ($report->report_type !== InstitutionalReport::TYPE_MEETING
-            || $report->scheduled_at === null
-            || $report->held_at !== null
-            || $report->cancelled_at !== null
-            || $report->status !== InstitutionalReport::STATUS_DRAFT) {
-            return false;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION)
-            && $user->direction_id !== null
-            && (int) $user->direction_id === (int) $report->direction_id) {
-            return true;
-        }
-
-        return $report->service_id !== null
-            && $user->hasRole(User::ROLE_SERVICE)
-            && $user->service_id !== null
-            && (int) $user->service_id === (int) $report->service_id;
-    }
-
-    public function canPublishMeetingMinutes(User $user, InstitutionalReport $report): bool
-    {
-        if ($report->report_type !== InstitutionalReport::TYPE_MEETING
-            || $report->cancelled_at !== null
-            || ! in_array($report->status, [InstitutionalReport::STATUS_DRAFT, InstitutionalReport::STATUS_RETURNED], true)) {
-            return false;
-        }
-
-        return $this->canAmend($user, $report) || $this->canManageMeetingScope($user, $report);
-    }
-
-    public function canManageMeetingDecisions(User $user, InstitutionalReport $report): bool
-    {
-        return $report->report_type === InstitutionalReport::TYPE_MEETING
-            && $report->held_at !== null
-            && $report->cancelled_at === null
-            && ($this->canPublishMeetingMinutes($user, $report) || $this->canManageMeetingScope($user, $report));
-    }
-
-    public function canUpdateMeetingDecision(User $user, InstitutionalReport $report, InstitutionalMeetingDecision $decision): bool
-    {
-        if ((int) $decision->institutional_report_id !== (int) $report->id
-            || $report->report_type !== InstitutionalReport::TYPE_MEETING
-            || $report->cancelled_at !== null) {
-            return false;
-        }
-
-        return $this->canManageMeetingDecisions($user, $report)
-            || (int) $decision->responsible_id === (int) $user->id;
-    }
-
     public function canReview(User $user, InstitutionalReport $report): bool
     {
         return match ((string) $report->status) {
@@ -129,22 +68,6 @@ class InstitutionalReportingService
         );
     }
 
-    public function canExportMeetingReports(User $user): bool
-    {
-        return $this->canView($user) && $user->hasRole(
-            User::ROLE_SUPER_ADMIN,
-            User::ROLE_ADMIN,
-            User::ROLE_DG,
-            User::ROLE_DIRECTION,
-            User::ROLE_SERVICE,
-            User::ROLE_PLANIFICATION,
-            User::ROLE_CHEF_PLANIFICATION,
-            User::ROLE_SCIQ,
-            User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ,
-        );
-    }
-
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -154,40 +77,26 @@ class InstitutionalReportingService
             abort(403, 'Votre profil ne peut pas deposer de rapport institutionnel.');
         }
 
+        if ((string) ($payload['report_type'] ?? '') === InstitutionalReport::TYPE_MEETING) {
+            throw ValidationException::withMessages([
+                'report_type' => 'Le module Réunions et PV a été retiré.',
+            ]);
+        }
+
         $scope = $this->resolveSubmissionScope($payload, $actor);
-        $isMeeting = (string) $payload['report_type'] === InstitutionalReport::TYPE_MEETING;
-        if ($isMeeting && ! $this->canScheduleMeeting($actor)) {
-            abort(403, 'Seul le chef de service ou le directeur du périmètre peut programmer une réunion.');
-        }
-        if ($isMeeting) {
-            if (($payload['meeting_type'] ?? null) === InstitutionalReport::MEETING_TYPE_DIRECTION
-                && ! $actor->hasRole(User::ROLE_DIRECTION)) {
-                abort(403, 'Seul le directeur peut programmer une réunion de direction.');
-            }
-            if (($payload['meeting_type'] ?? null) === InstitutionalReport::MEETING_TYPE_SERVICE
-                && ! $actor->hasRole(User::ROLE_SERVICE, User::ROLE_DIRECTION)) {
-                abort(403, 'Seul le chef de service ou le directeur peut programmer une réunion de service.');
-            }
-            $this->assertMeetingScope($payload, $scope);
-            $this->assertMeetingParticipants($payload, $scope);
-        }
 
         return InstitutionalReport::query()->create([
             'report_type' => (string) $payload['report_type'],
-            'meeting_type' => $isMeeting ? (string) $payload['meeting_type'] : null,
-            'title' => $this->nullableText($payload['title'] ?? null) ?? $this->defaultMeetingTitle($payload),
+            'meeting_type' => null,
+            'title' => trim((string) $payload['title']),
             'summary' => $this->nullableText($payload['summary'] ?? null),
             'direction_id' => $scope['direction_id'],
             'service_id' => $scope['service_id'],
-            'responsible_id' => $isMeeting ? (int) $payload['responsible_id'] : null,
-            'scheduled_at' => $payload['scheduled_at'] ?? null,
-            'original_scheduled_at' => $isMeeting ? ($payload['scheduled_at'] ?? null) : null,
-            'location' => $isMeeting ? $this->nullableText($payload['location'] ?? null) : null,
-            'participant_ids' => $isMeeting ? $this->normalizedParticipantIds($payload['participant_ids'] ?? []) : null,
-            'held_at' => $payload['held_at'] ?? null,
+            'responsible_id' => null,
+            'held_at' => null,
             'status' => InstitutionalReport::STATUS_DRAFT,
             'submitted_by' => $actor->id,
-            'review_history' => [$this->historyEntry($actor, 'created', 'Dossier cree ou reunion programmee.')],
+            'review_history' => [$this->historyEntry($actor, 'created', 'Rapport institutionnel créé.')],
         ]);
     }
 
@@ -197,13 +106,6 @@ class InstitutionalReportingService
             $lockedReport = InstitutionalReport::query()->lockForUpdate()->findOrFail($report->id);
             if (! $this->canAmend($actor, $lockedReport)) {
                 abort(403, 'Seul le deposant peut soumettre ce rapport dans son etat actuel.');
-            }
-
-            if ($lockedReport->report_type === InstitutionalReport::TYPE_MEETING
-                && $lockedReport->held_at === null) {
-                throw ValidationException::withMessages([
-                    'report' => 'Renseignez la date de tenue de la reunion avant de deposer son compte rendu.',
-                ]);
             }
 
             if (! $lockedReport->justificatifs()->exists()) {
@@ -230,9 +132,7 @@ class InstitutionalReportingService
     {
         return DB::transaction(function () use ($report, $payload, $actor): InstitutionalReport {
             $lockedReport = InstitutionalReport::query()->lockForUpdate()->findOrFail($report->id);
-            $canAmend = $this->canAmend($actor, $lockedReport)
-                || $this->canPublishMeetingMinutes($actor, $lockedReport);
-            if (! $canAmend) {
+            if (! $this->canAmend($actor, $lockedReport)) {
                 abort(403, 'Ce rapport ne peut plus etre corrige avec votre profil.');
             }
 
@@ -242,93 +142,15 @@ class InstitutionalReportingService
                 ]);
             }
 
-            $heldAt = $this->nullableText($payload['held_at'] ?? null);
-            if ($lockedReport->report_type === InstitutionalReport::TYPE_MEETING && $lockedReport->held_at === null && $heldAt === null) {
-                throw ValidationException::withMessages([
-                    'held_at' => 'Indiquez la date effective de la réunion avant de déposer son compte rendu.',
-                ]);
-            }
-
             $lockedReport->forceFill([
                 'summary' => $this->nullableText($payload['summary'] ?? $lockedReport->summary),
-                'held_at' => $heldAt ?? $lockedReport->held_at,
-                'actual_agenda' => $this->nullableText($payload['actual_agenda'] ?? $lockedReport->actual_agenda),
-                'decisions' => $this->nullableText($payload['decisions'] ?? $lockedReport->decisions),
                 'recommendations' => $this->nullableText($payload['recommendations'] ?? $lockedReport->recommendations),
                 'difficulties' => $this->nullableText($payload['difficulties'] ?? $lockedReport->difficulties),
                 'observations' => $this->nullableText($payload['observations'] ?? $lockedReport->observations),
                 'status' => InstitutionalReport::STATUS_SUBMITTED_SCIQ,
                 'submitted_at' => now(),
-                'minutes_published_at' => $lockedReport->report_type === InstitutionalReport::TYPE_MEETING ? now() : $lockedReport->minutes_published_at,
                 'returned_at' => null,
                 'review_history' => $this->appendHistory($lockedReport, $actor, 'resubmitted', 'Correction deposee et transmise au SCIQ.'),
-            ])->save();
-
-            return $lockedReport->refresh();
-        }, attempts: 3);
-    }
-
-    /**
-     * @param  array{scheduled_at:string,reason:string}  $payload
-     */
-    public function postponeMeeting(InstitutionalReport $report, array $payload, User $actor): InstitutionalReport
-    {
-        return DB::transaction(function () use ($report, $payload, $actor): InstitutionalReport {
-            $lockedReport = InstitutionalReport::query()->lockForUpdate()->findOrFail($report->id);
-            if (! $this->canPostponeMeeting($actor, $lockedReport)) {
-                abort(403, 'Seul le chef du service concerné ou le directeur peut reporter cette réunion avant sa tenue.');
-            }
-
-            $originalDate = $lockedReport->original_scheduled_at ?? $lockedReport->scheduled_at;
-            $newDate = Carbon::parse((string) $payload['scheduled_at']);
-            if (! $originalDate instanceof Carbon || ! $newDate->betweenIncluded($originalDate->copy()->startOfQuarter(), $originalDate->copy()->endOfQuarter())) {
-                throw ValidationException::withMessages([
-                    'scheduled_at' => 'La réunion reportée doit rester dans le même trimestre que sa programmation initiale.',
-                ]);
-            }
-
-            $lockedReport->forceFill([
-                'original_scheduled_at' => $originalDate,
-                'scheduled_at' => $newDate,
-                'postponed_at' => now(),
-                'postponed_by' => $actor->id,
-                'postponement_reason' => trim((string) $payload['reason']),
-                'postponement_count' => (int) $lockedReport->postponement_count + 1,
-                'review_history' => $this->appendHistory(
-                    $lockedReport,
-                    $actor,
-                    'meeting_postponed',
-                    'Réunion reportée dans le trimestre.',
-                    trim((string) $payload['reason'])
-                ),
-            ])->save();
-
-            return $lockedReport->refresh();
-        }, attempts: 3);
-    }
-
-    /**
-     * @param  array{reason:string}  $payload
-     */
-    public function cancelMeeting(InstitutionalReport $report, array $payload, User $actor): InstitutionalReport
-    {
-        return DB::transaction(function () use ($report, $payload, $actor): InstitutionalReport {
-            $lockedReport = InstitutionalReport::query()->lockForUpdate()->findOrFail($report->id);
-            if (! $this->canPostponeMeeting($actor, $lockedReport)) {
-                abort(403, 'Seul le chef du service concerné ou le directeur peut annuler cette réunion avant sa tenue.');
-            }
-
-            $lockedReport->forceFill([
-                'cancelled_at' => now(),
-                'cancelled_by' => $actor->id,
-                'cancellation_reason' => trim((string) $payload['reason']),
-                'review_history' => $this->appendHistory(
-                    $lockedReport,
-                    $actor,
-                    'meeting_cancelled',
-                    'Réunion annulée.',
-                    trim((string) $payload['reason'])
-                ),
             ])->save();
 
             return $lockedReport->refresh();
@@ -367,7 +189,8 @@ class InstitutionalReportingService
      */
     public function visibleQuery(User $user): Builder
     {
-        $query = InstitutionalReport::query();
+        $query = InstitutionalReport::query()
+            ->where('report_type', '!=', InstitutionalReport::TYPE_MEETING);
 
         if ($this->hasGlobalReviewScope($user)) {
             return $query;
@@ -400,7 +223,7 @@ class InstitutionalReportingService
                 ->orWhereLike('decisions', $search));
         }
 
-        foreach (['direction_id', 'service_id', 'responsible_id'] as $field) {
+        foreach (['direction_id', 'service_id'] as $field) {
             $value = $this->positiveInteger($filters[$field] ?? null);
             if ($value !== null) {
                 $query->where($field, $value);
@@ -422,16 +245,6 @@ class InstitutionalReportingService
             $query->whereBetween('scheduled_at', [$quarterStart, $quarterStart->copy()->endOfQuarter()]);
         }
 
-        $meetingType = (string) ($filters['meeting_type'] ?? '');
-        if (in_array($meetingType, [InstitutionalReport::MEETING_TYPE_SERVICE, InstitutionalReport::MEETING_TYPE_DIRECTION], true)) {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING)->where('meeting_type', $meetingType);
-        }
-        $participantId = $this->positiveInteger($filters['participant_id'] ?? null);
-        if ($participantId !== null) {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->whereJsonContains('participant_ids', $participantId);
-        }
-
         $status = (string) ($filters['status'] ?? '');
         if (in_array($status, [
             InstitutionalReport::STATUS_DRAFT,
@@ -444,40 +257,14 @@ class InstitutionalReportingService
         ], true)) {
             $query->where('status', $status);
         }
-        if ($status === 'cancelled') {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING)->whereNotNull('cancelled_at');
-        }
-        if ($status === 'postponed') {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING)->whereNotNull('postponed_at')->whereNull('cancelled_at');
-        }
-        if ($status === 'held') {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING)->whereNotNull('held_at')->whereNull('cancelled_at');
-        }
-        if ($status === 'overdue') {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING)->whereNotNull('scheduled_at')->where('scheduled_at', '<', now())->whereNull('held_at')->whereNull('cancelled_at');
-        }
-        if ($status === 'minutes_pending') {
-            $query->where('report_type', InstitutionalReport::TYPE_MEETING)->whereNotNull('held_at')->whereNull('minutes_published_at');
-        }
 
         return $query;
     }
 
-    /**
-     * @return array{total:int,pending:int,verified:int,meetings_scheduled:int,meetings_held:int,meetings_overdue:int,meetings_on_time:int,meetings_late:int,meetings_postponed:int,meetings_cancelled:int,minutes_distributed:int,minutes_returned:int,meeting_decisions_open:int,meeting_completion_rate:float}
-     */
+    /** @return array{total:int,pending:int,verified:int} */
     public function summaryFor(User $user, array $filters = []): array
     {
         $reports = $this->filteredVisibleQuery($user, $filters);
-        $pastMeetings = (clone $reports)
-            ->where('report_type', InstitutionalReport::TYPE_MEETING)
-            ->whereNotNull('scheduled_at')
-            ->where('scheduled_at', '<=', now());
-        $meetingsHeld = (clone $pastMeetings)->whereNotNull('held_at')->count();
-        $pastMeetingsCount = (clone $pastMeetings)->count();
-        $visibleMeetingIds = (clone $reports)
-            ->where('report_type', InstitutionalReport::TYPE_MEETING)
-            ->select('id');
 
         return [
             'total' => (clone $reports)->count(),
@@ -488,64 +275,7 @@ class InstitutionalReportingService
                 InstitutionalReport::STATUS_SUBMITTED_PLANNING_CHIEF,
             ])->count(),
             'verified' => (clone $reports)->where('status', InstitutionalReport::STATUS_VERIFIED)->count(),
-            'meetings_scheduled' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->where('scheduled_at', '>=', now())
-                ->whereNull('cancelled_at')
-                ->count(),
-            'meetings_held' => $meetingsHeld,
-            'meetings_overdue' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->whereNotNull('scheduled_at')
-                ->where('scheduled_at', '<', now())
-                ->whereNull('held_at')
-                ->whereNull('cancelled_at')
-                ->count(),
-            'meetings_on_time' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->whereNotNull('held_at')
-                ->whereColumn('held_at', '<=', 'scheduled_at')
-                ->count(),
-            'meetings_late' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->whereNotNull('held_at')
-                ->whereColumn('held_at', '>', 'scheduled_at')
-                ->count(),
-            'meetings_postponed' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->whereNotNull('postponed_at')
-                ->count(),
-            'meetings_cancelled' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->whereNotNull('cancelled_at')
-                ->count(),
-            'minutes_distributed' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->whereNotNull('submitted_at')
-                ->count(),
-            'minutes_returned' => (clone $reports)
-                ->where('report_type', InstitutionalReport::TYPE_MEETING)
-                ->where('status', InstitutionalReport::STATUS_RETURNED)
-                ->count(),
-            'meeting_decisions_open' => InstitutionalMeetingDecision::query()
-                ->whereIn('institutional_report_id', $visibleMeetingIds)
-                ->where('status', '!=', InstitutionalMeetingDecision::STATUS_COMPLETED)
-                ->count(),
-            'meeting_completion_rate' => $pastMeetingsCount > 0 ? round(($meetingsHeld / $pastMeetingsCount) * 100, 1) : 0.0,
         ];
-    }
-
-    /**
-     * @return Collection<int, InstitutionalReport>
-     */
-    public function meetingReminderCandidates(int $daysBefore): Collection
-    {
-        return InstitutionalReport::query()
-            ->where('report_type', InstitutionalReport::TYPE_MEETING)
-            ->whereNull('held_at')
-            ->whereNull('cancelled_at')
-            ->whereDate('scheduled_at', now()->addDays($daysBefore)->toDateString())
-            ->get();
     }
 
     public function statusLabel(string $status): string
@@ -562,86 +292,120 @@ class InstitutionalReportingService
         };
     }
 
-    public function meetingStateLabel(InstitutionalReport $report): string
+    /**
+     * @return list<array{status:string,label:string,actor:string,description:string}>
+     */
+    public function verificationSteps(): array
     {
-        if ($report->report_type !== InstitutionalReport::TYPE_MEETING) {
-            return 'Non concerné';
-        }
-
-        if ($report->cancelled_at !== null) {
-            return 'Annulée';
-        }
-        if ($report->held_at !== null) {
-            return $report->scheduled_at !== null && $report->held_at->lte($report->scheduled_at)
-                ? 'Tenue dans les délais'
-                : 'Tenue hors délai';
-        }
-        if ($report->scheduled_at !== null && $report->scheduled_at->isPast()) {
-            return 'Non tenue à échéance';
-        }
-        if ($report->postponed_at !== null) {
-            return 'Reportée dans le trimestre';
-        }
-
-        return 'Programmée';
+        return [
+            [
+                'status' => InstitutionalReport::STATUS_SUBMITTED_SCIQ,
+                'label' => 'Contrôle SCIQ',
+                'actor' => 'SCIQ',
+                'description' => 'Vérifie le dossier, les pièces et le périmètre déclaré.',
+            ],
+            [
+                'status' => InstitutionalReport::STATUS_SUBMITTED_PLANNING,
+                'label' => 'Vérification Planification',
+                'actor' => 'Planification',
+                'description' => 'Confirme la cohérence avec le suivi PAS, PAO et PTA.',
+            ],
+            [
+                'status' => InstitutionalReport::STATUS_SUBMITTED_SCIQ_CHIEF,
+                'label' => 'Validation Chef SCIQ',
+                'actor' => 'Chef SCIQ',
+                'description' => 'Appose le visa hiérarchique SCIQ lorsque le contrôle est conforme.',
+            ],
+            [
+                'status' => InstitutionalReport::STATUS_SUBMITTED_PLANNING_CHIEF,
+                'label' => 'Validation Chef Planification',
+                'actor' => 'Chef Planification',
+                'description' => 'Donne le visa final du circuit institutionnel.',
+            ],
+        ];
     }
 
     /**
-     * @param  array{description:string,responsible_id?:int|null,priority:string,due_at?:string|null}  $payload
+     * @return list<array{status:string,label:string,actor:string,description:string,state:string}>
      */
-    public function createMeetingDecision(InstitutionalReport $report, array $payload, User $actor): InstitutionalMeetingDecision
+    public function verificationProgress(InstitutionalReport $report): array
     {
-        return DB::transaction(function () use ($report, $payload, $actor): InstitutionalMeetingDecision {
-            $lockedReport = InstitutionalReport::query()->lockForUpdate()->findOrFail($report->id);
-            if (! $this->canManageMeetingDecisions($actor, $lockedReport)) {
-                abort(403, 'Vous ne pouvez pas enregistrer de décision pour cette réunion.');
-            }
+        $steps = $this->verificationSteps();
+        $currentIndex = collect($steps)->search(
+            static fn (array $step): bool => $step['status'] === $report->status
+        );
 
-            $responsibleId = $this->positiveInteger($payload['responsible_id'] ?? null);
-            if ($responsibleId !== null) {
-                $this->assertMeetingDecisionResponsible($responsibleId, $lockedReport);
-            }
-            if (! empty($payload['due_at']) && $lockedReport->held_at !== null
-                && Carbon::parse((string) $payload['due_at'])->startOfDay()->lt($lockedReport->held_at->copy()->startOfDay())) {
-                throw ValidationException::withMessages([
-                    'due_at' => 'L’échéance ne peut pas être antérieure à la réunion.',
-                ]);
-            }
+        return collect($steps)
+            ->values()
+            ->map(function (array $step, int $index) use ($currentIndex, $report): array {
+                $state = 'pending';
 
-            return $lockedReport->meetingDecisions()->create([
-                'description' => trim((string) $payload['description']),
-                'responsible_id' => $responsibleId,
-                'priority' => (string) $payload['priority'],
-                'due_at' => $payload['due_at'] ?? null,
-                'status' => InstitutionalMeetingDecision::STATUS_TO_DO,
-                'created_by' => $actor->id,
-            ]);
-        }, attempts: 3);
+                if ($report->status === InstitutionalReport::STATUS_RETURNED) {
+                    $state = 'returned';
+                } elseif ($report->status === InstitutionalReport::STATUS_VERIFIED || ($currentIndex !== false && $index < $currentIndex)) {
+                    $state = 'done';
+                } elseif ($currentIndex !== false && $index === $currentIndex) {
+                    $state = 'current';
+                }
+
+                return [...$step, 'state' => $state];
+            })
+            ->all();
     }
 
-    /**
-     * @param  array{status:string,follow_up_note?:string|null}  $payload
-     */
-    public function updateMeetingDecision(InstitutionalReport $report, InstitutionalMeetingDecision $decision, array $payload, User $actor): InstitutionalMeetingDecision
+    /** @return array{label:string,description:string,tone:string} */
+    public function nextAction(InstitutionalReport $report): array
     {
-        return DB::transaction(function () use ($report, $decision, $payload, $actor): InstitutionalMeetingDecision {
-            $lockedReport = InstitutionalReport::query()->lockForUpdate()->findOrFail($report->id);
-            $lockedDecision = InstitutionalMeetingDecision::query()->lockForUpdate()->findOrFail($decision->id);
-            if (! $this->canUpdateMeetingDecision($actor, $lockedReport, $lockedDecision)) {
-                abort(403, 'Vous ne pouvez pas mettre à jour cette décision.');
-            }
+        return match ($report->status) {
+            InstitutionalReport::STATUS_DRAFT => [
+                'label' => 'Soumettre au SCIQ',
+                'description' => 'Le déposant doit joindre les pièces puis transmettre le dossier au SCIQ.',
+                'tone' => 'info',
+            ],
+            InstitutionalReport::STATUS_SUBMITTED_SCIQ => [
+                'label' => 'Contrôle attendu du SCIQ',
+                'description' => 'Un contrôleur SCIQ doit valider le dossier ou demander une correction motivée.',
+                'tone' => 'warning',
+            ],
+            InstitutionalReport::STATUS_SUBMITTED_PLANNING => [
+                'label' => 'Vérification attendue de la Planification',
+                'description' => 'La Planification doit contrôler la cohérence du rapport avec les données de suivi.',
+                'tone' => 'warning',
+            ],
+            InstitutionalReport::STATUS_SUBMITTED_SCIQ_CHIEF => [
+                'label' => 'Visa attendu du Chef SCIQ',
+                'description' => 'Le Chef SCIQ doit confirmer le contrôle avant transmission finale.',
+                'tone' => 'warning',
+            ],
+            InstitutionalReport::STATUS_SUBMITTED_PLANNING_CHIEF => [
+                'label' => 'Visa final attendu du Chef Planification',
+                'description' => 'Le Chef Planification doit valider le dossier pour le classer comme vérifié.',
+                'tone' => 'warning',
+            ],
+            InstitutionalReport::STATUS_RETURNED => [
+                'label' => 'Correction attendue du déposant',
+                'description' => 'Le déposant doit corriger le résumé ou les pièces puis resoumettre le dossier.',
+                'tone' => 'danger',
+            ],
+            InstitutionalReport::STATUS_VERIFIED => [
+                'label' => 'Circuit terminé',
+                'description' => 'Le rapport est vérifié. Les pièces, décisions et dates restent consultables dans l’historique.',
+                'tone' => 'success',
+            ],
+            default => [
+                'label' => 'Statut à examiner',
+                'description' => 'Le statut du dossier doit être vérifié avant toute action.',
+                'tone' => 'neutral',
+            ],
+        };
+    }
 
-            $status = (string) $payload['status'];
-            $lockedDecision->forceFill([
-                'status' => $status,
-                'follow_up_note' => $this->nullableText($payload['follow_up_note'] ?? null),
-                'completed_at' => $status === InstitutionalMeetingDecision::STATUS_COMPLETED
-                    ? ($lockedDecision->completed_at ?? now())
-                    : null,
-            ])->save();
-
-            return $lockedDecision->refresh();
-        }, attempts: 3);
+    /** @return array{at?:string,user?:string,role?:string,event?:string,message?:string,note?:string|null}|null */
+    public function latestReturnEntry(InstitutionalReport $report): ?array
+    {
+        return collect(is_array($report->review_history) ? $report->review_history : [])
+            ->reverse()
+            ->first(static fn (array $entry): bool => ($entry['event'] ?? null) === 'returned');
     }
 
     private function hasGlobalReviewScope(User $user): bool
@@ -654,84 +418,6 @@ class InstitutionalReportingService
             User::ROLE_SCIQ_SUIVI_GLOBAL,
             User::ROLE_CHEF_UNITE_SCIQ,
         );
-    }
-
-    private function canManageMeetingScope(User $user, InstitutionalReport $report): bool
-    {
-        if ($user->hasRole(User::ROLE_DIRECTION)
-            && $user->direction_id !== null
-            && (int) $user->direction_id === (int) $report->direction_id) {
-            return true;
-        }
-
-        return $report->service_id !== null
-            && $user->hasRole(User::ROLE_SERVICE)
-            && $user->service_id !== null
-            && (int) $user->service_id === (int) $report->service_id;
-    }
-
-    private function assertMeetingDecisionResponsible(int $responsibleId, InstitutionalReport $report): void
-    {
-        $responsible = User::query()->find($responsibleId, ['id', 'direction_id', 'service_id']);
-        if (! $responsible instanceof User
-            || (int) $responsible->direction_id !== (int) $report->direction_id
-            || ($report->service_id !== null && (int) $responsible->service_id !== (int) $report->service_id)) {
-            throw ValidationException::withMessages([
-                'responsible_id' => 'Le responsable de la décision doit appartenir au périmètre de la réunion.',
-            ]);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @param  array{direction_id:?int,service_id:?int}  $scope
-     */
-    private function assertMeetingScope(array $payload, array $scope): void
-    {
-        $meetingType = (string) ($payload['meeting_type'] ?? '');
-        if ($meetingType === InstitutionalReport::MEETING_TYPE_SERVICE && $scope['service_id'] === null) {
-            throw ValidationException::withMessages(['service_id' => 'Une réunion de service doit être rattachée à un service.']);
-        }
-        if ($meetingType === InstitutionalReport::MEETING_TYPE_DIRECTION && $scope['service_id'] !== null) {
-            throw ValidationException::withMessages(['service_id' => 'Une réunion de direction doit être rattachée à la direction entière, sans service.']);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @param  array{direction_id:?int,service_id:?int}  $scope
-     */
-    private function assertMeetingParticipants(array $payload, array $scope): void
-    {
-        $participantIds = $this->normalizedParticipantIds($payload['participant_ids'] ?? []);
-        $responsibleId = $this->positiveInteger($payload['responsible_id'] ?? null);
-        if ($responsibleId === null) {
-            throw ValidationException::withMessages(['responsible_id' => 'Désignez le responsable de la réunion.']);
-        }
-        $userIds = array_values(array_unique([...$participantIds, $responsibleId]));
-        $users = User::query()->whereIn('id', $userIds)->get(['id', 'direction_id', 'service_id']);
-        if ($users->count() !== count($userIds)) {
-            throw ValidationException::withMessages(['participant_ids' => 'Un participant ou le responsable est introuvable.']);
-        }
-
-        foreach ($users as $user) {
-            $insideDirection = (int) $user->direction_id === (int) $scope['direction_id'];
-            $insideService = $scope['service_id'] === null || (int) $user->service_id === (int) $scope['service_id'];
-            if (! $insideDirection || ! $insideService) {
-                throw ValidationException::withMessages(['participant_ids' => 'Le responsable et les participants doivent appartenir au périmètre de la réunion.']);
-            }
-        }
-    }
-
-    /** @return list<int> */
-    private function normalizedParticipantIds(mixed $value): array
-    {
-        return collect(is_array($value) ? $value : [])
-            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
-            ->map(fn (mixed $id): int => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
     }
 
     /**
@@ -813,21 +499,6 @@ class InstitutionalReportingService
         $text = trim((string) $value);
 
         return $text !== '' ? $text : null;
-    }
-
-    /** @param array<string, mixed> $payload */
-    private function defaultMeetingTitle(array $payload): string
-    {
-        if ((string) ($payload['report_type'] ?? '') !== InstitutionalReport::TYPE_MEETING) {
-            return 'Rapport sans objet';
-        }
-
-        $type = (string) ($payload['meeting_type'] ?? 'service') === InstitutionalReport::MEETING_TYPE_DIRECTION
-            ? 'direction'
-            : 'service';
-        $scheduledAt = isset($payload['scheduled_at']) ? Carbon::parse((string) $payload['scheduled_at'])->format('d/m/Y') : 'à programmer';
-
-        return 'Réunion de '.$type.' du '.$scheduledAt;
     }
 
     private function positiveInteger(mixed $value): ?int

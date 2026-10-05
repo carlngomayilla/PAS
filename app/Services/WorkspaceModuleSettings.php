@@ -101,7 +101,7 @@ class WorkspaceModuleSettings
                 continue;
             }
 
-            if ($code === 'alertes') {
+            if (in_array($code, ['alertes', 'reports', 'ai_imports'], true)) {
                 continue;
             }
 
@@ -217,10 +217,9 @@ class WorkspaceModuleSettings
             'pao' => ['code' => 'pao', 'label' => 'PAO', 'description' => 'Déclinaison annuelle par direction', 'enabled' => true, 'order' => 40, 'section' => 'planification'],
             'pta' => ['code' => 'pta', 'label' => 'PTA', 'description' => 'Planification opérationnelle par service', 'enabled' => true, 'order' => 50, 'section' => 'planification'],
             'imports_excel' => ['code' => 'imports_excel', 'label' => 'Imports Excel', 'description' => 'Chargement Excel global PAS, PAO, PTA et actions', 'enabled' => true, 'order' => 55, 'section' => 'planification'],
-            'ai_imports' => ['code' => 'ai_imports', 'label' => 'IA & Imports', 'description' => 'Extraction IA, previsualisation et import PTA valide', 'enabled' => true, 'order' => 56, 'section' => 'planification'],
             'execution' => ['code' => 'execution', 'label' => 'Actions', 'description' => 'Exécution des tâches et suivi de progression', 'enabled' => true, 'order' => 60, 'section' => 'execution'],
             'reporting' => ['code' => 'reporting', 'label' => 'Reporting', 'description' => 'Reporting consolidé, exports et diffusion', 'enabled' => true, 'order' => 70, 'section' => 'pilotage'],
-            'reports' => ['code' => 'reports', 'label' => 'Réunions & PV', 'description' => 'Programmation, dépôt des PV et double visa SCIQ–Planification', 'enabled' => true, 'order' => 71, 'section' => 'pilotage'],
+            'institutional_reports' => ['code' => 'institutional_reports', 'label' => 'Rapports institutionnels', 'description' => 'Rapports périodiques et vérification institutionnelle', 'enabled' => true, 'order' => 71, 'section' => 'pilotage'],
             'ai_reports' => ['code' => 'ai_reports', 'label' => 'Rapports IA', 'description' => 'Rapports PAS, PAO et PTA rediges depuis les metriques', 'enabled' => true, 'order' => 72, 'section' => 'pilotage'],
             'referentiel' => ['code' => 'referentiel', 'label' => 'Référentiels', 'description' => 'Directions, services, utilisateurs', 'enabled' => true, 'order' => 80, 'section' => 'gouvernance'],
             'delegations' => ['code' => 'delegations', 'label' => 'Délégations', 'description' => 'Suppléance temporaire de validation', 'enabled' => true, 'order' => 90, 'section' => 'gouvernance'],

@@ -6,7 +6,6 @@ use Database\Factories\InstitutionalReportFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class InstitutionalReport extends Model
@@ -131,10 +130,5 @@ class InstitutionalReport extends Model
     public function justificatifs(): MorphMany
     {
         return $this->morphMany(Justificatif::class, 'justifiable');
-    }
-
-    public function meetingDecisions(): HasMany
-    {
-        return $this->hasMany(InstitutionalMeetingDecision::class);
     }
 }

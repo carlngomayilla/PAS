@@ -87,9 +87,9 @@ class ActionTrackingService
 
     // ── CONSTANTES DE VALIDATION ──────────────────────────────────────────────
     // Circuit de validation cible (3 visas) :
-    //   agent/RMO → chef de service → controleur SCIQ → planification (cloture).
-    // Le controleur (SCIQ) ne cloture plus : il transmet a la planification, qui
-    // realise la validation finale (cloture officielle) de l'action.
+    //   agent/RMO → chef de service → planification → controleur SCIQ (cloture).
+    // Les statuts historiques de la bascule precedente restent lisibles, mais
+    // les nouvelles transitions suivent strictement cet ordre.
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
 
     public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
@@ -106,19 +106,28 @@ class ActionTrackingService
 
     public const VALIDATION_VALIDEE_CONTROLE = 'validee_controle';
 
-    // Etape finale : validation planification (= cloture officielle de l'action).
+    // Etape intermediaire : validation planification avant le controle SCIQ.
     public const VALIDATION_SOUMISE_PLANIFICATION = 'soumise_planification';
 
     public const VALIDATION_CORRECTION_PLANIFICATION = 'correction_planification';
 
     public const VALIDATION_VALIDEE_PLANIFICATION = 'validee_planification';
 
+    /** Retour SCIQ en attente d'arbitrage par la Planification. */
+    public const VALIDATION_RETOUR_SCIQ = 'retour_sciq';
+
+    /** Retour SCIQ accepté par la Planification, en attente du Chef. */
+    public const VALIDATION_RETOUR_PLANIFICATION = 'retour_planification';
+
+    /** Contestation de la Planification, en attente d'un réexamen SCIQ. */
+    public const VALIDATION_REEXAMEN_SCIQ = 'reexamen_sciq';
+
     /**
      * Statuts qui valent cloture officielle de l'action.
      *
-     * Depuis le circuit a trois visas, c'est la planification qui cloture :
-     * `validee_controle` ne vaut plus cloture que pour les enregistrements
-     * historiques anterieurs a la bascule.
+     * Dans le circuit cible, le SCIQ pose le dernier visa et cloture l'action.
+     * `validee_planification` reste accepte pour les enregistrements historiques
+     * issus de l'ancien ordre des visas.
      *
      * @var list<string>
      */
@@ -138,6 +147,8 @@ class ActionTrackingService
         self::VALIDATION_CORRECTION_DEMANDEE,
         self::VALIDATION_CORRECTION_CONTROLE,
         self::VALIDATION_CORRECTION_PLANIFICATION,
+        self::VALIDATION_RETOUR_SCIQ,
+        self::VALIDATION_RETOUR_PLANIFICATION,
     ];
 
     /**
@@ -273,6 +284,9 @@ class ActionTrackingService
             self::VALIDATION_SOUMISE_PLANIFICATION,
             self::VALIDATION_CORRECTION_PLANIFICATION,
             self::VALIDATION_VALIDEE_PLANIFICATION,
+            self::VALIDATION_RETOUR_SCIQ,
+            self::VALIDATION_RETOUR_PLANIFICATION,
+            self::VALIDATION_REEXAMEN_SCIQ,
         ];
     }
 

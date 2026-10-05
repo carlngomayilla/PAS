@@ -13,6 +13,7 @@ use App\Models\ActionKpi;
 use App\Models\Direction;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
+use App\Models\PasAxe;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
@@ -69,7 +70,16 @@ class ActionWebController extends Controller
         }
 
         $actionRelations = [
-            'pta:id,pao_id,direction_id,service_id,titre,statut',
+            'pta:id,pao_id,objectif_operationnel_id,direction_id,service_id,titre,statut',
+            'pta.direction:id,code,libelle',
+            'pta.service:id,direction_id,code,libelle',
+            'pta.pao:id,pas_objectif_id,titre,annee',
+            'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
+            'pta.pao.pasObjectif.pasAxe:id,code,libelle',
+            'pta.objectifOperationnel:id,pas_axe_id,libelle',
+            'pta.objectifOperationnel.pasAxe:id,code,libelle',
+            'objectifOperationnel:id,pas_axe_id,libelle',
+            'objectifOperationnel.pasAxe:id,code,libelle',
             'responsable:id,name,email',
             'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance',
         ];
@@ -87,7 +97,12 @@ class ActionWebController extends Controller
 
         $viewMode = $this->applyActionFilters($query, $request, $user);
 
-        $summary = $this->buildActionIndexSummary($query);
+        $summary = $this->buildActionIndexSummary($query, $user);
+        $currentValidationQueue = trim((string) $request->string('validation_queue'));
+        $validationQueues = $this->validationQueueDefinitions($user);
+        if ($viewMode === 'validations' && ($currentValidationQueue === '' || ! array_key_exists($currentValidationQueue, $validationQueues))) {
+            $currentValidationQueue = array_key_first($validationQueues) ?? '';
+        }
 
         $sort = (string) $request->string('sort');
         match ($sort) {
@@ -121,14 +136,19 @@ class ActionWebController extends Controller
         $layoutMode = $this->actionIndexLayout($request);
         $visualizationRows = $this->actionVisualizationRows($query, $layoutMode);
         $rows = $query->paginate($perPage)->withQueryString();
+        $actionRowCards = $this->actionRowCards($rows->getCollection());
 
         return view('workspace.actions.index', [
             'rows' => $rows,
+            'actionRowCards' => $actionRowCards,
             'visualizationRows' => $visualizationRows,
             'layoutMode' => $layoutMode,
             'scope' => $user->accessScope(),
             'summary' => $summary,
             'ptaOptions' => $this->ptaOptions($user),
+            'pasAxeOptions' => $this->pasAxeOptions($user),
+            'directionOptions' => $this->directionOptions($user),
+            'serviceOptions' => $this->serviceOptions($user),
             'statusOptions' => array_merge(['achevees'], ActionTrackingService::dynamicStatusOptions()),
             'validationOptions' => $this->validationStatusOptions(),
             'contextOptions' => Action::contextOptions(),
@@ -139,6 +159,8 @@ class ActionWebController extends Controller
             'showDualActionTabs' => $this->shouldUseDualActionTabs($user),
             'showActionValidationTab' => $this->canUseActionValidationTab($user),
             'isFinalControlQueue' => $this->isFinalControlUser($user),
+            'validationQueues' => $validationQueues,
+            'currentValidationQueue' => $currentValidationQueue,
             'canReadAudit' => $user->hasPermission('audit.read'),
             'filters' => [
                 'vue' => $viewMode,
@@ -146,6 +168,7 @@ class ActionWebController extends Controller
                 'origine_action' => trim((string) $request->string('origine_action')),
                 'q' => (string) $request->string('q'),
                 'pta_id' => $request->filled('pta_id') ? (int) $request->integer('pta_id') : null,
+                'pas_axe_id' => $request->filled('pas_axe_id') ? (int) $request->integer('pas_axe_id') : null,
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
                 'service_id' => $request->filled('service_id') ? (int) $request->integer('service_id') : null,
                 'pas_objectif_id' => $request->filled('pas_objectif_id') ? (int) $request->integer('pas_objectif_id') : null,
@@ -154,7 +177,7 @@ class ActionWebController extends Controller
                 'week_start' => $request->filled('week_start') ? trim((string) $request->string('week_start')) : '',
                 'statut' => trim((string) $request->string('statut')),
                 'statut_validation' => $viewMode === 'validations'
-                    ? $this->validationQueueStatus($user)
+                    ? $this->validationQueueStatus($user, $currentValidationQueue)
                     : ($request->filled('statut_validation') ? trim((string) $request->string('statut_validation')) : ''),
                 'statut_validation_min' => $viewMode === 'validations'
                     ? ''
@@ -166,6 +189,125 @@ class ActionWebController extends Controller
                 'sort' => $sort,
             ],
         ]);
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<int, array{
+     *     proof_label: string,
+     *     proof_tone: string,
+     *     next_label: string,
+     *     next_hint: string,
+     *     next_anchor: string,
+     *     next_tone: string
+     * }>
+     */
+    private function actionRowCards(Collection $actions): array
+    {
+        return $actions
+            ->mapWithKeys(fn (Action $action): array => [
+                (int) $action->id => [
+                    ...$this->actionProofSummary($action),
+                    ...$this->actionNextStepSummary($action),
+                ],
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array{proof_label: string, proof_tone: string}
+     */
+    private function actionProofSummary(Action $action): array
+    {
+        $proofCount = (int) ($action->justificatifs_total ?? 0);
+
+        if ($proofCount > 0) {
+            return [
+                'proof_label' => $proofCount.' pièce(s) jointe(s)',
+                'proof_tone' => 'success',
+            ];
+        }
+
+        if ((bool) $action->justificatif_obligatoire) {
+            return [
+                'proof_label' => 'Pièce obligatoire manquante',
+                'proof_tone' => 'warning',
+            ];
+        }
+
+        return [
+            'proof_label' => 'Selon exécution',
+            'proof_tone' => 'neutral',
+        ];
+    }
+
+    /**
+     * @return array{next_label: string, next_hint: string, next_anchor: string, next_tone: string}
+     */
+    private function actionNextStepSummary(Action $action): array
+    {
+        $validationStatus = (string) ($action->statut_validation ?: ActionTrackingService::VALIDATION_NON_SOUMISE);
+        $progress = (float) ($action->progression_reelle ?? 0);
+
+        return match ($validationStatus) {
+            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'attente_validation_chef' => [
+                'next_label' => 'Visa Chef attendu',
+                'next_hint' => 'Le responsable attend la décision hiérarchique.',
+                'next_anchor' => '#action-validation',
+                'next_tone' => 'warning',
+            ],
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
+            'attente_validation_planification' => [
+                'next_label' => 'Validation Planification attendue',
+                'next_hint' => 'La Planification vérifie la cohérence avant transmission au SCIQ.',
+                'next_anchor' => '#action-validation',
+                'next_tone' => 'info',
+            ],
+            ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+            'attente_validation_sciq' => [
+                'next_label' => 'Contrôle SCIQ attendu',
+                'next_hint' => 'Le SCIQ donne le dernier visa et clôture officiellement l’action.',
+                'next_anchor' => '#action-validation',
+                'next_tone' => 'info',
+            ],
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            'retour_chef',
+            'retour_planification',
+            'retour_sciq' => [
+                'next_label' => 'Correction à traiter',
+                'next_hint' => 'Mettre à jour les résultats ou la preuve demandée.',
+                'next_anchor' => '#action-validation',
+                'next_tone' => 'warning',
+            ],
+            ActionTrackingService::VALIDATION_REEXAMEN_SCIQ => [
+                'next_label' => 'Réexamen SCIQ attendu',
+                'next_hint' => 'Le SCIQ doit réexaminer la contestation de la Planification.',
+                'next_anchor' => '#action-validation',
+                'next_tone' => 'info',
+            ],
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            'achevee_validee' => [
+                'next_label' => 'Action achevée',
+                'next_hint' => 'Résultat officiellement validé et consultable.',
+                'next_anchor' => '#action-validation',
+                'next_tone' => 'success',
+            ],
+            default => [
+                'next_label' => $progress > 0.0 ? 'Soumettre au chef' : 'Renseigner l’avancement',
+                'next_hint' => $progress > 0.0
+                    ? 'Transmettre l’exécution et les pièces au visa hiérarchique.'
+                    : 'Démarrer ou compléter le suivi de réalisation.',
+                'next_anchor' => '#action-validation',
+                'next_tone' => $progress > 0.0 ? 'info' : 'neutral',
+            ],
+        };
     }
 
     private function actionIndexLayout(Request $request): string
@@ -1209,7 +1351,11 @@ class ActionWebController extends Controller
         }
 
         if ($viewMode === 'validations') {
-            $this->wherePendingValidation($query, $user);
+            $validationQueue = trim((string) $request->string('validation_queue'));
+            $validationQueue = $validationQueue !== ''
+                ? $validationQueue
+                : (array_key_first($this->validationQueueStatusMap($user)) ?? null);
+            $this->wherePendingValidation($query, $user, $validationQueue);
             $this->whereUserIsNotResponsible($query, $user);
         }
 
@@ -1227,6 +1373,16 @@ class ActionWebController extends Controller
             $request->filled('pta_id'),
             fn (Builder $q) => $q->where('pta_id', (int) $request->integer('pta_id'))
         );
+        $query->when($request->filled('pas_axe_id'), function (Builder $q) use ($request): void {
+            $pasAxeId = (int) $request->integer('pas_axe_id');
+
+            $q->where(function (Builder $axisQuery) use ($pasAxeId): void {
+                $axisQuery
+                    ->whereHas('objectifOperationnel', fn (Builder $objectiveQuery) => $objectiveQuery->where('pas_axe_id', $pasAxeId))
+                    ->orWhereHas('pta.objectifOperationnel', fn (Builder $objectiveQuery) => $objectiveQuery->where('pas_axe_id', $pasAxeId))
+                    ->orWhereHas('pta.pao.pasObjectif', fn (Builder $strategicObjectiveQuery) => $strategicObjectiveQuery->where('pas_axe_id', $pasAxeId));
+            });
+        });
         $query->when(
             $request->filled('direction_id'),
             fn (Builder $q) => $q->whereHas(
@@ -1386,6 +1542,75 @@ class ActionWebController extends Controller
         app(ExerciceContext::class)->applyToPta($query);
 
         return $query->get(['id', 'pao_id', 'objectif_operationnel_id', 'direction_id', 'service_id', 'titre', 'statut']);
+    }
+
+    /**
+     * @return Collection<int, PasAxe>
+     */
+    private function pasAxeOptions(User $user): Collection
+    {
+        $visibleActions = Action::query();
+        $this->scopeAction($visibleActions, $user);
+
+        $axisIds = $visibleActions
+            ->with([
+                'objectifOperationnel:id,pas_axe_id',
+                'pta:id,pao_id,objectif_operationnel_id',
+                'pta.objectifOperationnel:id,pas_axe_id',
+                'pta.pao:id,pas_objectif_id',
+                'pta.pao.pasObjectif:id,pas_axe_id',
+            ])
+            ->get(['actions.id', 'actions.pta_id', 'actions.objectif_operationnel_id'])
+            ->flatMap(static fn (Action $action): array => [
+                $action->objectifOperationnel?->pas_axe_id,
+                $action->pta?->objectifOperationnel?->pas_axe_id,
+                $action->pta?->pao?->pasObjectif?->pas_axe_id,
+            ])
+            ->filter(static fn ($id): bool => (int) $id > 0)
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($axisIds === []) {
+            return new Collection;
+        }
+
+        $query = PasAxe::query()
+            ->whereKey($axisIds)
+            ->orderBy('ordre')
+            ->orderBy('code');
+
+        return $query->get(['id', 'code', 'libelle', 'ordre']);
+    }
+
+    /**
+     * @return Collection<int, Direction>
+     */
+    private function directionOptions(User $user): Collection
+    {
+        $query = Direction::query()
+            ->where('actif', true)
+            ->orderBy('code');
+
+        $this->scopeByUserDirection($query, $user, 'id');
+
+        return $query->get(['id', 'code', 'libelle']);
+    }
+
+    /**
+     * @return Collection<int, Service>
+     */
+    private function serviceOptions(User $user): Collection
+    {
+        $query = Service::query()
+            ->where('actif', true)
+            ->orderBy('direction_id')
+            ->orderBy('code');
+
+        $this->scopeByUserDirection($query, $user, 'direction_id', 'id');
+
+        return $query->get(['id', 'direction_id', 'code', 'libelle']);
     }
 
     /**
@@ -1557,16 +1782,127 @@ class ActionWebController extends Controller
 
     private function isFinalControlUser(User $user): bool
     {
-        return app(PlanningModificationLockService::class)->canGivePlanifAvis($user)
-            || $user->isSuperAdmin()
-            || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
+        return $user->hasRole(
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN
+        );
     }
 
-    private function validationQueueStatus(User $user): string
+    private function isPlanificationReviewer(User $user): bool
     {
-        return $this->isFinalControlUser($user)
-            ? ActionTrackingService::VALIDATION_SOUMISE_CONTROLE
-            : ActionTrackingService::VALIDATION_SOUMISE_CHEF;
+        return $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN
+        );
+    }
+
+    private function validationQueueStatus(User $user, ?string $queue = null): string
+    {
+        return $this->validationQueueStatuses($user, $queue)[0] ?? ActionTrackingService::VALIDATION_SOUMISE_CHEF;
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function validationQueueStatusMap(User $user): array
+    {
+        $map = [];
+        if ($user->isServiceOrUnitChief()) {
+            $map = [
+                'chef' => [ActionTrackingService::VALIDATION_SOUMISE_CHEF],
+                'chef_rejets' => [ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION],
+            ];
+        }
+        if ($this->isPlanificationReviewer($user)) {
+            $map['planification'] = [ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION];
+            $map['planification_rejets'] = [ActionTrackingService::VALIDATION_RETOUR_SCIQ];
+        }
+        if ($this->isFinalControlUser($user)) {
+            $map['sciq'] = [ActionTrackingService::VALIDATION_SOUMISE_CONTROLE];
+            $map['sciq_reexamen'] = [ActionTrackingService::VALIDATION_REEXAMEN_SCIQ];
+        }
+
+        // Les profils Planification et SCIQ disposent d'une lecture globale des
+        // données, mais leur file de validation reste spécialisée. Seuls les
+        // administrateurs transverses voient toutes les files dans cet écran.
+        $isCrossQueueSupervisor = $user->hasRole(
+            User::ROLE_ADMIN,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN,
+            User::ROLE_DG
+        );
+        if ($isCrossQueueSupervisor) {
+            $map = [
+                'chef' => [ActionTrackingService::VALIDATION_SOUMISE_CHEF],
+                'chef_rejets' => [ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION],
+                'planification' => [ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION],
+                'planification_rejets' => [ActionTrackingService::VALIDATION_RETOUR_SCIQ],
+                'sciq' => [ActionTrackingService::VALIDATION_SOUMISE_CONTROLE],
+                'sciq_reexamen' => [ActionTrackingService::VALIDATION_REEXAMEN_SCIQ],
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function validationQueueStatuses(User $user, ?string $queue = null): array
+    {
+        $map = $this->validationQueueStatusMap($user);
+        if ($queue !== null && $queue !== '' && isset($map[$queue])) {
+            return $map[$queue];
+        }
+
+        $statuses = [];
+        foreach ($map as $queueStatuses) {
+            $statuses = [...$statuses, ...$queueStatuses];
+        }
+
+        return array_values(array_unique($statuses ?: [ActionTrackingService::VALIDATION_SOUMISE_CHEF]));
+    }
+
+    /**
+     * @return array<string, array{label:string,count:int,url:string}>
+     */
+    private function validationQueueDefinitions(User $user): array
+    {
+        $map = $this->validationQueueStatusMap($user);
+        if ($map === []) {
+            return [];
+        }
+
+        $base = Action::query();
+        $this->scopeAction($base, $user);
+        app(ExerciceContext::class)->applyToAction($base);
+        $labels = [
+            'chef' => 'Chef · À valider',
+            'chef_rejets' => 'Chef · Retours Planification',
+            'planification' => 'Planification · À valider',
+            'planification_rejets' => 'Planification · Retours SCIQ',
+            'sciq' => 'SCIQ · Contrôles finaux',
+            'sciq_reexamen' => 'SCIQ · Réexamens',
+        ];
+
+        $queues = [];
+        foreach ($map as $key => $statuses) {
+            $queues[$key] = [
+                'label' => $labels[$key] ?? ucfirst($key),
+                'count' => (clone $base)->whereIn('statut_validation', $statuses)->count(),
+                'url' => route('workspace.actions.index', [
+                    'vue' => 'validations',
+                    'validation_queue' => $key,
+                ]),
+            ];
+        }
+
+        return $queues;
     }
 
     private function scopeAction(Builder $query, User $user): void
@@ -1661,21 +1997,24 @@ class ActionWebController extends Controller
     {
         return $query->where(function (Builder $pendingQuery): void {
             $pendingQuery->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)
+                ->orWhere('statut_validation', ActionTrackingService::VALIDATION_RETOUR_PLANIFICATION)
                 ->orWhereHas('sousActions', fn (Builder $subActionQuery) => $subActionQuery
                     ->where('validation_status', SousAction::VALIDATION_SOUMISE));
         });
     }
 
-    private function wherePendingValidation(Builder $query, User $user): Builder
+    private function wherePendingValidation(Builder $query, User $user, ?string $queue = null): Builder
     {
-        if ($this->isFinalControlUser($user)) {
-            return $query->whereIn('statut_validation', [
-                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
-            ]);
-        }
+        $statuses = $this->validationQueueStatuses($user, $queue);
 
-        return $this->wherePendingChefValidation($query);
+        return $query->where(function (Builder $pendingQuery) use ($queue, $statuses): void {
+            $pendingQuery->whereIn('statut_validation', $statuses);
+
+            if ($queue === 'chef' && in_array(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $statuses, true)) {
+                $pendingQuery->orWhereHas('sousActions', fn (Builder $subActionQuery) => $subActionQuery
+                    ->where('validation_status', SousAction::VALIDATION_SOUMISE));
+            }
+        });
     }
 
     private function whereUserIsNotResponsible(Builder $query, User $user): Builder
@@ -1693,7 +2032,7 @@ class ActionWebController extends Controller
     /**
      * @return array{total:int, avg_progression:float, avg_kpi_global:float, avg_quality:float, funded_count:int, validated_count:int, pending_validation_count:int, pending_justificatif_count:int, status_counts:array<string, int>}
      */
-    private function buildActionIndexSummary(Builder $query): array
+    private function buildActionIndexSummary(Builder $query, ?User $user = null): array
     {
         $baseQuery = (clone $query)->toBase();
         // Reset des colonnes héritées (actions.* et sous-requêtes withCount) :
@@ -1739,8 +2078,9 @@ class ActionWebController extends Controller
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ];
 
-        $pendingValidationCount = (int) $this->wherePendingChefValidation(clone $query)
-            ->count();
+        $pendingValidationCount = $user instanceof User
+            ? (int) $this->wherePendingValidation(clone $query, $user)->count()
+            : (int) $this->wherePendingChefValidation(clone $query)->count();
         $validatedCount = (int) (clone $baseQuery)
             ->whereIn('statut_validation', $validatedStatuses)
             ->count();

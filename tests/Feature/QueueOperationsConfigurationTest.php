@@ -11,7 +11,7 @@ class QueueOperationsConfigurationTest extends TestCase
     {
         $this->artisan('schedule:list')
             ->expectsOutputToContain('horizon:snapshot')
-            ->expectsOutputToContain('queue:monitor redis:notifications,redis:exports,redis:ai-imports,redis:default --max=100')
+            ->expectsOutputToContain('queue:monitor redis:notifications,redis:exports,redis:default --max=100')
             ->expectsOutputToContain('queue:prune-failed --hours=168')
             ->assertSuccessful();
     }
@@ -26,21 +26,21 @@ class QueueOperationsConfigurationTest extends TestCase
         );
         $this->assertStringContainsString('class_exists(SnapshotCommand::class)', $schedule);
         $this->assertStringContainsString("Schedule::command('alertes:notifier --refresh-metrics')", $schedule);
-        $this->assertStringContainsString("Schedule::command('meetings:send-reminders')", $schedule);
+        $this->assertStringNotContainsString("Schedule::command('meetings:send-reminders')", $schedule);
         $this->assertStringContainsString("Schedule::command('anbg:planning-auto-archive --execute')", $schedule);
         $this->assertStringContainsString("Schedule::command('anbg:retention-run --execute')", $schedule);
         $this->assertStringContainsString("Schedule::command('horizon:snapshot')", $schedule);
         $this->assertStringContainsString('->everyFiveMinutes()', $schedule);
         $this->assertStringContainsString('class_exists(MonitorCommand::class)', $schedule);
         $this->assertStringContainsString(
-            'queue:monitor redis:notifications,redis:exports,redis:ai-imports,redis:default --max=100',
+            'queue:monitor redis:notifications,redis:exports,redis:default --max=100',
             $schedule,
         );
         $this->assertStringContainsString('->everyMinute()', $schedule);
         $this->assertStringContainsString('class_exists(PruneFailedJobsCommand::class)', $schedule);
         $this->assertStringContainsString('queue:prune-failed --hours=168', $schedule);
-        $this->assertSame(7, substr_count($schedule, '->onOneServer()'));
-        $this->assertSame(7, substr_count($schedule, '->withoutOverlapping('));
+        $this->assertSame(6, substr_count($schedule, '->onOneServer()'));
+        $this->assertSame(6, substr_count($schedule, '->withoutOverlapping('));
         $this->assertSame(2, substr_count($schedule, '->when($usesRedisQueue)'));
     }
 

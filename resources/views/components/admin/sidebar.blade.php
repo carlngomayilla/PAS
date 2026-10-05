@@ -32,16 +32,15 @@
         'organisation' => 'organisation',
         'workflows' => 'workflow',
         'imports_excel' => 'docs',
-        'ai_imports' => 'docs',
         'ai_reports' => 'reporting',
-        'reports' => 'reporting',
+        'institutional_reports' => 'reporting',
         default => $code,
     };
     $moduleSection = static fn (string $code): string => match ($code) {
         'mes_taches', 'notifications' => 'Menu',
-        'pas', 'pao', 'pta', 'imports_excel', 'ai_imports' => 'Planification',
+        'pas', 'pao', 'pta', 'imports_excel' => 'Planification',
         'execution', 'mes_actions', 'corrections', 'validations', 'agents', 'services_agents', 'controle', 'financement' => 'Exécution',
-        'reporting', 'reports', 'ai_reports', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
+        'reporting', 'institutional_reports', 'ai_reports', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
         'super_admin' => 'Plateforme',
         default => 'Administration',
     };
@@ -121,24 +120,16 @@
             'display_order' => $moduleOrder('pta', 60),
         ];
     }
-    $visibleImportModuleCodes = collect(['imports_excel', 'ai_imports'])
-        ->filter(fn (string $code): bool => $canSeeModule($code))
-        ->values()
-        ->all();
-    if ($visibleImportModuleCodes !== []) {
-        $hasManualImports = in_array('imports_excel', $visibleImportModuleCodes, true);
+    if ($canSeeModule('imports_excel')) {
         $planningItems[] = [
             'code' => 'imports',
-            'module_codes' => $visibleImportModuleCodes,
-            'label' => 'Imports',
-            'route' => $hasManualImports ? 'workspace.imports.index' : 'workspace.ai-imports.pta.index',
+            'module_codes' => ['imports_excel'],
+            'label' => 'Imports Excel',
+            'route' => 'workspace.imports.index',
             'icon' => 'docs',
-            'patterns' => ['workspace.imports.*', 'workspace.ai-imports.*'],
-            'badge' => collect($visibleImportModuleCodes)->sum(fn (string $code): int => (int) ($moduleBadges[$code] ?? 0)),
-            'display_order' => min(
-                $hasManualImports ? $moduleOrder('imports_excel', 55) : PHP_INT_MAX,
-                in_array('ai_imports', $visibleImportModuleCodes, true) ? $moduleOrder('ai_imports', 56) : PHP_INT_MAX,
-            ),
+            'patterns' => ['workspace.imports.*'],
+            'badge' => (int) ($moduleBadges['imports_excel'] ?? 0),
+            'display_order' => $moduleOrder('imports_excel', 55),
         ];
     }
     if ($planningItems !== []) {
@@ -190,15 +181,15 @@
     }
 
     $pilotageItems = [];
-    if ($canSeeModule('reports')) {
+    if ($canSeeModule('institutional_reports')) {
         $pilotageItems[] = [
-            'code' => 'reports',
-            'label' => $moduleLabel('reports', 'Rapports'),
-            'route' => 'workspace.meetings.index',
+            'code' => 'institutional_reports',
+            'label' => $moduleLabel('institutional_reports', 'Rapports institutionnels'),
+            'route' => 'workspace.reports.index',
             'icon' => 'reporting',
-            'patterns' => ['workspace.meetings.*'],
-            'badge' => (int) ($moduleBadges['reports'] ?? 0),
-            'display_order' => $moduleOrder('reports', 71),
+            'patterns' => ['workspace.reports.*'],
+            'badge' => (int) ($moduleBadges['institutional_reports'] ?? 0),
+            'display_order' => $moduleOrder('institutional_reports', 71),
         ];
     }
     $visibleReportingModuleCodes = collect(['reporting', 'ai_reports'])

@@ -45,17 +45,6 @@ test('captures de référence UI/UX avant modification', async ({ page }, testIn
     await setTheme(page, 'dark');
     await capture(page, 'super-admin-dashboard-desktop-dark', false);
 
-    await login(page, 'chef.service.e2e@example.test');
-    await page.goto('/workspace/reunions', { waitUntil: 'domcontentloaded' });
-    await setTheme(page, 'light');
-    await capture(page, 'meetings-desktop-light');
-    await setTheme(page, 'dark');
-    await capture(page, 'meetings-desktop-dark');
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    await setTheme(page, 'light');
-    await capture(page, 'meetings-mobile-390-light');
-
     await page.setViewportSize({ width: 320, height: 568 });
     await login(page, 'agent.e2e@example.test');
     await setTheme(page, 'light');

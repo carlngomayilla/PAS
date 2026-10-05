@@ -89,6 +89,26 @@
             ->only(['report_type', 'exercice', 'periode', 'trimestre', 'direction_id', 'service_id', 'statut', 'type_action', 'responsable_id', 'criticite', 'periode_debut', 'periode_fin'])
             ->filter(fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')
             ->all();
+        $selectedDirectionId = (int) request('direction_id');
+        $selectedServiceId = (int) request('service_id');
+        $selectedDirectionLabel = collect($reportFilterOptions['directions'] ?? [])->firstWhere('id', $selectedDirectionId)['label'] ?? null;
+        $selectedServiceLabel = collect($reportFilterOptions['services'] ?? [])->firstWhere('id', $selectedServiceId)['label'] ?? null;
+        $selectedPeriodLabel = collect($reportFilterOptions['periodes'] ?? $reportFilterOptions['trimestres'] ?? [])->firstWhere('value', $selectedReportPeriod)['label'] ?? 'Toutes périodes';
+        $selectedExercise = trim((string) request('exercice', ''));
+        $dateRangeLabel = trim((string) request('periode_debut', '')).' → '.trim((string) request('periode_fin', ''));
+        $periodLabel = $selectedExercise !== '' ? 'Exercice '.$selectedExercise.' · '.$selectedPeriodLabel : $selectedPeriodLabel;
+        if (trim(str_replace('→', '', $dateRangeLabel)) !== '') {
+            $periodLabel .= ' · '.$dateRangeLabel;
+        }
+        $perimeterLabel = $selectedServiceLabel
+            ? $selectedServiceLabel
+            : ($selectedDirectionLabel ?: ($scopeLabel ?: 'Périmètre autorisé'));
+        $traceabilityCards = [
+            ['label' => 'Période', 'value' => $periodLabel],
+            ['label' => 'Périmètre', 'value' => $perimeterLabel],
+            ['label' => 'Source', 'value' => 'Métriques applicatives PAS / PAO / PTA / Actions'],
+            ['label' => 'Date de calcul', 'value' => $generatedLabel],
+        ];
         $metricPercent = static fn ($value): float => min(100, max(0, (float) $value));
     @endphp
 
@@ -128,6 +148,24 @@
             </a>
         </x-slot:actions>
     </x-ui.page-title>
+
+    <section class="showcase-panel mb-4" aria-labelledby="reporting-traceability-title">
+        <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h2 id="reporting-traceability-title" class="showcase-panel-title">Contexte du reporting</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Les chiffres affichés et exportés reprennent les filtres ci-dessous.</p>
+            </div>
+            <span class="anbg-badge anbg-badge-info px-3 py-1">{{ $reportTypes[$activeReportType]['label'] ?? 'Rapport consolidé' }}</span>
+        </div>
+        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+            @foreach ($traceabilityCards as $card)
+                <div class="rounded-lg border border-slate-200 bg-slate-50/85 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+                    <p class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $card['label'] }}</p>
+                    <p class="mt-1 break-words text-sm font-bold text-[#17324a] dark:text-slate-100">{{ $card['value'] }}</p>
+                </div>
+            @endforeach
+        </div>
+    </section>
 
     <section class="showcase-panel mb-4">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">

@@ -34,6 +34,7 @@
             subtitle="Fiche administrative PTA"
         >
             <x-slot:actions>
+                <a class="btn btn-secondary" href="{{ route('workspace.actions.index', ['pta_id' => $row->id, 'exercice' => $row->pao?->annee ?? 'all']) }}">Voir les actions du PTA</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Retour aux PTA</a>
                 @if (($path['pao']['id'] ?? null) !== null)
                     <a class="btn btn-secondary" href="{{ route('workspace.pao.show', $path['pao']['id']) }}">Explorer le PAO</a>

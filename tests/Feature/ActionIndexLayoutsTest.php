@@ -6,6 +6,8 @@ use App\Models\Action;
 use App\Models\Direction;
 use App\Models\Pao;
 use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
@@ -24,7 +26,7 @@ class ActionIndexLayoutsTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * @return array{chef: User, pta: Pta, actions: array<string, Action>}
+     * @return array{chef: User, pta: Pta, axis: PasAxe, actions: array<string, Action>}
      */
     private function seedActions(): array
     {
@@ -33,7 +35,19 @@ class ActionIndexLayoutsTest extends TestCase
         $chef = User::factory()->create(['role' => User::ROLE_SERVICE, 'direction_id' => $direction->id, 'service_id' => $service->id]);
 
         $pas = Pas::query()->create(['titre' => 'PAS Index', 'periode_debut' => 2026, 'periode_fin' => 2030]);
-        $pao = Pao::query()->create(['pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO Index', 'annee' => 2026]);
+        $axis = PasAxe::query()->create([
+            'pas_id' => $pas->id,
+            'direction_id' => $direction->id,
+            'code' => 'AXE-INDEX',
+            'libelle' => 'Axe de filtrage',
+            'ordre' => 1,
+        ]);
+        $strategicObjective = PasObjectif::query()->create([
+            'pas_axe_id' => $axis->id,
+            'code' => 'OBJ-INDEX',
+            'libelle' => 'Objectif de filtrage',
+        ]);
+        $pao = Pao::query()->create(['pas_id' => $pas->id, 'pas_objectif_id' => $strategicObjective->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO Index', 'annee' => 2026]);
         $pta = Pta::query()->create(['pao_id' => $pao->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PTA Index']);
 
         // Volontairement crees dans le desordre pour eprouver le tri par defaut.
@@ -41,7 +55,7 @@ class ActionIndexLayoutsTest extends TestCase
         $t1 = $this->createAction($pta, $chef, 'Action PREMIER trimestre', '2026-01-10', '2026-02-15');
         $t2 = $this->createAction($pta, $chef, 'Action DEUXIEME trimestre', '2026-03-01', '2026-05-20');
 
-        return ['chef' => $chef, 'pta' => $pta, 'actions' => ['t1' => $t1, 't2' => $t2, 't3' => $t3]];
+        return ['chef' => $chef, 'pta' => $pta, 'axis' => $axis, 'actions' => ['t1' => $t1, 't2' => $t2, 't3' => $t3]];
     }
 
     private function createAction(
@@ -228,6 +242,47 @@ class ActionIndexLayoutsTest extends TestCase
         $response
             ->assertSee($visibleAction->libelle)
             ->assertDontSee($foreignAction->libelle);
+    }
+
+    public function test_list_exposes_business_filters_and_action_execution_columns(): void
+    {
+        $fixture = $this->seedActions();
+        $action = $fixture['actions']['t2'];
+        $action->forceFill([
+            'statut' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'progression_reelle' => 60,
+            'progression_theorique' => 45,
+            'justificatif_obligatoire' => true,
+        ])->save();
+
+        $this->actingAs($fixture['chef'])
+            ->get(route('workspace.actions.index', [
+                'q' => 'DEUXIEME',
+                'pas_axe_id' => $fixture['axis']->id,
+                'direction_id' => $fixture['pta']->direction_id,
+                'service_id' => $fixture['pta']->service_id,
+                'annee' => 2026,
+                'mois_demarrage' => '2026-03',
+                'statut' => ActionTrackingService::STATUS_EN_COURS,
+            ]))
+            ->assertOk()
+            ->assertSee('Axe stratégique')
+            ->assertSee('Direction')
+            ->assertSee('Service')
+            ->assertSee('Mois de démarrage')
+            ->assertSee('AXE-INDEX - Axe de filtrage')
+            ->assertSee('DIN - Direction Index')
+            ->assertSee('SIN - Service Index')
+            ->assertSee('Action DEUXIEME trimestre')
+            ->assertDontSee('Action PREMIER trimestre')
+            ->assertDontSee('Action TROISIEME trimestre')
+            ->assertSee($fixture['chef']->name)
+            ->assertSee('20/05/2026')
+            ->assertSee('60%')
+            ->assertSee('Pièce obligatoire manquante')
+            ->assertSee('Visa chef attendu');
     }
 
     public function test_unknown_layout_falls_back_to_the_paginated_list(): void

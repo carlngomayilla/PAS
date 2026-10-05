@@ -101,7 +101,6 @@ return [
     'waits' => [
         'redis:notifications' => 30,
         'redis:exports' => 120,
-        'redis:ai-imports' => 180,
         'redis:default' => 60,
     ],
 
@@ -230,20 +229,6 @@ return [
             'backoff' => [10, 60, 180],
             'nice' => 0,
         ],
-        'supervisor-ai-imports' => [
-            'connection' => 'redis',
-            'queue' => ['ai-imports'],
-            'balance' => 'auto',
-            'autoScalingStrategy' => 'time',
-            'maxProcesses' => 1,
-            'maxTime' => 3600,
-            'maxJobs' => 50,
-            'memory' => 768,
-            'tries' => 3,
-            'timeout' => 1320,
-            'backoff' => [10, 60, 180],
-            'nice' => 0,
-        ],
         'supervisor-default' => [
             'connection' => 'redis',
             'queue' => ['default'],
@@ -272,11 +257,6 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
             ],
-            'supervisor-ai-imports' => [
-                'maxProcesses' => 2,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 10,
-            ],
             'supervisor-default' => [
                 'maxProcesses' => 3,
                 'balanceMaxShift' => 1,
@@ -287,7 +267,6 @@ return [
         'local' => [
             'supervisor-notifications' => ['maxProcesses' => 1],
             'supervisor-exports' => ['maxProcesses' => 1],
-            'supervisor-ai-imports' => ['maxProcesses' => 1],
             'supervisor-default' => ['maxProcesses' => 1],
         ],
     ],

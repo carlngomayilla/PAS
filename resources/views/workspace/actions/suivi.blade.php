@@ -4,7 +4,19 @@
     @php
         $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
         $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
-        $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
+        $validationStatusLabel = static function (string $status): string {
+            return [
+                'realisee_a_soumettre' => 'Réalisée à soumettre',
+                'attente_validation_chef' => 'En attente du Chef',
+                'retour_chef' => 'Retour du Chef',
+                'attente_validation_planification' => 'En attente de la Planification',
+                'retour_planification' => 'Retour de la Planification',
+                'attente_validation_sciq' => 'En attente du SCIQ',
+                'retour_sciq' => 'Retour du SCIQ',
+                'reexamen_sciq' => 'Réexamen SCIQ',
+                'achevee_validee' => 'Achevée et validée',
+            ][$status] ?? \App\Support\UiLabel::validationStatus($status);
+        };
         $kpi = $action->actionKpi;
         $status = $action->statut_dynamique ?: 'non_demarre';
         $pta = $action->pta;
@@ -50,19 +62,21 @@
             'service_enabled' => true,
             'direction_enabled' => false,
             'submission_target' => 'service',
-            'chain_label' => 'Agent -> Chef de service -> Controle SCIQ -> Planification',
-            'submission_help_text' => "L'action est visée par le chef, contrôlée par SCIQ, puis validée par Planification.",
+            'chain_label' => 'Agent -> Chef -> Planification -> SCIQ -> Action achevée',
+            'submission_help_text' => "L'action est d'abord visée par le Chef, contrôlée par la Planification, puis soumise au SCIQ pour clôture officielle.",
             'submission_button_label' => 'Soumettre',
             'service_review_button_label' => 'Viser et transmettre',
             'service_review_success_text' => 'Visa chef enregistre.',
-            'final_statistics_hint' => 'Oui après validation finale par Planification.',
+             'final_statistics_hint' => 'Oui après validation finale par le SCIQ.',
             'rejection_comment_required' => true,
         ];
         $agentLocked = auth()->check()
             && (int) auth()->id() === (int) $action->responsable_id
             && !in_array($validationStatus, ['non_soumise', 'correction_demandee', 'rejetee_chef', 'correction_controle', 'rejetee_direction'], true);
-        $isAwaitingChef = $workflow['service_enabled'] && $validationStatus === 'soumise_chef';
-        $isAwaitingControl = $validationStatus === 'soumise_controle';
+        $isAwaitingChef = $workflow['service_enabled'] && in_array($validationStatus, ['soumise_chef', 'attente_validation_chef'], true);
+        $isAwaitingChefSciqReturn = $workflow['service_enabled'] && $validationStatus === 'retour_planification';
+        $isAwaitingPlanification = in_array($validationStatus, ['soumise_planification', 'attente_validation_planification'], true);
+        $isAwaitingControl = in_array($validationStatus, ['soumise_controle', 'attente_validation_sciq', 'reexamen_sciq'], true);
         // L'etape « validation direction » a ete supprimee du circuit metier.
         // Les statuts `validee_direction` / `rejetee_direction` ne sont
         // conserves qu'en lecture historique (actions cloturees avant la
@@ -97,6 +111,9 @@
                 'action_transmise_controle',
                 'action_validee_controle',
                 'action_rejetee_controle',
+                'action_transmise_planification',
+                'action_validee_planification',
+                'action_rejetee_planification',
                 'action_validee_direction',
                 'action_rejetee_direction',
                 'financement_demande',
@@ -185,6 +202,12 @@
             'soumise_controle' => 'anbg-badge anbg-badge-info',
             'correction_controle' => 'anbg-badge anbg-badge-warning',
             'validee_controle' => 'anbg-badge anbg-badge-success',
+            'soumise_planification' => 'anbg-badge anbg-badge-info',
+            'correction_planification' => 'anbg-badge anbg-badge-warning',
+            'validee_planification' => 'anbg-badge anbg-badge-success',
+            'retour_sciq' => 'anbg-badge anbg-badge-warning',
+            'retour_planification' => 'anbg-badge anbg-badge-warning',
+            'reexamen_sciq' => 'anbg-badge anbg-badge-info',
             'rejetee_direction' => 'anbg-badge anbg-badge-danger',
             'validee_direction' => 'anbg-badge anbg-badge-success',
         ];
@@ -207,9 +230,16 @@
         ];
         $actionWorkspace = is_array($actionWorkspace ?? null) ? $actionWorkspace : [];
         $workspaceNextStep = is_array($actionWorkspace['next_step'] ?? null) ? $actionWorkspace['next_step'] : [];
+        $workspaceReadinessChecks = is_array($actionWorkspace['readiness_checks'] ?? null) ? $actionWorkspace['readiness_checks'] : [];
         $workspaceHierarchy = is_array($actionWorkspace['hierarchy'] ?? null) ? $actionWorkspace['hierarchy'] : [];
         $workspaceDeadline = is_array($actionWorkspace['deadline'] ?? null) ? $actionWorkspace['deadline'] : [];
         $workspaceConfiguration = is_array($actionWorkspace['configuration'] ?? null) ? $actionWorkspace['configuration'] : [];
+        $workspaceReadinessClasses = [
+            'success' => 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200',
+            'warning' => 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200',
+            'info' => 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200',
+            'neutral' => 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200',
+        ];
         $workspaceDeadlineClasses = [
             'late' => 'text-red-700 dark:text-red-300',
             'urgent' => 'text-red-700 dark:text-red-300',
@@ -260,11 +290,32 @@
             .' au '
             .(optional($action->date_fin)->format('d/m/Y') ?: '-');
         $stepperStoppedStatuses = ['suspendu', 'annule'];
-        $stepperFinishedStatuses = ['acheve', 'acheve_dans_delai', 'acheve_hors_delai', 'cloturee'];
-        $stepperSubmittedStatuses = ['soumise_chef', 'validee_chef', 'soumise_controle', 'correction_demandee', 'correction_controle', 'rejetee_chef', 'validee_controle', 'validee_direction', 'rejetee_direction'];
-        $stepperChefApprovedStatuses = ['validee_chef', 'soumise_controle', 'soumise_planification', 'validee_controle', 'validee_planification', 'validee_direction'];
-        $stepperValidatedStatuses = ['validee_controle', 'validee_planification', 'validee_direction'];
-        $stepperCorrectionStatuses = ['correction_demandee', 'correction_controle', 'rejetee_chef', 'rejetee_direction'];
+        $stepperFinishedStatuses = ['acheve', 'acheve_dans_delai', 'acheve_hors_delai', 'cloturee', 'achevee_validee'];
+        $stepperSubmittedStatuses = [
+            'soumise_chef', 'attente_validation_chef', 'validee_chef',
+            'soumise_planification', 'attente_validation_planification',
+            'soumise_controle', 'attente_validation_sciq',
+            'correction_demandee', 'retour_chef',
+            'correction_planification', 'retour_planification',
+            'correction_controle', 'retour_sciq', 'reexamen_sciq',
+            'rejetee_chef', 'rejetee_direction',
+            'validee_controle', 'validee_planification', 'validee_direction',
+        ];
+        $stepperChefApprovedStatuses = [
+            'validee_chef', 'soumise_planification', 'attente_validation_planification',
+            'soumise_controle', 'attente_validation_sciq',
+            'validee_controle', 'validee_planification', 'validee_direction',
+        ];
+        $stepperPlanificationApprovedStatuses = [
+            'soumise_controle', 'attente_validation_sciq',
+            'validee_controle', 'validee_planification', 'validee_direction',
+        ];
+        $stepperControlApprovedStatuses = ['validee_controle', 'validee_planification', 'validee_direction'];
+        $stepperValidatedStatuses = ['validee_controle', 'validee_planification', 'validee_direction', 'achevee_validee'];
+        $stepperCorrectionStatuses = [
+            'correction_demandee', 'retour_chef', 'correction_planification', 'retour_planification',
+            'correction_controle', 'retour_sciq', 'rejetee_chef', 'rejetee_direction',
+        ];
         $stepperIsStopped = in_array($status, $stepperStoppedStatuses, true);
         $stepperHasStarted = $progressionReelle > 0
             || ! in_array($status, ['non_demarre'], true)
@@ -272,7 +323,10 @@
         $stepperExecutionDone = $progressionReelle >= 100 || in_array($status, $stepperFinishedStatuses, true);
         $stepperHasSubmitted = in_array($validationStatus, $stepperSubmittedStatuses, true);
         $stepperChefApproved = in_array($validationStatus, $stepperChefApprovedStatuses, true);
-        $stepperControlPending = in_array($validationStatus, ['validee_chef', 'soumise_controle'], true);
+        $stepperPlanificationApproved = in_array($validationStatus, $stepperPlanificationApprovedStatuses, true);
+        $stepperPlanificationPending = in_array($validationStatus, ['soumise_planification', 'attente_validation_planification', 'correction_planification', 'retour_planification'], true);
+        $stepperControlPending = in_array($validationStatus, ['soumise_controle', 'attente_validation_sciq', 'reexamen_sciq'], true);
+        $stepperControlApproved = in_array($validationStatus, $stepperControlApprovedStatuses, true);
         $stepperIsValidated = in_array($validationStatus, $stepperValidatedStatuses, true);
         $stepperNeedsCorrection = in_array($validationStatus, $stepperCorrectionStatuses, true) || $status === 'a_corriger';
         $stepperIsClosed = $stepperIsValidated;
@@ -281,34 +335,36 @@
             : number_format($progressionReelle, 0, ',', ' ').'% realise';
         $actionStepperSteps = [
             [
-                'label' => 'Planification',
-                'caption' => 'Action créée',
-                'state' => 'done',
-            ],
-            [
-                'label' => 'Exécution',
-                'caption' => $executionStepCaption,
+                'label' => 'Agent',
+                'caption' => $stepperIsValidated ? 'Réalisation transmise' : $executionStepCaption,
                 'state' => $stepperIsStopped
                     ? 'blocked'
-                    : ($stepperExecutionDone || $stepperIsValidated ? 'done' : ($stepperHasStarted ? 'current' : 'pending')),
+                    : ($stepperHasSubmitted || $stepperIsValidated ? 'done' : ($stepperHasStarted ? 'current' : 'pending')),
             ],
             [
-                'label' => 'Visa chef',
-                'caption' => $stepperChefApproved ? 'Visa enregistre' : $validationLabel,
-                'state' => $stepperNeedsCorrection
+                'label' => 'Chef',
+                'caption' => $stepperChefApproved ? 'Visa enregistré' : ($isAwaitingChef ? 'Décision attendue' : $validationLabel),
+                'state' => $stepperNeedsCorrection && in_array($validationStatus, ['correction_demandee', 'retour_chef', 'rejetee_chef'], true)
                     ? 'warning'
-                    : ($stepperChefApproved ? 'done' : ($stepperHasSubmitted ? 'current' : 'pending')),
+                    : ($stepperChefApproved ? 'done' : ($isAwaitingChef ? 'current' : 'pending')),
             ],
             [
-                'label' => 'Controle',
-                'caption' => $stepperIsValidated ? 'Controle valide' : ($stepperControlPending ? 'Decision attendue' : 'A venir'),
-                'state' => $validationStatus === 'correction_controle'
+                'label' => 'Planification',
+                'caption' => $stepperIsValidated || $stepperPlanificationApproved ? 'Visa enregistré' : ($stepperPlanificationPending ? 'Décision attendue' : 'À venir'),
+                'state' => $stepperNeedsCorrection && in_array($validationStatus, ['correction_planification', 'retour_planification'], true)
                     ? 'warning'
-                    : ($stepperIsValidated ? 'done' : ($stepperControlPending ? 'current' : 'pending')),
+                    : ($stepperPlanificationApproved || $stepperIsValidated ? 'done' : ($stepperPlanificationPending ? 'current' : 'pending')),
             ],
             [
-                'label' => 'Clôture',
-                'caption' => $stepperIsClosed ? 'Dossier finalisé' : 'À venir',
+                'label' => 'SCIQ',
+                'caption' => $stepperIsValidated ? 'Visa final enregistré' : ($stepperControlPending ? 'Décision attendue' : 'À venir'),
+                'state' => $stepperNeedsCorrection && in_array($validationStatus, ['correction_controle', 'retour_sciq'], true)
+                    ? 'warning'
+                    : ($stepperControlApproved || $stepperIsValidated ? 'done' : ($stepperControlPending ? 'current' : 'pending')),
+            ],
+            [
+                'label' => 'Action achevée',
+                'caption' => $stepperIsClosed ? 'Clôture officielle' : 'Après le visa SCIQ',
                 'state' => $stepperIsStopped
                     ? 'blocked'
                     : ($stepperIsClosed ? 'done' : 'pending'),
@@ -320,6 +376,32 @@
                 $actionStepperActiveIndex = $stepIndex;
             }
         }
+        $lastCorrectionLog = $action->actionLogs
+            ->filter(fn ($log): bool => in_array((string) $log->type_evenement, [
+                'action_rejetee_chef',
+                'action_rejetee_controle',
+                'action_rejetee_planification',
+                'retour_sciq_accepte_planification',
+                'retour_planification_accepte_chef',
+                'retour_sciq_accepte_chef',
+            ], true))
+            ->sortByDesc('created_at')
+            ->first();
+        $lastCorrectionDetails = is_array($lastCorrectionLog?->details) ? $lastCorrectionLog->details : [];
+        $lastCorrectionMessage = trim((string) ($lastCorrectionDetails['motif'] ?? $lastCorrectionLog?->message ?? ''));
+        $planificationReviewedAt = $action->planification_validated_at
+            ?? $action->planification_reviewed_at
+            ?? ($stepperIsValidated ? $action->cloture_le : null);
+        $workflowCircuitSteps = [
+            ['label' => 'Agent', 'caption' => $action->soumise_le ? 'Soumission le '.$action->soumise_le->format('d/m/Y H:i') : 'Saisie ou correction'],
+            ['label' => 'Chef', 'caption' => $action->evalue_le ? 'Visa le '.$action->evalue_le->format('d/m/Y H:i') : 'Visa attendu'],
+            ['label' => 'Planification', 'caption' => $planificationReviewedAt ? 'Visa le '.$planificationReviewedAt->format('d/m/Y H:i') : 'Visa attendu'],
+            ['label' => 'SCIQ', 'caption' => $action->controle_reviewed_at ? 'Visa le '.$action->controle_reviewed_at->format('d/m/Y H:i') : 'Contrôle final attendu'],
+            ['label' => 'Action achevée', 'caption' => $action->cloture_le ? 'Clôture le '.$action->cloture_le->format('d/m/Y H:i') : 'Après le visa SCIQ'],
+        ];
+        $executionProofCount = $action->justificatifs
+            ->whereIn('categorie', ['execution_quantitative', 'execution_non_quantitative', 'final'])
+            ->count();
     @endphp
 
     <section id="action-header" class="action-detail-hero mb-4">
@@ -397,6 +479,26 @@
                         {{ $workspaceNextStep['action_label'] ?? 'Ouvrir' }}
                     </a>
                 </div>
+
+                @if ($workspaceReadinessChecks !== [])
+                    <div class="mt-5">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Points de controle avant validation</h3>
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Résultat, pièces, retours et circuit</span>
+                        </div>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            @foreach ($workspaceReadinessChecks as $readinessCheck)
+                                <a
+                                    href="{{ $readinessCheck['anchor'] ?? '#action-validation' }}"
+                                    class="block rounded-xl border p-3 transition hover:-translate-y-0.5 hover:shadow-sm {{ $workspaceReadinessClasses[$readinessCheck['state'] ?? 'neutral'] ?? $workspaceReadinessClasses['neutral'] }}"
+                                >
+                                    <span class="block text-[0.68rem] font-bold uppercase tracking-wide opacity-75">{{ $readinessCheck['label'] ?? '-' }}</span>
+                                    <strong class="mt-1 block text-sm leading-5">{{ $readinessCheck['value'] ?? '-' }}</strong>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 @if ($workspaceHierarchy !== [])
                     <ol class="mt-5 grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-3 dark:border-slate-700 dark:bg-slate-700" aria-label="Rattachement strategique">
@@ -535,9 +637,10 @@
         [$perfLabel, $perfClass] = $v2PerfLabels[$v2PerfStatus ?? 'non_demarre'] ?? $v2PerfLabels['non_demarre'];
         [$tempLabel, $tempClass] = $v2TemporalLabels[$v2TemporalStatus ?? 'sans_echeance'] ?? $v2TemporalLabels['sans_echeance'];
         $v2ValidationStatus = (string) ($action->statut_validation ?? 'non_soumise');
-        $v2IsSubmitted = $v2ValidationStatus === 'soumise_chef';
-        $v2IsAwaitingControl = in_array($v2ValidationStatus, ['validee_chef', 'soumise_controle'], true);
-        $v2IsValidated = in_array($v2ValidationStatus, ['validee_controle', 'validee_planification', 'validee_direction'], true);
+        $v2IsSubmitted = in_array($v2ValidationStatus, ['soumise_chef', 'attente_validation_chef'], true);
+        $v2IsAwaitingPlanification = in_array($v2ValidationStatus, ['soumise_planification', 'attente_validation_planification'], true);
+        $v2IsAwaitingControl = in_array($v2ValidationStatus, ['validee_chef', 'soumise_controle', 'attente_validation_sciq'], true);
+        $v2IsValidated = in_array($v2ValidationStatus, ['validee_controle', 'validee_planification', 'validee_direction', 'achevee_validee'], true);
     @endphp
 
     <span id="action-suivi" class="block scroll-mt-24" aria-hidden="true"></span>
@@ -584,7 +687,7 @@
             <article class="action-tracking-stat action-tracking-stat-main">
                 <span class="action-tracking-stat-label">Performance officielle</span>
                 <strong class="action-tracking-stat-value">{{ number_format((float) $v2OfficialPerf, 0, ',', ' ') }}%</strong>
-                <span class="action-tracking-stat-note">{{ $v2IsValidated ? 'Validée par le contrôle' : 'En attente de validation finale' }}</span>
+                <span class="action-tracking-stat-note">{{ $v2IsValidated ? 'Validée officiellement' : 'En attente de validation finale' }}</span>
             </article>
             <article class="action-tracking-stat">
                 <span class="action-tracking-stat-label">Performance provisoire</span>
@@ -602,21 +705,25 @@
         </div>
 
         @if ($v2IsSubmitted)
-            <p class="action-section-note mb-3">Action soumise au chef de service — saisie gelée en attente de sa décision.</p>
+            <p class="action-section-note mb-3">Réalisation soumise au Chef — saisie gelée en attente de sa décision.</p>
+        @elseif ($v2IsAwaitingPlanification)
+            <p class="action-section-note mb-3">Visa du Chef enregistré — saisie gelée en attente du contrôle de cohérence de la Planification.</p>
         @elseif ($v2IsAwaitingControl)
-            <p class="action-section-note mb-3">Visa du chef enregistré — saisie gelée en attente du contrôle final SCIQ/Planification.</p>
+            <p class="action-section-note mb-3">Visa de la Planification enregistré — saisie gelée en attente du contrôle final SCIQ.</p>
         @elseif ($v2IsValidated)
-            <p class="action-section-note mb-3">Action validée officiellement par le contrôleur et clôturée.</p>
+            <p class="action-section-note mb-3">Action validée officiellement et clôturée.</p>
         @elseif ($v2ValidationStatus === 'correction_demandee')
             <p class="action-section-note action-section-note-warning mb-3">Renvoyée pour correction. Motif : <strong>{{ $action->motif_validation_chef ?: '—' }}</strong></p>
         @elseif ($v2ValidationStatus === 'correction_controle')
             <p class="action-section-note action-section-note-warning mb-3">Correction demandée par le contrôle. Motif : <strong>{{ $action->controle_comment ?: '—' }}</strong></p>
+        @elseif ($v2ValidationStatus === 'correction_planification')
+            <p class="action-section-note action-section-note-warning mb-3">Correction demandée par la planification. Motif : <strong>{{ $lastCorrectionMessage !== '' ? $lastCorrectionMessage : '—' }}</strong></p>
         @endif
 
         @if (($v2ActionResponsible ?? false) && $action->hasHistoricalExecutionToValidate())
             <div class="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
                 <strong>Réalisation antérieure à confirmer.</strong>
-                Les faits et dates historiques restent conservés. Vérifiez les informations, ajoutez le justificatif demandé, puis enregistrez ou soumettez l’action. Les visas du chef, du SCIQ et de la Planification seront datés lorsqu’ils seront réellement donnés.
+                Les faits et dates historiques restent conservés. Vérifiez les informations, ajoutez le justificatif demandé, puis enregistrez ou soumettez l’action. Les visas du Chef, de la Planification et du SCIQ seront datés lorsqu’ils seront réellement donnés.
                 @if ($action->historical_execution_recorded_at)
                     <span class="mt-1 block text-xs">Reprise saisie le {{ $action->historical_execution_recorded_at->format('d/m/Y à H:i') }}.</span>
                 @endif
@@ -632,7 +739,7 @@
         @if (($v2ActionResponsible ?? false))
             @php $v2FormFrozen = ($v2ActionFrozen ?? false); @endphp
             @if ($v2FormFrozen)
-                <p class="action-section-note mb-2">Formulaire figé pendant le visa du chef et le contrôle final. Il se rouvre automatiquement en cas de demande de correction.</p>
+                <p class="action-section-note mb-2">Formulaire figé pendant les visas Chef, Planification et SCIQ. Il se rouvre automatiquement en cas de demande de correction.</p>
             @endif
             <form class="mt-2 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm @if ($v2FormFrozen) opacity-70 @endif" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
                 @csrf
@@ -767,7 +874,7 @@
             <div class="mt-3 rounded-lg border border-[#3996d3]/25 bg-white p-4 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <span class="action-tracking-kicker">Etape 2 sur 3</span>
+                <span class="action-tracking-kicker">Étape 2 sur 4</span>
                         <strong class="block text-sm text-[#17324a]">Visa du chef de service</strong>
                         <p class="mt-1 text-xs text-slate-500">Le taux calculé est proposé automatiquement. Tout ajustement doit être justifié.</p>
                     </div>
@@ -795,13 +902,29 @@
             </div>
         @endif
 
+        @if (($canReviewByChefV2 ?? false) && $isAwaitingChefSciqReturn)
+            <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                <h3 class="text-base font-black text-amber-950">Arbitrage du retour SCIQ</h3>
+                <p class="mt-1 text-sm text-amber-900">La Planification a accepté le retour SCIQ. Le Chef doit confirmer le renvoi avant que l’agent puisse corriger.</p>
+                <div class="mt-3 grid gap-3 lg:grid-cols-1">
+                    <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
+                        @csrf
+                        <input type="hidden" name="decision" value="accepter_rejet">
+                        <label for="chef-sciq-return-accept">Motif</label>
+                        <textarea id="chef-sciq-return-accept" name="motif" rows="2" required></textarea>
+                        <button class="btn btn-primary mt-2" type="submit">Accepter le retour vers l’agent</button>
+                    </form>
+                </div>
+            </div>
+        @endif
+
         @if (($canReviewByControllerV2 ?? false) && $v2IsAwaitingControl)
             <div class="mt-3 rounded-lg border border-emerald-200 bg-white p-4 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <span class="action-tracking-kicker text-emerald-700">Etape 3 sur 3</span>
-                        <strong class="block text-sm text-[#17324a]">Décision du contrôleur</strong>
-                        <p class="mt-1 text-xs text-slate-500">SCIQ / Planification valide le taux proposé par le chef ou demande une correction.</p>
+                        <span class="action-tracking-kicker text-emerald-700">Étape 4 sur 4</span>
+                        <strong class="block text-sm text-[#17324a]">{{ $validationStatus === 'reexamen_sciq' ? 'Réexamen SCIQ' : 'Contrôle final SCIQ' }}</strong>
+                        <p class="mt-1 text-xs text-slate-500">SCIQ vérifie le résultat, les preuves et les visas Chef et Planification avant la clôture officielle.</p>
                     </div>
                     <div class="text-right">
                         <span class="block text-xs font-bold uppercase text-slate-500">Taux proposé par le chef</span>
@@ -817,7 +940,7 @@
                         <input type="hidden" name="decision" value="valider">
                         <label for="control-comment">Observation finale <span class="text-xs text-slate-400">(optionnel)</span></label>
                         <textarea id="control-comment" name="motif" rows="2">{{ old('motif') }}</textarea>
-                        <button class="btn btn-primary mt-2" type="submit">Viser et transmettre à la planification</button>
+                         <button class="btn btn-primary mt-2" type="submit">Valider définitivement et clôturer</button>
                     </form>
                     <form method="POST" action="{{ route('workspace.actions.control.review', $action) }}" class="rounded-md border border-amber-200 bg-amber-50/50 p-3">
                         @csrf
@@ -850,9 +973,10 @@
             </div>
         @endif
 
-        {{-- 3e visa du circuit : validation finale (cloture) par la planification. --}}
+        {{-- 2e visa du circuit : contrôle de cohérence par la Planification. --}}
         @php
-            $isAwaitingPlanification = $validationStatus === 'soumise_planification';
+            $isAwaitingPlanification = in_array($validationStatus, ['soumise_planification', 'attente_validation_planification'], true);
+            $isAwaitingPlanificationSciqReturn = $validationStatus === 'retour_sciq';
             $canValidatePlanification = auth()->user()?->hasRole(
                 \App\Models\User::ROLE_PLANIFICATION,
                 \App\Models\User::ROLE_CHEF_PLANIFICATION,
@@ -860,32 +984,32 @@
                 \App\Models\User::ROLE_SUPER_ADMIN
             );
         @endphp
-        @if ($isAwaitingPlanification && $canValidatePlanification)
+        @if (($isAwaitingPlanification || $isAwaitingPlanificationSciqReturn) && $canValidatePlanification)
             <div class="mt-4 rounded-lg border border-[#3996d3]/30 bg-[#eef6fc]/60 p-4">
-                <h3 class="text-base font-black text-[#17324a]">Validation finale — Planification</h3>
+                <h3 class="text-base font-black text-[#17324a]">{{ $isAwaitingPlanificationSciqReturn ? 'Arbitrage du retour SCIQ' : 'Validation Planification' }}</h3>
                 <p class="mt-1 text-sm text-[#667085]">
-                    L'action a été visée par le chef de service puis par le contrôle. Votre validation clôture officiellement l'action.
+                    {{ $isAwaitingPlanificationSciqReturn ? 'Acceptez le retour vers le Chef ou contestez-le pour demander un réexamen SCIQ.' : "L'action a été visée par le Chef. Vérifiez la cohérence du résultat, de la cible et des justificatifs avant de la transmettre au SCIQ." }}
                 </p>
                 <div class="mt-3 grid gap-3 lg:grid-cols-2">
                     <form method="POST" action="{{ route('workspace.actions.planification.review', $action) }}" class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
                         @csrf
-                        <input type="hidden" name="decision" value="valider">
+                        <input type="hidden" name="decision" value="{{ $isAwaitingPlanificationSciqReturn ? 'accepter_rejet' : 'valider' }}">
                         <label for="planif-comment">Observation finale <span class="text-xs text-slate-400">(optionnel)</span></label>
                         <textarea id="planif-comment" name="motif" rows="2">{{ old('motif') }}</textarea>
-                        <button class="btn btn-primary mt-2" type="submit">Valider et clôturer</button>
+                        <button class="btn btn-primary mt-2" type="submit">{{ $isAwaitingPlanificationSciqReturn ? 'Accepter le retour vers le Chef' : 'Valider et transmettre au SCIQ' }}</button>
                     </form>
                     <form method="POST" action="{{ route('workspace.actions.planification.review', $action) }}" class="rounded-md border border-amber-200 bg-amber-50/50 p-3">
                         @csrf
-                        <input type="hidden" name="decision" value="rejeter">
+                        <input type="hidden" name="decision" value="{{ $isAwaitingPlanificationSciqReturn ? 'contester' : 'rejeter' }}">
                         <label for="planif-reason">Motif de correction</label>
                         <textarea id="planif-reason" name="motif" rows="2" required>{{ old('motif') }}</textarea>
-                        <button class="btn btn-secondary mt-2" type="submit">Renvoyer en correction</button>
+                        <button class="btn btn-secondary mt-2" type="submit">{{ $isAwaitingPlanificationSciqReturn ? 'Contester et demander réexamen SCIQ' : 'Renvoyer en correction' }}</button>
                     </form>
                 </div>
             </div>
         @elseif ($isAwaitingPlanification)
             <p class="mt-4 rounded-lg border border-[#3996d3]/30 bg-[#eef6fc]/60 p-3 text-sm font-semibold text-[#17324a]">
-                Action visée par le contrôle — en attente de la validation finale de la planification.
+                Action visée par le Chef — en attente de la validation Planification.
             </p>
         @endif
     </section>
@@ -932,6 +1056,35 @@
                     <dd class="dd-badges">
                         <span class="{{ $validationStyles[$action->statut_validation ?: 'non_soumise'] ?? 'anbg-badge anbg-badge-neutral' }}">{{ $validationStatusLabel($action->statut_validation ?: 'non_soumise') }}</span>
                     </dd>
+                </dl>
+            </article>
+
+            {{-- Circuit & prochaine action --}}
+            <article class="showcase-inline-stat action-detail-card">
+                <h3 class="form-section-title">Circuit et prochaine action</h3>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>Prochaine action</dt><dd>{{ $workspaceNextStep['title'] ?? 'Consulter le dossier' }}</dd>
+                    <dt>Action attendue</dt><dd>{{ $workspaceNextStep['action_label'] ?? '-' }}</dd>
+                    <dt>Circuit</dt>
+                    <dd>
+                        @foreach ($workflowCircuitSteps as $circuitStep)
+                            <span class="mb-1 mr-1 inline-flex rounded-full border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                                {{ $circuitStep['label'] }} · {{ $circuitStep['caption'] }}
+                            </span>
+                        @endforeach
+                    </dd>
+                    <dt>Dernier retour</dt>
+                    <dd>
+                        @if ($lastCorrectionLog)
+                            {{ $lastCorrectionLog->utilisateur?->name ?? 'Système' }}
+                            · {{ optional($lastCorrectionLog->created_at)->format('d/m/Y H:i') ?: '-' }}
+                            · {{ $lastCorrectionMessage !== '' ? $lastCorrectionMessage : $lastCorrectionLog->message }}
+                        @else
+                            Aucun retour de correction
+                        @endif
+                    </dd>
+                    <dt>Pièces d'exécution</dt>
+                    <dd>{{ $executionProofCount }} pièce(s) déposée(s){{ $action->justificatif_obligatoire ? ' · obligatoire' : ' · selon exécution' }}</dd>
                 </dl>
             </article>
 
@@ -1676,21 +1829,50 @@
                         <th>Niveau</th>
                         <th>Type</th>
                         <th>Message</th>
+                        <th>Motif de retour / décision</th>
                         <th>Destinataire</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($action->actionLogs as $log)
+                        @php
+                            $logDetails = is_array($log->details) ? $log->details : [];
+                            $logMotif = trim((string) ($logDetails['motif'] ?? $logDetails['commentaire'] ?? $logDetails['correction_attendue'] ?? ''));
+                            $logDecision = match ((string) $log->type_evenement) {
+                                'action_rejetee_chef' => 'Retour du Chef',
+                                'action_rejetee_planification' => 'Retour de la Planification',
+                                'action_rejetee_controle' => 'Retour du SCIQ',
+                                'retour_sciq_accepte_planification' => 'Arbitrage Planification',
+                                'retour_planification_accepte_chef' => 'Arbitrage Chef',
+                                'retour_sciq_accepte_chef' => 'Retour SCIQ confirmé par le Chef',
+                                'action_validee_chef', 'action_transmise_planification' => 'Visa Chef',
+                                'action_transmise_controle' => 'Visa Planification',
+                                'action_validee_controle' => 'Visa final SCIQ',
+                                default => '',
+                            };
+                        @endphp
                         <tr>
                             <td>{{ optional($log->created_at)->format('d/m/Y H:i') }}</td>
                             <td>{{ $alertLevelLabels[$log->niveau] ?? \App\Support\UiLabel::alertLevel($log->niveau) }}</td>
                             <td>{{ \App\Support\UiLabel::eventType($log->type_evenement) }}</td>
                             <td>{{ $log->message }}</td>
+                            <td>
+                                @if ($logDecision !== '')
+                                    <span class="anbg-badge {{ str_starts_with((string) $log->type_evenement, 'action_rejetee_') ? 'anbg-badge-warning' : 'anbg-badge-info' }} px-2 py-1">{{ $logDecision }}</span>
+                                @endif
+                                @if ($logMotif !== '')
+                                    <p class="mt-1 max-w-sm whitespace-pre-line text-xs text-slate-600 dark:text-slate-300">{{ $logMotif }}</p>
+                                @elseif ($logDecision !== '' && str_starts_with((string) $log->type_evenement, 'action_rejetee_'))
+                                    <span class="text-xs text-amber-700 dark:text-amber-300">Motif non renseigné</span>
+                                @else
+                                    <span class="text-xs text-slate-400">-</span>
+                                @endif
+                            </td>
                             <td>{{ $log->cible_role ? \App\Support\UiLabel::roleAudience($log->cible_role) : '-' }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5">
+                            <td colspan="6">
                                 <x-ui.empty-state
                                     title="Aucun événement"
                                     message="Les alertes et événements de suivi apparaîtront ici."

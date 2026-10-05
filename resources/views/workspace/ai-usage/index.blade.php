@@ -8,7 +8,7 @@
                 <h1 class="showcase-panel-title">Consommation IA</h1>
                 <p class="text-sm text-slate-500">Appels, tokens, cout estime et budget mensuel.</p>
             </div>
-            <a class="btn btn-outline" href="{{ route('workspace.ai-imports.index') }}">Imports IA</a>
+            <a class="btn btn-outline" href="{{ route('workspace.ai-reports.index') }}">Rapports IA</a>
         </div>
 
         <div class="mb-5 grid gap-3 sm:grid-cols-3">

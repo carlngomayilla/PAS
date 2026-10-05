@@ -26,14 +26,14 @@ class UserWorkspaceService
         $modules = $this->modulesForSpecRole($specRole, $user);
         if ($user->hasPermission('reporting.read')) {
             $modules[] = [
-                'code' => 'reports',
-                'label' => 'Réunions & PV',
-                'description' => 'Programmation, dépôt des PV et double visa SCIQ–Planification',
-                'endpoint' => '/workspace/reunions',
+                'code' => 'institutional_reports',
+                'label' => 'Rapports institutionnels',
+                'description' => 'Rapports périodiques, pièces justificatives et circuit de vérification',
+                'endpoint' => '/workspace/rapports',
                 'can_write' => ! $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE),
                 'actions' => $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE)
                     ? ['Consulter']
-                    : ['Consulter', 'Programmer une réunion', 'Déposer un PV'],
+                    : ['Consulter', 'Déposer un rapport'],
             ];
         }
         $modules = array_values(array_filter(
@@ -41,18 +41,7 @@ class UserWorkspaceService
             fn (array $module): bool => $this->moduleAllowedByPermissions($module, $user)
         ));
 
-        return collect($this->workspaceModuleSettings->applyToModules($modules))
-            ->map(function (array $module): array {
-                if (($module['code'] ?? null) === 'reports') {
-                    $module['label'] = 'Réunions & PV';
-                    $module['description'] = 'Programmation, dépôt des PV et double visa SCIQ–Planification';
-                    $module['endpoint'] = '/workspace/reunions';
-                }
-
-                return $module;
-            })
-            ->values()
-            ->all();
+        return $this->workspaceModuleSettings->applyToModules($modules);
     }
 
     /**
@@ -398,7 +387,6 @@ class UserWorkspaceService
                 $m('pilotage', 'Dashboard', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
-                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
                 $m('execution', 'Action', '/workspace/actions', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Valider', 'Renvoyer']]),
                 $m('reports_echeance', 'Modifications', '/workspace/reports-echeance', ['can_write' => true, 'actions' => ['Valider', 'Demander complément', 'Rejeter']]),
                 // La validation est désormais traitée dans l'onglet Actions > Validations.
@@ -417,7 +405,6 @@ class UserWorkspaceService
                 $m('pao', 'PAO', '/workspace/pao'),
                 $m('pta', 'PTA', '/workspace/pta'),
                 $m('imports_excel', 'Imports Excel', '/workspace/imports-excel', ['can_write' => true, 'actions' => ['Verifier', 'Mapper colonnes', 'Importer']]),
-                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Analyser', 'Valider', 'Importer']]),
                 $m('execution', 'Action', '/workspace/actions'),
                 // Un seul espace regroupe la file de contrôle, les anomalies et la traçabilité.
                 $m('controle', 'Contrôle & conformité', '/workspace/actions?vue=validations', ['can_write' => true, 'actions' => ['Vérifier', 'Demander correction', 'Valider', 'Consulter la traçabilité']]),
@@ -435,7 +422,6 @@ class UserWorkspaceService
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pao', 'PAO', '/workspace/pao', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('pta', 'PTA des services', '/workspace/pta'),
-                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
                 $m('execution', 'Action', '/workspace/actions'),
                 $m('reports_echeance', 'Modifications', '/workspace/reports-echeance', ['can_write' => true, 'actions' => ['Donner accord', 'Demander complément', 'Rejeter']]),
                 // 'services_agents' → referentiel utilisateurs (filtree par direction).
@@ -451,7 +437,6 @@ class UserWorkspaceService
                 $m('reports_echeance', 'Modifications', '/workspace/reports-echeance', ['can_write' => true, 'actions' => ['Donner accord', 'Demander complément', 'Rejeter']]),
                 $m('pao', 'PAO', '/workspace/pao', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('pta', 'PTA des services', '/workspace/pta'),
-                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
                 $m('execution', 'Action', '/workspace/actions'),
                 $m('services_agents', 'Services / Agents', '/workspace/referentiel/utilisateurs'),
                 $m('reporting', 'Reporting direction', '/workspace/reporting'),
@@ -496,10 +481,6 @@ class UserWorkspaceService
                     'can_write' => $isUcasChief,
                     'actions' => $isUcasChief ? ['Consulter', 'Créer', 'Modifier'] : ['Consulter'],
                 ]),
-                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', [
-                    'can_write' => $isUcasChief,
-                    'actions' => $isUcasChief ? ['Charger', 'Corriger', 'Valider'] : ['Consulter'],
-                ]),
                 $m('execution', 'Action', '/workspace/actions', [
                     'can_write' => $isUcasChief,
                     'actions' => $isUcasChief ? ['Consulter', 'Valider', 'Renvoyer'] : ['Consulter'],
@@ -515,7 +496,6 @@ class UserWorkspaceService
                 $m('pilotage', 'Dashboard admin', '/workspace/pilotage'),
                 $m('super_admin', 'Super Administration', '/workspace/super-admin', ['can_write' => true]),
                 $m('imports_excel', 'Imports Excel', '/workspace/imports-excel', ['can_write' => true, 'actions' => ['Verifier', 'Mapper colonnes', 'Importer']]),
-                $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Analyser', 'Valider', 'Importer']]),
                 $m('ai_reports', 'Rapports IA', '/workspace/ai-reports', ['can_write' => true, 'actions' => ['Generer', 'Valider', 'Exporter']]),
                 $m('referentiel', 'Utilisateurs', '/workspace/referentiel/utilisateurs', ['can_write' => true]),
                 $m('roles_permissions', 'Rôles & permissions', '/workspace/super-admin/roles-permissions', ['can_write' => true]),
@@ -554,14 +534,8 @@ class UserWorkspaceService
                 User::ROLE_CHEF_PLANIFICATION,
                 User::ROLE_CHEF_UNITE_SCIQ
             ),
-            'ai_imports' => $user->hasAnyPermission(
-                'ai_pta_import.view',
-                'ai_pta_import.upload',
-                'ai_pta_import.analyze',
-                'ai_pta_import.history'
-            ),
             'ai_reports' => $user->hasPermission('ai_reports.view'),
-            'reports', 'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
+            'institutional_reports', 'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
             'financements_critiques' => $user->hasPermission('alerts.read'),
             'audit' => $user->hasPermission('audit.read'),
             'referentiel', 'roles_permissions', 'organisation' => $user->hasAnyPermission(

@@ -144,7 +144,7 @@
                                                 <button class="btn btn-primary" type="submit">Cloturer</button>
                                             </form>
                                         @endif
-                                        @if ($row->statut === 'clôture')
+                                        @if ($row->statut === \App\Models\Pas::STATUS_CLOTURE)
                                             <form method="POST" action="{{ route('workspace.pas.archive', $row) }}" data-confirm-message="Archiver ce PAS cloture ?" data-confirm-tone="warning" data-confirm-label="Archiver">
                                                 @csrf
                                                 <input type="hidden" name="motif" value="Archivage PAS cloture depuis la liste">
@@ -177,7 +177,7 @@
                 </tbody>
             </table>
         </div>
-        <div class="pagination">{{ $rows->links() }}</div>
+        <x-ui.pagination :paginator="$rows" label="PAS filtrés" />
     </section>
     </div>
 @endsection
