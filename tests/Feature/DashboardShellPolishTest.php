@@ -62,6 +62,9 @@ class DashboardShellPolishTest extends TestCase
         $this->assertStringContainsString("sidebar.addEventListener('mouseenter'", $script);
         $this->assertStringContainsString("'Menu' => 10", $sidebar);
         $this->assertStringContainsString("'Plateforme' => 60", $sidebar);
+        $this->assertStringContainsString('aria-label="{{ $item[\'label\'] }}"', $sidebar);
+        $this->assertStringContainsString('class="min-w-0 flex-1 break-words"', $sidebar);
+        $this->assertStringContainsString('overflow-wrap: anywhere !important;', $styles);
     }
 
     public function test_import_and_reporting_navigation_are_unified_with_internal_tabs(): void

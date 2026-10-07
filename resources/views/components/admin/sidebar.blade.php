@@ -454,6 +454,7 @@
                                     class="app-sidebar-link {{ $active ? 'active is-active' : '' }}"
                                     data-sidebar-module="{{ $moduleCode }}"
                                     title="{{ $item['label'] }}"
+                                    aria-label="{{ $item['label'] }}"
                                     @if ($active) aria-current="page" @endif
                                 >
                                     <span class="app-sidebar-link-icon">
@@ -461,7 +462,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $iconPath }}" />
                                         </svg>
                                     </span>
-                                    <span class="min-w-0 flex-1 truncate" data-sidebar-label title="{{ $item['label'] }}">{{ $item['label'] }}</span>
+                                    <span class="min-w-0 flex-1 break-words" data-sidebar-label title="{{ $item['label'] }}">{{ $item['label'] }}</span>
                                     @if ($badgeCount > 0)
                                         <span class="app-sidebar-notification-dot" aria-hidden="true"></span>
                                         <span class="app-sidebar-badge inline-flex min-w-[1.55rem] items-center justify-center px-1.5 py-1 text-[10px] leading-none" data-sidebar-badge-for="{{ $moduleCode }}">{{ $badgeCount > 99 ? '99+' : $badgeCount }}</span>

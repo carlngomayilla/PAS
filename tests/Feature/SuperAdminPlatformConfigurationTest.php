@@ -195,7 +195,7 @@ class SuperAdminPlatformConfigurationTest extends TestCase
             ->assertSee('Manrope', false)
             ->assertSee("root.setAttribute('data-theme', 'light')", false)
             ->assertSee('--app-screen-max-width: 1180px', false)
-            ->assertSee('--app-sidebar-width: 152px', false);
+            ->assertSee('--app-sidebar-width: 320px', false);
     }
 
     public function test_super_admin_can_request_appearance_preview_without_persisting_changes(): void

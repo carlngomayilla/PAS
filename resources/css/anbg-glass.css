@@ -5266,6 +5266,15 @@ body.admin-theme-scope.anbg-glass-theme .app-sidebar-link-icon {
     flex: 0 0 2rem !important;
 }
 
+    /* Keep complete module names readable when the desktop rail is expanded.
+       Long institutional labels may wrap to a second line instead of being
+       silently truncated, while the collapsed rail still hides the label. */
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) [data-sidebar-label] {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        text-overflow: clip !important;
+    }
+
 /* Header controls: one clean hit area, centered icon, external notification badge. */
 body.admin-theme-scope.anbg-glass-theme .admin-navbar-action-button {
     display: inline-grid !important;

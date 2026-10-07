@@ -688,9 +688,9 @@ class AppearanceSettings
     private function sidebarWidth(string $value): string
     {
         return match (trim($value)) {
-            'compact' => '112px',
-            'wide' => '152px',
-            default => '128px',
+            'compact' => '240px',
+            'wide' => '320px',
+            default => '280px',
         };
     }
 
