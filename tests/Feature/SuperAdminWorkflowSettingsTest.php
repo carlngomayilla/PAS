@@ -52,7 +52,7 @@ class SuperAdminWorkflowSettingsTest extends TestCase
         ]);
 
         $summary = app(WorkflowSettings::class)->actionValidationSummary();
-        $this->assertSame('planification', $summary['final_stage']);
+        $this->assertSame('sciq', $summary['final_stage']);
         $this->assertFalse($summary['rejection_comment_required']);
         $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pas'));
         $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pao'));

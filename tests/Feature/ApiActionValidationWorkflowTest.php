@@ -29,7 +29,9 @@ class ApiActionValidationWorkflowTest extends TestCase
             'motif' => 'Ajustement vérifié avec les pièces.',
         ])
             ->assertOk()
-            ->assertJsonPath('data.statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CONTROLE);
+            // Le visa du chef transmet maintenant l'action à la Planification;
+            // le contrôle SCIQ intervient ensuite comme visa final.
+            ->assertJsonPath('data.statut_validation', ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION);
 
         $this->assertSame('75.00', (string) $fixture['action']->fresh()->chef_progress_percent);
     }
