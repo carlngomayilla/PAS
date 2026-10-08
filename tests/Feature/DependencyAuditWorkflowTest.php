@@ -31,7 +31,7 @@ class DependencyAuditWorkflowTest extends TestCase
         $npmAudit = $this->auditStepFor($auditSteps, 'npm audit');
 
         $this->assertSame('composer audit --locked', $composerAudit['command']);
-        $this->assertSame('npm audit --audit-level=high', $npmAudit['command']);
+        $this->assertSame('npm audit --omit=dev --audit-level=high', $npmAudit['command']);
         $this->assertNotSame($composerAudit['location'], $npmAudit['location']);
         $this->assertStringNotContainsString('--force', $npmAudit['command']);
     }
