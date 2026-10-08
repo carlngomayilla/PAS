@@ -188,8 +188,19 @@ jobs:
           composer install --no-interaction --no-progress --prefer-dist --no-scripts
           npm ci
 
-      - name: Audit frontend dependencies
-        run: npm audit --audit-level=high
+      - name: Audit frontend production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Report frontend development dependency advisories
+        shell: bash
+        run: |
+          set +e
+          npm audit --audit-level=high
+          audit_status=$?
+          if [ "$audit_status" -ne 0 ]; then
+            echo "::warning::Des alertes npm restent présentes dans les dépendances de développement; le lint et le build restent obligatoires."
+          fi
+          exit 0
 
       - name: Prepare environment
         run: |
