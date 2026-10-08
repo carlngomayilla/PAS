@@ -1,3 +1,7 @@
+/* Keep the reference skin as the first named layer so its scoped !important
+   tokens can intentionally override historical component overrides. */
+@layer reference, theme, base, components, utilities;
+
 @import 'tailwindcss';
 
 /* Dark mode enabled â€” class strategy (.dark on <html>) */

@@ -11,6 +11,44 @@ test.describe('stabilisation du dashboard', () => {
         await login(page, credentials.planning);
         await page.goto('/dashboard');
 
+        const themeToggle = page.locator('#admin-theme-toggle');
+        const html = page.locator('html');
+        const body = page.locator('body');
+
+        if (await html.evaluate(element => element.classList.contains('dark'))) {
+            await themeToggle.click();
+            await expect(html).not.toHaveClass(/dark/);
+        }
+
+        await expect(body).toHaveCSS('background-color', 'rgb(238, 242, 247)');
+        await expect(page.locator('#admin-shell-header')).toHaveCSS('position', 'sticky');
+
+        const primaryButtons = page.locator([
+            '.app-btn-primary',
+            '.btn-primary',
+            '.btn-blue',
+            '.btn-follow',
+            '.app-button-primary',
+            '.page-header-button-primary',
+            '.pta-inline-save',
+        ].join(', '));
+
+        if (await primaryButtons.count() > 0) {
+            await expect(primaryButtons.first()).toHaveCSS('border-radius', '10px');
+        }
+
+        try {
+            await themeToggle.click();
+            await expect(html).toHaveClass(/dark/);
+            await expect(body).toHaveCSS('background-color', 'rgb(6, 11, 19)');
+        } finally {
+            if (await html.evaluate(element => element.classList.contains('dark'))) {
+                await themeToggle.click();
+            }
+            await expect(html).not.toHaveClass(/dark/);
+            await expect(body).toHaveCSS('background-color', 'rgb(238, 242, 247)');
+        }
+
         await expect(page.getByRole('tab')).toHaveText(['Pilotage', 'Tableaux', 'Graphiques']);
 
         const filterForm = page.locator('[data-dashboard-synthesis-filter-form]');
