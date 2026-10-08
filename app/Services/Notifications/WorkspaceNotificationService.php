@@ -130,12 +130,14 @@ class WorkspaceNotificationService
 
         $action->loadMissing('pta:id,direction_id,service_id');
 
-        $planificationRecipients = $this->globalUsers([
-            User::ROLE_PLANIFICATION,
-            User::ROLE_CHEF_PLANIFICATION,
-            User::ROLE_ADMIN_FONCTIONNEL,
-            User::ROLE_SUPER_ADMIN,
-        ]);
+        $planificationRecipients = $this->mergeRecipients(
+            $this->globalUsers([
+                User::ROLE_PLANIFICATION,
+                User::ROLE_ADMIN_FONCTIONNEL,
+                User::ROLE_SUPER_ADMIN,
+            ]),
+            User::query()->where('role', User::ROLE_CHEF_PLANIFICATION)->get()
+        );
 
         $this->dispatchEvent(
             'action_submitted_to_direction',

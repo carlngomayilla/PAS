@@ -9,8 +9,10 @@ use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -34,6 +36,35 @@ class ApiActionValidationWorkflowTest extends TestCase
             ->assertJsonPath('data.statut_validation', ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION);
 
         $this->assertSame('75.00', (string) $fixture['action']->fresh()->chef_progress_percent);
+    }
+
+    public function test_chief_approval_notifies_planification_before_sciq_through_the_api(): void
+    {
+        Notification::fake();
+        $fixture = $this->createFixture();
+        $planners = collect([
+            User::factory()->create(['role' => User::ROLE_PLANIFICATION]),
+            User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]),
+        ]);
+        $controller = User::factory()->create(['role' => User::ROLE_SCIQ]);
+        Sanctum::actingAs($fixture['chef']);
+
+        $this->postJson(route('v1.actions.review', $fixture['action']), [
+            'decision' => 'valider',
+        ])->assertOk()
+            ->assertJsonPath('data.statut_validation', ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION);
+
+        foreach ($planners as $planner) {
+            Notification::assertSentTo($planner, WorkspaceModuleNotification::class);
+            $notification = Notification::sent($planner, WorkspaceModuleNotification::class)
+                ->first(fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($planner)['title'] === 'Action à valider par la Planification');
+            $this->assertNotNull($notification);
+            $data = $notification->toArray($planner);
+            $this->assertSame('Action à valider par la Planification', $data['title']);
+            $this->assertSame($fixture['action']->id, (int) $data['entity_id']);
+        }
+
+        Notification::assertNotSentTo($controller, WorkspaceModuleNotification::class);
     }
 
     public function test_rejection_requires_a_reason(): void

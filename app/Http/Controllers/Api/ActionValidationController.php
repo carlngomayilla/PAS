@@ -58,7 +58,7 @@ class ActionValidationController extends Controller
 
         $notificationService->notifyActionReviewedByChef($reviewed, $approve, $user);
         if ($approve) {
-            $notificationService->notifyActionSubmittedToController($reviewed, $user);
+            $notificationService->notifyActionSubmittedToPlanification($reviewed, $user);
         }
 
         return (new ActionResource($reviewed->loadMissing([
