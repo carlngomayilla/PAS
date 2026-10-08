@@ -8,6 +8,19 @@ use Tests\TestCase;
 
 class PremiumUiComponentsTest extends TestCase
 {
+    public function test_page_title_keeps_content_separate_from_optional_actions(): void
+    {
+        $plain = Blade::render('<x-ui.page-title title="Suivi des actions" subtitle="Contexte" />');
+        $withActions = Blade::render('<x-ui.page-title title="Suivi des actions"><x-slot:actions><button type="button">Exporter</button></x-slot:actions></x-ui.page-title>');
+
+        $this->assertStringContainsString('app-page-header-content', $plain);
+        $this->assertStringNotContainsString('app-page-header-actions', $plain);
+        $this->assertStringContainsString('<h1 class="app-title">Suivi des actions</h1>', $plain);
+        $this->assertStringContainsString('app-page-header-content', $withActions);
+        $this->assertStringContainsString('app-page-header-actions', $withActions);
+        $this->assertStringContainsString('Exporter', $withActions);
+    }
+
     public function test_global_loader_exposes_the_accessible_blocking_contract(): void
     {
         $html = Blade::render('<x-ui.process-bubble />');

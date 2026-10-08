@@ -296,7 +296,7 @@
                 @endif
             </div>
             <div class="flex items-center gap-2">
-                <div class="view-toggle" role="group" aria-label="Mode d'affichage">
+                <div class="view-toggle action-view-toggle" role="group" aria-label="Mode d'affichage">
                 <a href="{{ $baseListUrl }}" class="view-toggle-btn {{ $layoutMode === 'list' ? 'active' : '' }}" title="Vue liste">
                     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                     Liste
@@ -343,13 +343,36 @@
             </a>
         </div>
         <form method="GET" action="{{ route('workspace.actions.index') }}" data-auto-filter-form>
+            @php
+                $advancedFilterCount = count(array_filter([
+                    (bool) ($filters['pas_axe_id'] ?? null),
+                    (bool) ($filters['direction_id'] ?? null),
+                    (bool) ($filters['service_id'] ?? null),
+                    (string) ($filters['mois_demarrage'] ?? '') !== '',
+                    (string) ($filters['week_start'] ?? '') !== '',
+                    (string) ($filters['statut_validation'] ?? '') !== '',
+                    ($filters['financement_requis'] ?? null) !== null,
+                    (string) ($filters['financement_statut'] ?? '') !== '',
+                    (string) ($filters['sort'] ?? '') !== '',
+                    (int) ($filters['per_page'] ?? 15) !== 15,
+                    (bool) ($filters['pas_objectif_id'] ?? null),
+                    (string) ($filters['statut_validation_min'] ?? '') !== '',
+                    (bool) ($filters['without_kpi'] ?? false),
+                ]));
+            @endphp
             @if ($filters['vue'] !== '')
                 <input type="hidden" name="vue" value="{{ $filters['vue'] }}">
+            @endif
+            @if ($isValidationTab && $currentValidationQueue !== '')
+                <input type="hidden" name="validation_queue" value="{{ $currentValidationQueue }}">
+            @endif
+            @if ($layoutMode !== 'list')
+                <input type="hidden" name="layout" value="{{ $layoutMode }}">
             @endif
             @if ($filters['statut_validation_min'] !== '')
                 <input type="hidden" name="statut_validation_min" value="{{ $filters['statut_validation_min'] }}">
             @endif
-            <div class="showcase-filter-grid">
+            <div class="showcase-filter-grid action-primary-filter-grid">
                 <div>
                     <label for="q">Recherche</label>
                     <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Titre, description, résultat">
@@ -366,49 +389,8 @@
                     </select>
                 </div>
                 <div>
-                    <label for="pas_axe_id">Axe stratégique</label>
-                    <select id="pas_axe_id" name="pas_axe_id">
-                        <option value="">Tous</option>
-                        @foreach ($pasAxeOptions as $axe)
-                            <option value="{{ $axe->id }}" @selected($filters['pas_axe_id'] === $axe->id)>
-                                {{ $optionLabel($axe) }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="direction_id">Direction</label>
-                    <select id="direction_id" name="direction_id">
-                        <option value="">Toutes</option>
-                        @foreach ($directionOptions as $direction)
-                            <option value="{{ $direction->id }}" @selected($filters['direction_id'] === $direction->id)>
-                                {{ $optionLabel($direction) }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="service_id">Service</label>
-                    <select id="service_id" name="service_id">
-                        <option value="">Tous</option>
-                        @foreach ($serviceOptions as $service)
-                            <option value="{{ $service->id }}" @selected($filters['service_id'] === $service->id)>
-                                {{ $optionLabel($service) }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
                     <label for="annee">Année</label>
-                    <input id="annee" name="annee" type="number" min="2000" max="2100" value="{{ $filters['annee'] }}" placeholder="2026">
-                </div>
-                <div>
-                    <label for="mois_demarrage">Mois de démarrage</label>
-                    <input id="mois_demarrage" name="mois_demarrage" type="month" value="{{ $filters['mois_demarrage'] }}">
-                </div>
-                <div>
-                    <label for="week_start">Semaine suivie</label>
-                    <input id="week_start" name="week_start" type="date" value="{{ $filters['week_start'] }}">
+                    <input id="annee" name="annee" type="number" min="2000" max="2100" value="{{ $filters['annee'] }}" placeholder="{{ now()->year }}">
                 </div>
                 <div>
                     <label for="statut">Statut dynamique</label>
@@ -419,54 +401,105 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <label for="statut_validation">Validation</label>
-                    @if ($isValidationTab)
-                        <input type="hidden" name="statut_validation" value="{{ $filters['statut_validation'] }}">
-                        <input id="statut_validation" type="text" value="{{ $validationQueueDisplayLabels[$currentValidationQueue] ?? \App\Support\UiLabel::validationStatus($filters['statut_validation']) }}" readonly>
-                    @else
-                        <select id="statut_validation" name="statut_validation">
-                            <option value="">Toutes</option>
-                            @foreach ($validationOptions as $status)
-                                <option value="{{ $status }}" @selected($filters['statut_validation'] === $status)>{{ $validationStatusLabel($status) }}</option>
+            </div>
+            <details class="action-advanced-filters" data-action-advanced-filters @if ($advancedFilterCount > 0) open @endif>
+                <summary>
+                    <span>Filtres avancés</span>
+                    @if ($advancedFilterCount > 0)
+                        <span class="action-advanced-filter-count">{{ $advancedFilterCount }} {{ $advancedFilterCount === 1 ? 'actif' : 'actifs' }}</span>
+                    @endif
+                </summary>
+                <div class="showcase-filter-grid action-advanced-filter-grid">
+                    <div>
+                        <label for="pas_axe_id">Axe stratégique</label>
+                        <select id="pas_axe_id" name="pas_axe_id">
+                            <option value="">Tous</option>
+                            @foreach ($pasAxeOptions as $axe)
+                                <option value="{{ $axe->id }}" @selected($filters['pas_axe_id'] === $axe->id)>
+                                    {{ $optionLabel($axe) }}
+                                </option>
                             @endforeach
                         </select>
-                    @endif
+                    </div>
+                    <div>
+                        <label for="direction_id">Direction</label>
+                        <select id="direction_id" name="direction_id">
+                            <option value="">Toutes</option>
+                            @foreach ($directionOptions as $direction)
+                                <option value="{{ $direction->id }}" @selected($filters['direction_id'] === $direction->id)>
+                                    {{ $optionLabel($direction) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="service_id">Service</label>
+                        <select id="service_id" name="service_id">
+                            <option value="">Tous</option>
+                            @foreach ($serviceOptions as $service)
+                                <option value="{{ $service->id }}" @selected($filters['service_id'] === $service->id)>
+                                    {{ $optionLabel($service) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="mois_demarrage">Mois de démarrage</label>
+                        <input id="mois_demarrage" name="mois_demarrage" type="month" value="{{ $filters['mois_demarrage'] }}">
+                    </div>
+                    <div>
+                        <label for="week_start">Semaine suivie</label>
+                        <input id="week_start" name="week_start" type="date" value="{{ $filters['week_start'] }}">
+                    </div>
+                    <div>
+                        <label for="statut_validation">Validation</label>
+                        @if ($isValidationTab)
+                            <input type="hidden" name="statut_validation" value="{{ $filters['statut_validation'] }}">
+                            <input id="statut_validation" type="text" value="{{ $validationQueueDisplayLabels[$currentValidationQueue] ?? \App\Support\UiLabel::validationStatus($filters['statut_validation']) }}" readonly>
+                        @else
+                            <select id="statut_validation" name="statut_validation">
+                                <option value="">Toutes</option>
+                                @foreach ($validationOptions as $status)
+                                    <option value="{{ $status }}" @selected($filters['statut_validation'] === $status)>{{ $validationStatusLabel($status) }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+                    <div>
+                        <label for="financement_requis">Financement requis</label>
+                        <select id="financement_requis" name="financement_requis">
+                            <option value="">Tous</option>
+                            <option value="1" @selected($filters['financement_requis'] === 1)>Oui</option>
+                            <option value="0" @selected($filters['financement_requis'] === 0)>Non</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="financement_statut">Statut financement</label>
+                        <select id="financement_statut" name="financement_statut">
+                            <option value="">Tous</option>
+                            @foreach ($financingStatusOptions as $value => $label)
+                                <option value="{{ $value }}" @selected(($filters['financement_statut'] ?? '') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sort">Tri</label>
+                        <select id="sort" name="sort">
+                            @foreach ($sortOptions as $sortValue => $sortLabel)
+                                <option value="{{ $sortValue }}" @selected($filters['sort'] === $sortValue)>{{ $sortLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="per_page">Lignes par page</label>
+                        <select id="per_page" name="per_page">
+                            @foreach ([15, 25, 50, 100] as $perPageOption)
+                                <option value="{{ $perPageOption }}" @selected((int) ($filters['per_page'] ?? 15) === $perPageOption)>{{ $perPageOption }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label for="financement_requis">Financement requis</label>
-                    <select id="financement_requis" name="financement_requis">
-                        <option value="">Tous</option>
-                        <option value="1" @selected($filters['financement_requis'] === 1)>Oui</option>
-                        <option value="0" @selected($filters['financement_requis'] === 0)>Non</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="financement_statut">Statut financement</label>
-                    <select id="financement_statut" name="financement_statut">
-                        <option value="">Tous</option>
-                        @foreach ($financingStatusOptions as $value => $label)
-                            <option value="{{ $value }}" @selected(($filters['financement_statut'] ?? '') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="sort">Tri</label>
-                    <select id="sort" name="sort">
-                        @foreach ($sortOptions as $sortValue => $sortLabel)
-                            <option value="{{ $sortValue }}" @selected($filters['sort'] === $sortValue)>{{ $sortLabel }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="per_page">Lignes par page</label>
-                    <select id="per_page" name="per_page">
-                        @foreach ([15, 25, 50, 100] as $perPageOption)
-                            <option value="{{ $perPageOption }}" @selected((int) ($filters['per_page'] ?? 15) === $perPageOption)>{{ $perPageOption }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
+            </details>
             @foreach (['pas_objectif_id'] as $hiddenFilter)
                 @if (!empty($filters[$hiddenFilter]))
                     <input type="hidden" name="{{ $hiddenFilter }}" value="{{ $filters[$hiddenFilter] }}">
@@ -818,7 +851,7 @@
         </div>
 
         <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table min-w-[1200px] w-full text-sm">
+            <table class="app-table data-table action-list-table min-w-[1200px] w-full text-sm">
                 <thead>
                     <tr>
                         <th>Action</th>

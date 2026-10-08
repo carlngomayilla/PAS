@@ -100,6 +100,49 @@ test.describe('stabilisation du dashboard', () => {
             actionsCard.click(),
         ]);
 
+        await page.goto('/workspace/actions');
+
+        const actionHeader = page.locator('main .app-page-header').first();
+        await expect(actionHeader).toBeVisible();
+        if (page.viewportSize()!.width >= 1024) {
+            expect(await actionHeader.evaluate(element => element.getBoundingClientRect().height)).toBeLessThan(150);
+        }
+
+        const advancedFilters = page.locator('[data-action-advanced-filters]');
+        await expect(advancedFilters).not.toHaveAttribute('open', '');
+        await advancedFilters.locator('summary').focus();
+        await page.keyboard.press('Enter');
+        await expect(advancedFilters).toHaveAttribute('open', '');
+
+        await Promise.all([
+            page.waitForURL(url => url.pathname === '/workspace/actions' && url.searchParams.get('financement_requis') === '0'),
+            advancedFilters.locator('select[name="financement_requis"]').selectOption('0'),
+        ]);
+        await expect(page.locator('[data-action-advanced-filters]')).toHaveAttribute('open', '');
+        await expect(page.locator('select[name="financement_requis"]')).toHaveValue('0');
+
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/workspace/actions');
+        const actionTable = page.locator('main table.app-table').first();
+        await expect(actionTable).toBeVisible();
+        const mobileTable = await actionTable.evaluate(table => {
+            const wrapper = table.closest('.app-table-wrapper')!;
+            const cells = Array.from(table.querySelectorAll('tbody td'));
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            const firstCell = table.querySelector('tbody td');
+            return {
+                tableWidth: table.getBoundingClientRect().width,
+                wrapperWidth: wrapper.getBoundingClientRect().width,
+                clippedCells: cells.filter(cell => cell.scrollWidth > cell.clientWidth + 2).length,
+                clippedRows: rows.filter(row => row.scrollWidth > row.clientWidth + 2).length,
+                labelWhiteSpace: firstCell ? getComputedStyle(firstCell).whiteSpace : 'normal',
+            };
+        });
+        expect(mobileTable.tableWidth).toBeLessThanOrEqual(mobileTable.wrapperWidth + 2);
+        expect(mobileTable.clippedCells).toBe(0);
+        expect(mobileTable.clippedRows).toBe(0);
+        expect(mobileTable.labelWhiteSpace).not.toBe('nowrap');
+
         diagnostics.assertClean();
     });
 

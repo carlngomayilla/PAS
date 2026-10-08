@@ -2923,6 +2923,228 @@ body.admin-theme-scope[data-ui-version="institutional-v2"] .app-content {
     padding: clamp(1rem, 2vw, 1.75rem) !important;
 }
 
+/* Compact shared page headers: keep the page context visible without letting
+   repeated blue hero panels consume the first viewport. */
+@media screen {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) {
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 1rem !important;
+        min-height: 0 !important;
+        margin-bottom: 0.9rem !important;
+        padding: 0.8rem 1rem 0.85rem 1.15rem !important;
+        border: 1px solid var(--reco-border) !important;
+        border-radius: 14px !important;
+        background: var(--reco-surface) !important;
+        box-shadow: 0 8px 20px rgb(17 48 84 / 7%) !important;
+        overflow: hidden !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar)::before {
+        display: block !important;
+        position: absolute !important;
+        inset: 0 auto 0 0 !important;
+        width: 3px !important;
+        border-radius: 0 !important;
+        background: linear-gradient(180deg, var(--reco-gold), var(--reco-green)) !important;
+        content: "" !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) > .app-page-header-content {
+        min-width: 0 !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) nav {
+        margin-bottom: 0.2rem !important;
+        color: var(--reco-muted) !important;
+        font-size: 0.7rem !important;
+        line-height: 1.25 !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) .app-eyebrow {
+        display: block !important;
+        margin-bottom: 0.2rem !important;
+        color: var(--reco-blue) !important;
+        font-size: 0.66rem !important;
+        letter-spacing: 0.09em !important;
+        line-height: 1.25 !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) .app-title {
+        margin: 0 !important;
+        color: var(--reco-text) !important;
+        font-size: clamp(1.35rem, 1.05rem + 0.55vw, 1.75rem) !important;
+        font-weight: 800 !important;
+        line-height: 1.18 !important;
+        letter-spacing: -0.025em !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) p {
+        max-width: 64rem !important;
+        margin-top: 0.25rem !important;
+        color: var(--reco-muted) !important;
+        font-size: 0.78rem !important;
+        line-height: 1.4 !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) > .app-page-header-actions {
+        display: flex !important;
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+        max-width: 48% !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 0.5rem !important;
+        flex-wrap: wrap !important;
+    }
+
+    html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) {
+        border-color: #1c2f47 !important;
+        background: #0c1626 !important;
+        box-shadow: 0 8px 20px rgb(0 0 0 / 22%) !important;
+    }
+
+    html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) .app-title {
+        color: #f0f7ff !important;
+    }
+
+    html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) .app-eyebrow {
+        color: #8dc8ff !important;
+    }
+
+    html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) p,
+    html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) nav {
+        color: #9db3c9 !important;
+    }
+}
+
+@media screen and (max-width: 48rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) {
+        align-items: stretch !important;
+        flex-direction: column !important;
+        gap: 0.65rem !important;
+        padding: 0.75rem 0.85rem 0.8rem 1rem !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-page-header:not(.app-navbar) > .app-page-header-actions {
+        width: 100% !important;
+        max-width: none !important;
+        justify-content: flex-start !important;
+    }
+}
+
+
+@media screen {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-primary-filter-grid,
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-advanced-filter-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 0.85rem !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-advanced-filters {
+        margin-top: 1rem !important;
+        border-top: 1px solid var(--reco-border) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-primary-filter-grid .search-field-wrapper > input {
+        padding-left: 2.25rem !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-advanced-filters > summary {
+        padding: 0.8rem 0 !important;
+        color: var(--reco-text) !important;
+        font-size: 0.8rem !important;
+        font-weight: 700 !important;
+        cursor: pointer;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-advanced-filters > summary:focus-visible {
+        outline: 2px solid var(--reco-blue) !important;
+        outline-offset: 3px !important;
+        border-radius: 4px !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-advanced-filter-count {
+        margin-left: 0.4rem !important;
+        padding: 0.15rem 0.45rem !important;
+        border-radius: 6px !important;
+        background: var(--ui-brand-soft) !important;
+        color: var(--reco-text) !important;
+        font-size: 0.7rem !important;
+    }
+}
+
+@media screen and (max-width: 64rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-primary-filter-grid,
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-advanced-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+@media screen and (max-width: 30rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-primary-filter-grid,
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-advanced-filter-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
+
+@media screen and (max-width: 639px) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table tbody tr {
+        width: 100% !important;
+        min-width: 0 !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table[data-mobile-cards] tbody tr {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table[data-mobile-cards] tbody td {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 0.5rem !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table tbody td {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table tbody td > * {
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table tbody td:last-child {
+        grid-column: 1 / -1 !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] table.action-list-table tbody td:last-child > div {
+        flex-wrap: wrap !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-view-toggle {
+        flex-wrap: wrap !important;
+        max-width: 100% !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .action-view-toggle .view-toggle-btn {
+        flex: 1 1 auto !important;
+        justify-content: center !important;
+    }
+}
+
 /* eRecommandation-style dark institutional header with a restrained gold edge. */
 body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-shell-header,
 body.admin-theme-scope[data-ui-version="institutional-v2"] .admin-page-header.app-navbar {

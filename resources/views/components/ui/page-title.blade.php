@@ -5,7 +5,7 @@
 ])
 
 <header {{ $attributes->merge(['class' => 'app-page-header mb-6']) }}>
-    <div class="min-w-0">
+    <div class="app-page-header-content min-w-0">
         @isset($breadcrumbs)
             <nav class="mb-2 text-xs font-semibold text-[var(--app-muted)]" aria-label="Fil d’Ariane">
                 {{ $breadcrumbs }}
@@ -20,7 +20,7 @@
         @endif
     </div>
     @isset($actions)
-        <div class="flex flex-wrap gap-2">
+        <div class="app-page-header-actions flex flex-wrap gap-2">
             {{ $actions }}
         </div>
     @endisset
