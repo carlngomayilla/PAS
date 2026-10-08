@@ -4,7 +4,6 @@
     $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
     $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
     $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
-    $currentDashboardUser = auth()->user();
     $dashboardNotifications = $dashboardNotifications ?? collect();
     $analytics = $dashboardData ?? [];
     $financialSummary = is_array($analytics['financial_summary'] ?? null) ? $analytics['financial_summary'] : null;
@@ -138,6 +137,7 @@
     $currentDashboardTab = isset($currentDashboardTab) && array_key_exists($currentDashboardTab, $availableDashboardTabs)
         ? $currentDashboardTab
         : ($dashboardTabAliases[$requestedDashboardTab] ?? 'overview');
+    $currentDashboardUser = auth()->user();
     $canOpenPtaSuivi = $currentDashboardUser
         && (
             $currentDashboardUser->hasPermission(\App\Services\PtaSuiviService::PERMISSION)
@@ -171,42 +171,6 @@
         'statut_delai' => $synthesisFilters['statut_delai'] ?? null,
         'alerte_echeance' => $synthesisFilters['alerte_echeance'] ?? null,
     ];
-    $dashboardCleanFilter = static fn (mixed $value): bool => $value !== null
-        && trim((string) $value) !== ''
-        && trim((string) $value) !== 'all';
-    $selectedSynthesisPeriodOption = collect($synthesisPeriodOptions)
-        ->firstWhere('value', $selectedSynthesisPeriod);
-    $selectedSynthesisPeriodLabel = is_array($selectedSynthesisPeriodOption)
-        ? (string) ($selectedSynthesisPeriodOption['label'] ?? 'Toutes périodes')
-        : 'Toutes périodes';
-    $selectedActionStatusLabel = $synthesisActionStatusOptions[$synthesisFilters['statut_action'] ?? 'all'] ?? null;
-    $selectedWorkflowLabel = $synthesisWorkflowOptions[$synthesisFilters['statut_suivi'] ?? 'all'] ?? null;
-    $selectedDelayLabel = $synthesisDelayOptions[$synthesisFilters['statut_delai'] ?? 'all'] ?? null;
-    $selectedAlertLabel = $synthesisAlertOptions[$synthesisFilters['alerte_echeance'] ?? 'all'] ?? null;
-    $dashboardContextChips = collect([
-        ['label' => 'Exercice', 'value' => $exerciseFilter['label'] ?? 'Exercice courant', 'tone' => 'info'],
-        ['label' => 'Période', 'value' => $selectedSynthesisPeriodLabel, 'tone' => 'info'],
-        ['label' => 'Direction', 'value' => $directionSelector['selected_label'] ?? 'Pilotage global', 'tone' => 'neutral'],
-        ['label' => 'Service', 'value' => $directionSelector['service_selected_label'] ?? 'Tous les services', 'tone' => 'neutral'],
-        ['label' => 'RMO', 'value' => $selectedSynthesisRmoLabel ?: 'Tous les RMO', 'tone' => 'neutral'],
-        ['label' => 'Statut action', 'value' => $selectedActionStatusLabel, 'tone' => 'warning', 'active' => $dashboardCleanFilter($synthesisFilters['statut_action'] ?? null)],
-        ['label' => 'Statut suivi', 'value' => $selectedWorkflowLabel, 'tone' => 'warning', 'active' => $dashboardCleanFilter($synthesisFilters['statut_suivi'] ?? null)],
-        ['label' => 'Statut délai', 'value' => $selectedDelayLabel, 'tone' => 'warning', 'active' => $dashboardCleanFilter($synthesisFilters['statut_delai'] ?? null)],
-        ['label' => 'Alerte', 'value' => $selectedAlertLabel, 'tone' => 'danger', 'active' => $dashboardCleanFilter($synthesisFilters['alerte_echeance'] ?? null)],
-    ])
-        ->filter(static fn (array $chip): bool => ($chip['value'] ?? null) !== null && (($chip['active'] ?? true) || in_array($chip['label'], ['Exercice', 'Période', 'Direction', 'Service', 'RMO'], true)))
-        ->values()
-        ->all();
-    $dashboardActionScopeFilters = collect([
-        'annee' => $exerciseFilter['year'] ?? null,
-        'direction_id' => $directionSelector['selected_id'] ?? null,
-        'service_id' => $directionSelector['service_selected_id'] ?? null,
-    ])->filter($dashboardCleanFilter)->all();
-    $dashboardReportingScopeFilters = collect($nextPilotFilters)->filter($dashboardCleanFilter)->all();
-    $dashboardScopedActionUrl = route('workspace.actions.index', $dashboardActionScopeFilters);
-    $dashboardScopedReportingUrl = route('workspace.reporting', $dashboardReportingScopeFilters);
-    $dashboardScopedPilotageUrl = route('workspace.pilotage', $dashboardReportingScopeFilters);
-
     $summaryStrip = ($roleDashboard['summary_cards'] ?? []) !== [] ? $roleDashboard['summary_cards'] : [
         ['label' => 'Actions totales', 'value' => $metrics['totals']['actions_total'] ?? 0, 'accent' => '#1F2937', 'bg' => '#F8FBFF', 'meta' => null, 'href' => route('workspace.actions.index')],
         ['label' => $metricLabel('global'), 'value' => number_format((float) ($globalScores['global'] ?? 0), 0, ',', ' '), 'accent' => '#8FC043', 'bg' => '#F2F8E8', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc'])],
@@ -747,41 +711,6 @@
 </div>
 
 <x-dashboard.next-pilot-link :filters="$nextPilotFilters" />
-
-<section class="mb-4 overflow-hidden rounded-2xl border border-[#3996d3]/20 bg-gradient-to-br from-white via-[#f8fbff] to-[#eef7fc] p-4 shadow-sm dark:border-sky-400/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900" aria-labelledby="dashboard-context-title">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div class="min-w-0">
-            <p class="text-xs font-black uppercase tracking-[0.22em] text-[#3996d3] dark:text-sky-300">Contexte appliqué</p>
-            <h2 id="dashboard-context-title" class="mt-1 text-lg font-black text-[#17324a] dark:text-white">Dashboard filtré sur le périmètre courant</h2>
-            <p class="mt-1 max-w-3xl text-sm font-semibold text-[#667085] dark:text-slate-300">Les cartes, tableaux et graphiques ci-dessous utilisent ce même contexte. Les raccourcis ouvrent les écrans de suivi avec le périmètre déjà repris.</p>
-        </div>
-        <div class="flex flex-wrap gap-2 lg:justify-end">
-            <a class="btn btn-secondary btn-sm rounded-xl px-3 py-2 text-xs" href="{{ $dashboardScopedActionUrl }}">Voir les actions du périmètre</a>
-            <a class="btn btn-secondary btn-sm rounded-xl px-3 py-2 text-xs" href="{{ $dashboardScopedPilotageUrl }}">Pilotage PAS/PAO/PTA</a>
-            <a class="btn btn-primary btn-sm rounded-xl px-3 py-2 text-xs" href="{{ $dashboardScopedReportingUrl }}">Reporting filtré</a>
-            @if ($canOpenPtaSuivi)
-                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-2 text-xs" href="{{ route('pta.suivi.index', $ptaSuiviQuery) }}">Suivi PTA filtré</a>
-            @endif
-        </div>
-    </div>
-
-    <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        @foreach ($dashboardContextChips as $chip)
-            @php
-                $chipTone = match ($chip['tone'] ?? 'neutral') {
-                    'info' => 'border-[#3996d3]/25 bg-[#e8f3fb] text-[#176a9d] dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200',
-                    'warning' => 'border-[#f9b13c]/35 bg-[#fff8d6] text-[#9a5b00] dark:border-amber-300/25 dark:bg-amber-300/10 dark:text-amber-200',
-                    'danger' => 'border-[#b42318]/25 bg-[#fff1ef] text-[#b42318] dark:border-red-300/25 dark:bg-red-400/10 dark:text-red-200',
-                    default => 'border-slate-200 bg-white text-[#17324a] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
-                };
-            @endphp
-            <div class="rounded-2xl border px-3 py-2 {{ $chipTone }}">
-                <p class="text-[10px] font-black uppercase tracking-[0.18em] opacity-70">{{ $chip['label'] }}</p>
-                <p class="mt-1 truncate text-sm font-black" title="{{ $chip['value'] }}">{{ $chip['value'] }}</p>
-            </div>
-        @endforeach
-    </div>
-</section>
 
 <form
         method="GET"
