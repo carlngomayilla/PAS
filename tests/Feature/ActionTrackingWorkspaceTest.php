@@ -654,6 +654,13 @@ class ActionTrackingWorkspaceTest extends TestCase
     public function test_discussion_polling_uses_the_versioned_api_and_safe_dom_nodes(): void
     {
         $fixture = $this->createFixture();
+        $template = (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php'));
+
+        $this->assertStringContainsString('<script @cspNonce>', $template);
+        $this->assertStringNotContainsString('onclick=', $template);
+        $this->assertStringNotContainsString('onchange=', $template);
+        $this->assertStringContainsString('data-action-print', $template);
+        $this->assertStringContainsString('data-historical-execution-status', $template);
 
         $this->actingAs($fixture['agent'])
             ->get(route('workspace.actions.suivi', $fixture['action']))

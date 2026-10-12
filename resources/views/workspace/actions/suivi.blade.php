@@ -453,7 +453,7 @@
                     </a>
                 @endif
                 <a class="btn btn-warning" href="#action-echeances">Report de l'action</a>
-                <button type="button" onclick="window.print()" class="btn btn-secondary flex items-center gap-2" title="Imprimer la fiche action">
+                <button type="button" data-action-print class="btn btn-secondary flex items-center gap-2" title="Imprimer la fiche action">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                     Imprimer
                 </button>
@@ -959,7 +959,7 @@
                 <p class="mt-1 max-w-3xl text-sm text-indigo-900/80 dark:text-indigo-200/80">Enregistrez ici une action déjà réalisée au premier trimestre. Les dates indiquées sont les dates réelles ; la saisie et le visa restent datés du jour.</p>
                 <form method="POST" action="{{ route('workspace.actions.historical-execution.store', $action) }}" class="mt-4 grid gap-3 md:grid-cols-2">
                     @csrf
-                    <div><label for="historical-statut">État d'exécution</label><select id="historical-statut" name="statut_execution" required onchange="if (this.value !== 'achevee') { this.form.date_fin_reelle.value = ''; }"><option value="en_cours" @selected(old('statut_execution') === 'en_cours')>En cours</option><option value="achevee" @selected(old('statut_execution', 'achevee') === 'achevee')>Achevée</option></select></div>
+                    <div><label for="historical-statut">État d'exécution</label><select id="historical-statut" name="statut_execution" required data-historical-execution-status><option value="en_cours" @selected(old('statut_execution') === 'en_cours')>En cours</option><option value="achevee" @selected(old('statut_execution', 'achevee') === 'achevee')>Achevée</option></select></div>
                     <div><label for="historical-start">Date réelle de début <span class="text-xs font-normal text-slate-500">(laisser vide si inconnue)</span></label><input id="historical-start" name="date_debut_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_debut_reelle', optional($action->date_debut_reelle)->toDateString()) }}">@error('date_debut_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
                     <div><label for="historical-end">Date réelle de fin <span class="text-xs font-normal text-slate-500">(laisser vide si inconnue)</span></label><input id="historical-end" name="date_fin_reelle" type="date" max="{{ now()->toDateString() }}" value="{{ old('date_fin_reelle', optional($action->date_fin_reelle)->toDateString()) }}">@error('date_fin_reelle')<p class="field-error">{{ $message }}</p>@enderror</div>
                     @if ($action->isQuantitative())
@@ -1659,8 +1659,25 @@
             @endforelse
         </div>
     </section>
-    <script>
+    <script @cspNonce>
     (function () {
+        var printButton = document.querySelector('[data-action-print]');
+        var historicalStatus = document.querySelector('[data-historical-execution-status]');
+
+        if (printButton) {
+            printButton.addEventListener('click', function () {
+                window.print();
+            });
+        }
+
+        if (historicalStatus) {
+            historicalStatus.addEventListener('change', function () {
+                if (this.value !== 'achevee') {
+                    this.form.date_fin_reelle.value = '';
+                }
+            });
+        }
+
         var logsUrl = @json(route('v1.actions.logs', $action));
         var feed = document.getElementById('discussion-feed');
         var lastLogId = {{ $discussionEntries->last()?->id ?? 0 }};
