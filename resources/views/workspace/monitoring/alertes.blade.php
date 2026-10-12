@@ -113,14 +113,8 @@
         ];
     @endphp
     <div class="app-screen-flow">
-    <section class="showcase-hero mb-4 app-screen-block">
-        <div class="showcase-hero-body">
-            <div>
-                <span class="showcase-eyebrow">Alertes opérationnelles</span>
-                <h1 class="showcase-title">Centre d'alertes</h1>
-            </div>
-
-            <div class="showcase-action-row">
+    <x-ui.page-title class="mb-4 app-screen-block" eyebrow="Alertes opérationnelles" title="Centre d'alertes">
+            <x-slot:actions>
                 <span class="showcase-chip">
                     <span class="showcase-chip-dot bg-[#3996d3]"></span>
                     Limite d'affichage : {{ $limit }} éléments
@@ -139,9 +133,8 @@
                         </button>
                     </form>
                 @endif
-            </div>
-        </div>
-    </section>
+            </x-slot:actions>
+    </x-ui.page-title>
 
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($alertSummaryCards as $card)
@@ -171,7 +164,7 @@
         @endforeach
     </section>
 
-    <section class="showcase-toolbar mb-4 app-screen-block">
+    <section class="showcase-toolbar mb-4 app-screen-block" aria-label="Filtres des alertes">
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/55 p-1.5">
                 <button class="{{ $filterButtonBase }} border-[#3996d3]/40 bg-[#3996d3] text-white" data-level-filter="all" type="button">
@@ -219,7 +212,7 @@
                 $isUnread = (bool) ($alert['is_unread'] ?? false);
             @endphp
             <a
-                class="alert-card group relative block overflow-hidden rounded-2xl border bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg {{ $isUnread ? $style['panel'] : 'border-slate-200' }}"
+                class="alert-card showcase-panel group relative block overflow-hidden p-4 transition hover:shadow-md {{ $isUnread ? $style['panel'] : 'border-slate-200 dark:border-slate-700' }}"
                 data-alert-card
                 data-level="{{ $alert['niveau'] }}"
                 data-state="{{ $isUnread ? 'unread' : 'read' }}"
@@ -236,7 +229,7 @@
 
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-base font-semibold text-slate-950">{{ $alert['titre'] }}</h2>
+                            <h2 class="break-words text-base font-semibold text-[var(--app-text)]">{{ $alert['titre'] }}</h2>
                             <span class="{{ $style['badge'] }} px-3">
                                 {{ $alert['niveau_label'] }}
                             </span>
@@ -250,9 +243,9 @@
                             @endif
                         </div>
 
-                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ $alert['message'] }}</p>
+                        <p class="mt-2 break-words text-sm leading-6 text-[var(--app-text)]">{{ $alert['message'] }}</p>
 
-                        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--app-muted)]">
                             <span>{{ $alert['direction'] }}</span>
                             <span>{{ $alert['service'] }}</span>
                             <span>{{ $alert['date_label'] }}</span>
@@ -260,7 +253,7 @@
                         </div>
 
                         @if (!empty($alert['action']))
-                            <div class="mt-3 rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/70 px-3 py-2 text-sm text-slate-700">
+                            <div class="mt-3 break-words rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-3 py-2 text-sm text-[var(--app-text)]">
                                 <strong>Action:</strong> {{ $alert['action']['libelle'] }}
                                 <span class="mx-2 text-slate-400">|</span>
                                 <strong>PTA:</strong> {{ $alert['action']['pta'] }}
@@ -331,6 +324,7 @@
                     button.classList.toggle('bg-[#3996d3]', isActive);
                     button.classList.toggle('border-[#3996d3]/40', isActive);
                     button.classList.toggle('text-white', isActive);
+                    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
                     if (!isActive) {
                         button.classList.remove('border-[#3996d3]/40');
                         button.classList.remove('border-slate-300');

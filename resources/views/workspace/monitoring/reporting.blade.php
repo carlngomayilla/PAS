@@ -82,6 +82,14 @@
         $reportTypes = collect($reportTypes ?? []);
         $activeReportType = (string) ($activeReportType ?? request('report_type', 'consolide_dg'));
         $reportFilterOptions = (array) ($reportFilterOptions ?? []);
+        $advancedReportFilterCount = collect([
+            request('statut', 'all'),
+            request('type_action', 'all'),
+            request('responsable_id', 'all'),
+            request('criticite', 'all'),
+            request('periode_debut', ''),
+            request('periode_fin', ''),
+        ])->filter(static fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')->count();
         $selectedReportPeriod = app(\App\Services\PtaSuiviService::class)->normalizePeriod(request('periode', request('trimestre', 'all')));
         $ptaSuiviPayload = is_array($ptaSuiviPayload ?? null) ? $ptaSuiviPayload : [];
         $ptaSuiviSummary = (array) ($ptaSuiviPayload['summary'] ?? []);
@@ -122,34 +130,10 @@
             <span class="showcase-chip"><span class="showcase-chip-dot bg-[#1C203D]"></span>{{ $scopeLabel }}</span>
             <span class="showcase-chip"><span class="showcase-chip-dot bg-[#8FC043]"></span>{{ $officialBaseText }}</span>
             <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Tableau de bord analytique</a>
-            <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel', $reportQuery) }}">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
-                </svg>
-                Export Excel
-            </a>
-            <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.pdf', $reportQuery) }}">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M8 13h2a2 2 0 010 4H8v-4zm6 0h2m-2 4h2" />
-                </svg>
-                Export PDF
-            </a>
-            <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('pta.suivi.export.evolution-excel', $reportQuery) }}">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
-                </svg>
-                Rapport d'évolution (Excel)
-            </a>
-            <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('pta.suivi.export.evolution-pdf', $reportQuery) }}">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M8 13h2a2 2 0 010 4H8v-4zm6 0h2m-2 4h2" />
-                </svg>
-                Rapport d'évolution (PDF)
-            </a>
         </x-slot:actions>
     </x-ui.page-title>
 
-    <section class="showcase-panel mb-4" aria-labelledby="reporting-traceability-title">
+    <section class="showcase-panel reporting-context-strip mb-4" aria-labelledby="reporting-traceability-title">
         <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h2 id="reporting-traceability-title" class="showcase-panel-title">Contexte du reporting</h2>
@@ -157,7 +141,7 @@
             </div>
             <span class="anbg-badge anbg-badge-info px-3 py-1">{{ $reportTypes[$activeReportType]['label'] ?? 'Rapport consolidé' }}</span>
         </div>
-        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+        <div class="reporting-context-cards">
             @foreach ($traceabilityCards as $card)
                 <div class="rounded-lg border border-slate-200 bg-slate-50/85 p-3 dark:border-slate-700 dark:bg-slate-900/70">
                     <p class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $card['label'] }}</p>
@@ -175,21 +159,36 @@
             <span class="anbg-badge anbg-badge-info px-3 py-1">PDF + Excel</span>
         </div>
 
-        <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+        <div class="reporting-report-type-grid mb-4">
             @foreach ($reportTypes as $code => $report)
                 @php
                     $isActiveReport = $activeReportType === (string) $code;
                     $reportHref = route('workspace.reporting', array_merge($reportQuery, ['report_type' => (string) $code]));
                 @endphp
-                <a href="{{ $reportHref }}" class="rounded-[1.1rem] border px-4 py-3 text-sm transition {{ $isActiveReport ? 'border-[#3996d3] bg-[#e8f3fb] text-[#17324a]' : 'border-slate-200 bg-white text-slate-700 hover:border-[#3996d3]/60' }}">
+                <a href="{{ $reportHref }}" class="reporting-report-type-option {{ $isActiveReport ? 'reporting-report-type-option--active' : '' }}">
                     <strong class="block text-[0.92rem]">{{ $report['label'] ?? $code }}</strong>
                     <span class="mt-1 block text-xs leading-relaxed text-slate-500">{{ $report['description'] ?? '' }}</span>
                 </a>
             @endforeach
         </div>
 
-        <form method="GET" action="{{ route('workspace.reporting') }}" class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]" data-auto-filter-form>
+        <div class="reporting-export-bar">
+            <div>
+                <p class="reporting-export-eyebrow">Diffusion</p>
+                <h3>Exports du rapport sélectionné</h3>
+                <p>Les fichiers reprennent exactement le périmètre et les filtres actifs.</p>
+            </div>
+            <div class="reporting-export-actions">
+                <a class="btn btn-primary" href="{{ route('workspace.reporting.export.excel', $reportQuery) }}">Export Excel</a>
+                <a class="btn btn-primary" href="{{ route('workspace.reporting.export.pdf', $reportQuery) }}">Export PDF</a>
+                <a class="btn btn-secondary" href="{{ route('pta.suivi.export.evolution-excel', $reportQuery) }}">Évolution Excel</a>
+                <a class="btn btn-secondary" href="{{ route('pta.suivi.export.evolution-pdf', $reportQuery) }}">Évolution PDF</a>
+            </div>
+        </div>
+
+        <form method="GET" action="{{ route('workspace.reporting') }}" class="reporting-filter-surface" data-auto-filter-form>
             <input type="hidden" name="report_type" value="{{ $activeReportType }}">
+            <div class="reporting-primary-filter-grid">
             <div>
                 <label for="exercice">Exercice</label>
                 <select id="exercice" name="exercice">
@@ -224,6 +223,14 @@
                     @endforeach
                 </select>
             </div>
+            </div>
+
+            <details class="reporting-advanced-filters" data-reporting-advanced-filters @if ($advancedReportFilterCount > 0) open @endif>
+                <summary>
+                    <span>Filtres avancés</span>
+                    <span class="reporting-advanced-filter-count">{{ $advancedReportFilterCount }} actif{{ $advancedReportFilterCount > 1 ? 's' : '' }}</span>
+                </summary>
+                <div class="reporting-advanced-filter-grid">
             <div>
                 <label for="statut">Statut</label>
                 <select id="statut" name="statut">
@@ -268,7 +275,9 @@
                 <label for="periode_fin">Fin</label>
                 <input id="periode_fin" name="periode_fin" type="date" value="{{ request('periode_fin') }}">
             </div>
-            <div class="flex items-end gap-2">
+                </div>
+            </details>
+            <div class="reporting-filter-actions">
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting', ['report_type' => $activeReportType]) }}">Réinitialiser</a>
             </div>
         </form>
@@ -355,6 +364,7 @@
                     'exportMode' => 'web',
                 ])
             </article>
+            <x-pta.proof-modal />
         @endif
 
         @if ($activeReportType !== 'pta')

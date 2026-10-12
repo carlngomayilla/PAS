@@ -53,6 +53,7 @@ class AuditWorkspaceTest extends TestCase
                 'per_page' => 15,
             ]))
             ->assertOk()
+            ->assertSee('aria-label="Filtres du journal d’audit"', false)
             ->assertViewHas('logs', function ($paginator): bool {
                 return $paginator->total() === 35 && count($paginator->items()) === 15;
             })

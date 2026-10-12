@@ -5,20 +5,18 @@
         $isEdit = $mode === 'edit';
     @endphp
     <div class="app-screen-flow">
-    <section class="showcase-panel mb-4 app-screen-block">
-        <h1>{{ $isEdit ? 'Modifier service' : 'Nouveau service' }}</h1>
-    </section>
+    <x-ui.page-title class="mb-4 app-screen-block" eyebrow="Administration organisationnelle" :title="$isEdit ? 'Modifier service' : 'Nouveau service'" />
 
     <section class="showcase-panel mb-4 app-screen-block">
-        <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.services.update', $row) : route('workspace.referentiel.services.store') }}">
+        <form method="POST" class="form-shell reco-form-shell" action="{{ $isEdit ? route('workspace.referentiel.services.update', $row) : route('workspace.referentiel.services.store') }}">
             @csrf
             @if ($isEdit)
                 @method('PUT')
             @endif
 
-            <div class="form-section">
+            <div class="form-section reco-form-section">
                 <h2 class="form-section-title">Paramétrage service</h2>
-                <div class="grid gap-4">
+                <div class="form-grid reco-form-grid">
                     <div>
                         <label for="direction_id">Direction</label>
                         <select id="direction_id" name="direction_id" required>
@@ -48,7 +46,7 @@
                 </div>
             </div>
 
-            <div class="form-actions">
+            <div class="form-actions reco-form-footer">
                 <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Retour</a>
             </div>

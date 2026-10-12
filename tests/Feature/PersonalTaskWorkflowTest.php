@@ -41,6 +41,8 @@ class PersonalTaskWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Validation chef')
             ->assertSee('En retard')
+            ->assertSee('Charge en attente')
+            ->assertSee(route('workspace.tasks.index', ['vue' => 'retard']), false)
             ->assertSee('Action a valider');
 
         $this->actingAs($fixture['agent'])
@@ -248,6 +250,11 @@ class PersonalTaskWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('File priorisée')
             ->assertSee('Validations (81)')
+            ->assertSee(e(route('workspace.tasks.index', [
+                ...$filters,
+                'per_page' => 15,
+                'vue' => 'toutes',
+            ])), false)
             ->assertSee('1-15 sur 81')
             ->assertDontSee('Execution hors famille validation');
     }

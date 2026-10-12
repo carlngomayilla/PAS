@@ -63,7 +63,7 @@
 
     $showTargetFields = $typeAction === \App\Models\Action::TYPE_QUANTITATIVE;
     $thresholdMode = in_array(($rowData['seuil_mode'] ?? 'unique'), ['unique', 'trimestriel'], true)
-        ? (string) $rowData['seuil_mode']
+        ? (string) ($rowData['seuil_mode'] ?? 'unique')
         : 'unique';
     $subActionRows = collect($rowData['sous_actions'] ?? [])
         ->filter(fn ($subAction): bool => is_array($subAction))
@@ -86,7 +86,10 @@
         $errors->has("actions.$index.montant_estime")
         || $errors->has("actions.$index.nature_financement")
         || $errors->has("actions.$index.justificatif_financement")
+        || $errors->has("actions.$index.financement_requis")
     );
+    $hasResourceErrors = ! $isTemplate && $errorKeys->contains(fn (string $key): bool => str_starts_with($key, "actions.$index.ressources_necessaires") || $key === "actions.$index.ressources_details");
+    $hasRiskErrors = ! $isTemplate && $errorKeys->contains(fn (string $key): bool => in_array($key, ["actions.$index.risque_potentiel", "actions.$index.niveau_risque", "actions.$index.mesures_preventives"], true));
 @endphp
 
 @php
@@ -150,11 +153,11 @@
     @endif
 
     <fieldset @if ($isFrozen) disabled class="pta-action-fieldset-frozen opacity-70" @endif>
-    <div class="space-y-4">
-        <details class="form-step-accordion" open>
-            <summary>1. Identification de l'action</summary>
+    <div class="reco-form-shell">
+        <section class="reco-form-section" aria-label="Identification de l'action">
+            <h3 class="form-section-title">Identification de l'action</h3>
             <div class="form-step-body">
-            <div class="form-grid">
+            <div class="form-grid reco-form-grid">
                 <div class="md:col-span-2">
                     <label>Libellé de l'action</label>
                     <input name="actions[{{ $index }}][libelle]" type="text" value="{{ $rowData['libelle'] ?? '' }}" required>
@@ -183,12 +186,12 @@
                 </div>
             </div>
             </div>
-        </details>
+        </section>
 
-        <details class="form-step-accordion" open>
-            <summary>2. Responsable / affectation</summary>
+        <section class="reco-form-section" aria-label="Responsable et affectation">
+            <h3 class="form-section-title">Responsable et affectation</h3>
             <div class="form-step-body">
-            <div class="form-grid">
+            <div class="form-grid reco-form-grid">
                 <div class="md:col-span-2">
                     <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <label class="mb-0">RMO / agent assigné</label>
@@ -216,12 +219,12 @@
                 </div>
             </div>
             </div>
-        </details>
+        </section>
 
-        <details class="form-step-accordion" open>
-            <summary>3. Planification</summary>
+        <section class="reco-form-section" aria-label="Planification">
+            <h3 class="form-section-title">Planification</h3>
             <div class="form-step-body">
-            <div class="form-grid-compact">
+            <div class="form-grid-compact reco-form-grid">
                 <div>
                     <label>Date de début</label>
                     <input name="actions[{{ $index }}][date_debut]" type="date" value="{{ $rowData['date_debut'] ?? '' }}" required @readonly($datesLocked)>
@@ -241,10 +244,10 @@
                 <p class="mt-2 text-xs font-semibold text-amber-700">Dates verrouillées : utilisez la demande de report depuis le Suivi PTA.</p>
             @endif
             </div>
-        </details>
+        </section>
 
-        <details class="form-step-accordion" open>
-            <summary>4. Indicateur et seuil</summary>
+        <details class="form-step-accordion reco-form-section" open>
+            <summary>Indicateur et seuil</summary>
             <div class="form-step-body">
             <div class="form-grid">
                 <div>
@@ -312,7 +315,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section open>
+        <details class="form-step-accordion reco-form-section {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section open>
             <summary>5. Sous-actions prévues</summary>
             <div class="form-step-body">
             <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -403,8 +406,8 @@
             </div>
         </details>
 
-        <details class="form-step-accordion" open>
-            <summary>6. Ressources nécessaires</summary>
+        <details class="form-step-accordion reco-form-section" data-action-secondary-section="resources" @if ($hasResourceErrors) open @endif>
+            <summary>Ressources nécessaires</summary>
             <div class="form-step-body">
             <div class="form-grid-compact pta-resource-grid">
                 @foreach ($resourceOptions as $resourceCode => $resourceLabel)
@@ -428,8 +431,8 @@
             </div>
         </details>
 
-        <details class="form-step-accordion" open>
-            <summary>7. Risques</summary>
+        <details class="form-step-accordion reco-form-section" data-action-secondary-section="risks" @if ($hasRiskErrors) open @endif>
+            <summary>Risques</summary>
             <div class="form-step-body">
             <div class="form-grid">
                 <div class="md:col-span-2">
@@ -458,8 +461,8 @@
             </div>
         </details>
 
-        <details class="form-step-accordion" open>
-            <summary>8. Financement</summary>
+        <details class="form-step-accordion reco-form-section" data-action-secondary-section="financing" @if ($financementRequis || $hasFinancingErrors) open @endif>
+            <summary>Financement</summary>
             <div class="form-step-body">
             <div class="form-grid">
                 <div>

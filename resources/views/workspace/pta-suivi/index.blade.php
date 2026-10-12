@@ -15,6 +15,11 @@
         'statut_delai' => request('statut_delai'),
         'alerte_echeance' => request('alerte_echeance'),
     ])->filter(fn ($value): bool => $value !== null && trim((string) $value) !== '' && trim((string) $value) !== 'all')->all();
+    $advancedPtaFilterCount = collect([
+        $filters['statut_suivi'] ?? 'all',
+        $filters['statut_delai'] ?? 'all',
+        $filters['alerte_echeance'] ?? 'all',
+    ])->filter(static fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')->count();
 @endphp
 
 @push('head')
@@ -25,7 +30,7 @@
         .pta-suivi-logo img { width:128px; height:auto; display:block; }
         .pta-suivi-title { min-height:78px; display:flex; align-items:center; justify-content:center; background:#bdd7ee; border-left:1px solid #d7d7d7; border-right:1px solid #d7d7d7; font-size:18px; font-weight:900; letter-spacing:.02em; text-align:center; }
         .pta-suivi-meta { display:grid; grid-template-columns:1fr auto; gap:10px; padding:12px; border-bottom:1px solid #d7d7d7; }
-        .pta-suivi-meta p { margin:0 0 5px; color:#ff6600; font-size:12px; font-weight:700; }
+        .pta-suivi-meta p { margin:0 0 5px; color:#9a5b00; font-size:12px; font-weight:700; }
         .pta-suivi-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; justify-content:flex-end; }
         .pta-suivi-toolbar label { display:block; margin-bottom:3px; font-size:11px; font-weight:800; color:#17324a; }
         .pta-suivi-toolbar select { min-width:126px; border:1px solid #b7c7d6; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; }
@@ -122,18 +127,14 @@
 @endpush
 
 @section('content')
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 no-print">
-        <div>
-            <p class="text-xs font-black uppercase tracking-wide text-[#3996d3]">Contrôle PTA</p>
-            <h1 class="text-2xl font-black text-[#17324a]">Suivi PTA officiel</h1>
-        </div>
-        <div class="flex flex-wrap gap-2">
+    <x-ui.page-title class="mb-4 no-print" eyebrow="Contrôle PTA" title="Suivi PTA officiel" subtitle="Contrôlez l’exécution, consultez les preuves et exportez le périmètre actif.">
+        <x-slot:actions>
             <a class="btn btn-secondary rounded-xl px-4 py-2 text-sm" href="{{ route('dashboard', $syntheseQuery) }}">Synthèse</a>
             <button class="btn btn-secondary rounded-xl px-4 py-2 text-sm" type="button" onclick="window.print()">Imprimer</button>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.excel', $query) }}">Export Excel</a>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.pdf', $query) }}">Export PDF</a>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-ui.page-title>
 
     <section class="pta-suivi-page">
         <div class="pta-suivi-top">
@@ -150,7 +151,8 @@
                 @endforeach
                 <p>Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | À paramétrer : {{ $summary['a_parametrer'] ?? 0 }}</p>
             </div>
-            <form method="GET" action="{{ route('pta.suivi.index') }}" class="pta-suivi-toolbar no-print" data-auto-filter-form>
+            <form id="pta-suivi-filter-form" method="GET" action="{{ route('pta.suivi.index') }}" class="pta-suivi-toolbar no-print" data-auto-filter-form>
+                <div class="pta-suivi-primary-filters">
                 <div>
                     <label for="direction_id">Direction</label>
                     <select id="direction_id" name="direction_id">
@@ -185,6 +187,13 @@
                         @endforeach
                     </select>
                 </div>
+                </div>
+                <details class="pta-suivi-advanced-filters" @if ($advancedPtaFilterCount > 0) open @endif>
+                    <summary>
+                        <span>Filtres avancés</span>
+                        <span>{{ $advancedPtaFilterCount }} actif{{ $advancedPtaFilterCount > 1 ? 's' : '' }}</span>
+                    </summary>
+                    <div class="pta-suivi-advanced-filter-grid">
                 <div>
                     <label for="statut_suivi">Étape du suivi</label>
                     <select id="statut_suivi" name="statut_suivi">
@@ -212,6 +221,9 @@
                         @endforeach
                     </select>
                 </div>
+                    </div>
+                </details>
+                <a class="btn btn-secondary pta-suivi-filter-reset" href="{{ route('pta.suivi.index') }}">Réinitialiser</a>
             </form>
         </div>
 
@@ -220,58 +232,3 @@
 
     <x-pta.proof-modal />
 @endsection
-
-@push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const modal = document.querySelector('[data-pta-modal]');
-            const modalBody = document.querySelector('[data-pta-modal-body]');
-            const closeButtons = document.querySelectorAll('[data-pta-modal-close]');
-            const directionSelect = document.getElementById('direction_id');
-            const serviceSelect = document.getElementById('service_id');
-
-            function closeModal() {
-                if (!modal || !modalBody) return;
-                modal.classList.remove('is-open');
-                modal.setAttribute('aria-hidden', 'true');
-                modalBody.innerHTML = '';
-            }
-
-            document.addEventListener('click', async function (event) {
-                const button = event.target.closest('[data-pta-action-open]');
-                if (!button || !modal || !modalBody) return;
-                event.preventDefault();
-                modal.classList.add('is-open');
-                modal.setAttribute('aria-hidden', 'false');
-                modalBody.innerHTML = '<div class="p-6 text-center text-sm font-semibold text-slate-600">Chargement...</div>';
-                const loaderToken = window.AnBGLoader?.start({
-                    operation: 'load',
-                    message: 'Chargement du détail de l’action…',
-                });
-
-                try {
-                    const response = await fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                    if (!response.ok) throw new Error('Erreur de chargement');
-                    modalBody.innerHTML = await response.text();
-                } catch (error) {
-                    modalBody.innerHTML = '<div class="p-6 text-center text-sm font-semibold text-red-700">Impossible de charger le detail de cette action.</div>';
-                } finally {
-                    window.AnBGLoader?.finish(loaderToken);
-                }
-            });
-
-            closeButtons.forEach((button) => button.addEventListener('click', closeModal));
-            modal?.addEventListener('click', function (event) {
-                if (event.target === modal) closeModal();
-            });
-            document.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape') closeModal();
-            });
-
-            directionSelect?.addEventListener('change', function () {
-                if (!serviceSelect) return;
-                serviceSelect.value = 'all';
-            });
-        });
-    </script>
-@endpush

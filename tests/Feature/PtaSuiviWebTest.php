@@ -266,7 +266,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertDontSee('Faire le suivi', false)
             ->assertDontSee("Report d'échéance", false)
             ->assertSee('data-pta-action-open', false)
-            ->assertDontSee('href="'.route('pta.suivi.details', $action).'"', false);
+            ->assertSee('href="'.route('pta.suivi.details', $action).'"', false);
 
         $this->actingAs($user)
             ->patch(route('pta.suivi.actions.update', $action), [
@@ -313,7 +313,7 @@ class PtaSuiviWebTest extends TestCase
                 ->assertDontSee('name="rmo_id"', false)
                 ->assertDontSee('Faire le suivi', false)
                 ->assertDontSee("Report d'échéance", false)
-                ->assertDontSee(route('pta.suivi.actions.update', $action), false);
+                ->assertDontSee('action="'.route('pta.suivi.actions.update', $action).'"', false);
 
             // L'URL est comparee telle qu'elle figure dans le HTML : « & » y est echappe.
             $parameterUrl = route('workspace.pta.edit', $action->pta_id).'?focus=action&amp;action_id='.$action->id.'#action-'.$action->id;
@@ -528,13 +528,12 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('pta-hierarchy-action-cell" style="background:#f8fafc;color:#111827;"', false)
             ->assertSee('pta-preview-link', false)
             ->assertSee('data-pta-action-open', false)
-            ->assertDontSee('href="'.route('pta.suivi.details', $action).'"', false)
-            ->assertDontSee(route('pta.suivi.details', $action), false)
+            ->assertSee('href="'.route('pta.suivi.details', $action).'"', false)
             ->assertDontSee('pta-parameter-link', false)
             ->assertSee('pta-parameter-pill', false)
             ->assertDontSee('pta-inline-field', false)
             ->assertDontSee('name="rmo_id"', false)
-            ->assertDontSee(route('pta.suivi.actions.update', $action), false)
+            ->assertDontSee('action="'.route('pta.suivi.actions.update', $action).'"', false)
             ->assertSee(route('workspace.pta.edit', $action->pta_id).'?focus=action&amp;action_id='.$action->id.'#action-'.$action->id, false)
             ->assertSee('Modifier le paramétrage', false)
             ->assertDontSee('Faire le suivi', false)
@@ -618,9 +617,9 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('pta-action-index-cell pta-hierarchy-action-cell', false)
             ->assertSee('pta-hierarchy-sub-action-cell" style="background:#f1f5f9;color:#334155;"', false)
             ->assertSee('pta-preview-link', false)
-            ->assertDontSee(route('pta.suivi.details', $action), false)
-            ->assertDontSee(route('pta.suivi.actions.update', $action), false)
-            ->assertDontSee(route('pta.suivi.actions.destroy', $action), false)
+            ->assertSee(route('pta.suivi.details', $action), false)
+            ->assertDontSee('action="'.route('pta.suivi.actions.update', $action).'"', false)
+            ->assertDontSee('action="'.route('pta.suivi.actions.destroy', $action).'"', false)
             ->assertDontSee('report_sous_action_id=', false)
             ->assertDontSee('focus=sub_target&amp;sub_action_id=', false)
             ->assertDontSee('data-pta-param-editor', false)
@@ -707,7 +706,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('Action agent visible', false)
             ->assertDontSee('Faire le suivi', false)
             ->assertSee("Report d'échéance", false)
-            ->assertDontSee(route('pta.suivi.actions.update', $action), false)
+            ->assertDontSee('action="'.route('pta.suivi.actions.update', $action).'"', false)
             ->assertDontSee('Fiche PTA', false);
     }
 
@@ -1221,10 +1220,13 @@ class PtaSuiviWebTest extends TestCase
         $modal = (string) file_get_contents(resource_path('views/components/pta/proof-modal.blade.php'));
         $suiviView = (string) file_get_contents(resource_path('views/workspace/pta-suivi/index.blade.php'));
         $detailsView = (string) file_get_contents(resource_path('views/workspace/pta-suivi/partials/details.blade.php'));
+        $ptaSuiviUi = (string) file_get_contents(resource_path('js/pta-suivi-ui.js'));
+        $appJavaScript = (string) file_get_contents(resource_path('js/app.js'));
         $css = (string) file_get_contents(resource_path('css/app.css'));
+        $uiSystemCss = (string) file_get_contents(resource_path('css/ui-system.css'));
 
         $this->assertStringContainsString('<x-pta.preview-link', $table);
-        $this->assertStringContainsString('$cellPreviewMode = $isInteractive ? \'readonly\' : $exportMode;', $table);
+        $this->assertStringContainsString('$cellPreviewMode = $exportMode;', $table);
         $this->assertStringContainsString('data-pta-action-open', $component);
         $this->assertStringContainsString('href="{{ $url }}"', $component);
         $this->assertStringContainsString('href="{{ $previewUrl }}"', $proofButton);
@@ -1252,12 +1254,23 @@ class PtaSuiviWebTest extends TestCase
         $this->assertStringNotContainsString('<span class="pta-inline-actions">', $table);
         $this->assertStringNotContainsString('.pta-inline-actions', $suiviView);
         $this->assertStringContainsString('<x-pta.proof-modal />', $suiviView);
-        $this->assertStringContainsString('[data-pta-action-open]', $suiviView);
+        $this->assertStringContainsString('pta-suivi-filter-form', $suiviView);
+        $this->assertStringContainsString('pta-suivi-advanced-filters', $suiviView);
         $this->assertStringContainsString('Previsualisation PTA', $modal);
+        $this->assertStringContainsString('aria-describedby="pta-suivi-modal-description"', $modal);
+        $this->assertStringContainsString('class="pta-suivi-modal-description"', $modal);
+        $this->assertStringNotContainsString('pta-suivi-modal-description" class="sr-only"', $modal);
+        $this->assertStringContainsString('aria-live="polite"', $modal);
+        $this->assertStringContainsString("import './pta-suivi-ui';", $appJavaScript);
+        $this->assertStringContainsString('[data-pta-action-open]', $ptaSuiviUi);
+        $this->assertStringContainsString('pta-modal-open', $ptaSuiviUi);
         $this->assertStringNotContainsString('Parametrer dans le PTA', $detailsView);
         $this->assertStringNotContainsString("http_build_query(['focus' => 'action'])", (string) file_get_contents(app_path('Services/PtaSuiviService.php')));
         $this->assertStringContainsString('.pta-suivi-table tbody tr.pta-level-axis > td', $css);
         $this->assertStringContainsString('.pta-suivi-table th,', $css);
+        $this->assertStringContainsString('#pta-suivi-modal-description', $uiSystemCss);
+        $this->assertStringContainsString('.pta-status-badge', $uiSystemCss);
+        $this->assertStringContainsString('.pta-status-badge--delai.pta-status-badge--dans-les-delais', $uiSystemCss);
     }
 
     public function test_pta_suivi_eager_loads_action_logs_for_status_calculation(): void
@@ -1437,6 +1450,8 @@ class PtaSuiviWebTest extends TestCase
         $this->assertStringContainsString("@include('components.tables.pta-suivi-table'", $view);
         $this->assertStringContainsString("'exportMode' => 'web'", $view);
         $this->assertStringContainsString('dashboardTab=overview', $view);
+        $this->assertStringContainsString('<x-pta.proof-modal />', $view);
+        $this->assertStringContainsString('reporting-advanced-filters', $view);
     }
 
     /**

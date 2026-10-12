@@ -108,6 +108,8 @@ class NotificationWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('workspace.notifications.index'))
             ->assertOk()
+            ->assertSee('aria-label="Filtres des notifications"', false)
+            ->assertSee('aria-label="Synthèse des notifications"', false)
             ->assertSee('Action soumise')
             ->assertDontSee('Action en retard')
             ->assertSee('1 notification(s) non lue(s)');

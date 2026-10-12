@@ -7,11 +7,30 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class ProfileWebTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_optional_security_is_collapsed_but_opens_for_expiry_or_validation_errors(): void
+    {
+        $user = User::factory()->create(['password_changed_at' => now()]);
+        $response = $this->actingAs($user)->get(route('workspace.profile.edit'))->assertOk();
+        $this->assertDoesNotMatchRegularExpression('/<details[^>]*data-profile-security-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+
+        $user->update(['password_changed_at' => null]);
+        $response = $this->get(route('workspace.profile.edit'))->assertOk();
+        $this->assertMatchesRegularExpression('/<details[^>]*data-profile-security-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+
+        $user->update(['password_changed_at' => now()]);
+        $errors = new ViewErrorBag;
+        $errors->put('default', new MessageBag(['password' => ['Mot de passe refusé.']]));
+        $response = $this->withSession(['errors' => $errors])->get(route('workspace.profile.edit'))->assertOk();
+        $this->assertMatchesRegularExpression('/<details[^>]*data-profile-security-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+    }
 
     private const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0n8AAAAASUVORK5CYII=';
 
@@ -25,6 +44,8 @@ class ProfileWebTest extends TestCase
             ->get(route('workspace.profile.edit'))
             ->assertOk()
             ->assertSee('Mon profil')
+            ->assertSee('data-profile-page-header', false)
+            ->assertSee('Règles de mot de passe')
             ->assertSee($user->email);
     }
 

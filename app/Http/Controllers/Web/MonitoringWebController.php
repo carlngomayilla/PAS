@@ -685,19 +685,18 @@ class MonitoringWebController extends Controller
     private function requestForPtaSuivi(Request $request): Request
     {
         $query = $request->query();
-        $ptaRequest = $request->duplicate($query->all());
 
-        if ($query->has('exercice') && ! $query->has('annee')) {
-            $ptaRequest->query->set('annee', $query->get('exercice'));
+        if (array_key_exists('exercice', $query) && ! array_key_exists('annee', $query)) {
+            $query['annee'] = $query['exercice'];
         }
 
-        if ($query->has('trimestre') && ! $query->has('periode')) {
-            $ptaRequest->query->set('periode', $query->get('trimestre'));
+        if (array_key_exists('trimestre', $query) && ! array_key_exists('periode', $query)) {
+            $query['periode'] = $query['trimestre'];
         }
 
-        $ptaRequest->query->remove('statut');
+        unset($query['statut']);
 
-        return $ptaRequest;
+        return $request->duplicate($query);
     }
 
     /**

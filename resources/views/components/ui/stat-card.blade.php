@@ -29,7 +29,7 @@
         'danger' => ['accent' => '#dc2626', 'background' => '#fef2f2'],
     ];
     $resolvedTone = $tones[$tone] ?? $tones['blue'];
-    $classes = 'dashboard-primary-kpi-card no-kpi-band stat-card glass-kpi app-card group relative min-h-32 min-w-[150px] flex-1 overflow-hidden px-4 py-4 transition';
+    $classes = 'reco-metric-card dashboard-primary-kpi-card no-kpi-band stat-card glass-kpi app-card group relative min-h-32 min-w-[150px] flex-1 overflow-hidden px-4 py-4 transition';
     $style = '--dashboard-card-accent: '.$resolvedTone['accent'].'; --dashboard-card-bg: '.$resolvedTone['background'].';';
 @endphp
 
@@ -42,7 +42,7 @@
     <span class="dashboard-primary-kpi-glow" aria-hidden="true"></span>
     <div class="relative z-10 flex h-full flex-col justify-between gap-4">
         <div class="flex items-start justify-between gap-3">
-            <p class="max-w-[12rem] text-xs font-bold leading-5 text-[#526174]">{{ $titleText }}</p>
+            <p class="reco-metric-label max-w-[12rem] text-xs font-bold leading-5 text-[#526174]">{{ $titleText }}</p>
             <div class="dashboard-primary-kpi-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                 @if ($icon)
                 {{ $icon }}
@@ -55,7 +55,7 @@
         </div>
         <div class="flex items-end justify-between gap-3">
             <div class="min-w-0">
-                <p class="text-3xl font-black tracking-tight text-[#17324a]">{{ $value }}</p>
+                <p class="reco-metric-value text-3xl font-black tracking-tight text-[#17324a]">{{ $value }}</p>
                 @if ($badge)
                     <span class="app-badge mt-1">{{ $badge }}</span>
                 @endif

@@ -85,13 +85,16 @@ class OrganizationDirectoryTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/workspace/referentiel/utilisateurs?q[]=incorrect&direction_id[]=1&account_state[]=active')
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('aria-label="Filtres des utilisateurs"', false);
         $this->actingAs($admin)
             ->get('/workspace/referentiel/directions?q[]=incorrect&actif[]=1')
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('aria-label="Filtres des directions"', false);
         $this->actingAs($admin)
             ->get('/workspace/referentiel/services?direction_id[]=1&sort[]=size')
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('aria-label="Filtres des services"', false);
     }
 
     public function test_directory_and_csv_exports_respect_organizational_scope_and_escape_formulas(): void

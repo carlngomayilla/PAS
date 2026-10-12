@@ -38,6 +38,8 @@ class AlertCenterFilteringTest extends TestCase
                 'limit' => 100,
             ]))
             ->assertOk()
+            ->assertSee('aria-label="Filtres des alertes"', false)
+            ->assertSee('aria-label="Synthèse des alertes"', false)
             ->assertSee('Alerte vigilance visible')
             ->assertDontSee('Alerte critique masquee')
             ->assertSee('Vigilance');

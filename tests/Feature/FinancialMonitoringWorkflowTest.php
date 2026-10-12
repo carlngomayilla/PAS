@@ -22,17 +22,74 @@ class FinancialMonitoringWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_transaction_inputs_are_restored_only_for_the_same_action(): void
+    {
+        $fixture = $this->createFixture();
+        $input = [
+            'finance_form' => 'transaction',
+            'finance_action_id' => $fixture['action']->id,
+            'operation_type' => 'decaissement',
+            'amount' => '12000',
+            'reference' => 'FIN-REPRISE-2026',
+            'comment' => 'Observation conservée après erreur.',
+        ];
+
+        $response = $this->actingAs($fixture['daf_service'])->withSession(['_old_input' => $input])
+            ->get(route('workspace.daf.financements.index', ['action_id' => $fixture['action']->id]))
+            ->assertOk()
+            ->assertSee('value="12000"', false)
+            ->assertSee('FIN-REPRISE-2026')
+            ->assertSee('Observation conservée après erreur.');
+        $this->assertMatchesRegularExpression('/<details[^>]*data-finance-operation-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+
+        $input['finance_action_id'] = $fixture['action']->id + 10000;
+
+        $this->withSession(['_old_input' => $input])
+            ->get(route('workspace.daf.financements.index', ['action_id' => $fixture['action']->id]))
+            ->assertOk()
+            ->assertDontSee('FIN-REPRISE-2026');
+    }
+
+    public function test_overrun_inputs_are_restored_separately_from_transactions(): void
+    {
+        $fixture = $this->createFixture();
+
+        $this->actingAs($fixture['daf_service'])->withSession(['_old_input' => [
+            'finance_form' => 'overrun',
+            'scope_type' => 'action',
+            'scope_id' => $fixture['action']->id,
+            'requested_extra' => '25000',
+            'reason' => 'Justification conservée du dépassement.',
+            'reference' => 'DO-NOT-COPY-TO-TRANSACTION',
+        ]])->get(route('workspace.daf.financements.index', ['action_id' => $fixture['action']->id]))
+            ->assertOk()
+            ->assertSee('value="25000"', false)
+            ->assertSee('data-selected-value="'.$fixture['action']->id.'"', false)
+            ->assertSee('Justification conservée du dépassement.')
+            ->assertDontSee('DO-NOT-COPY-TO-TRANSACTION');
+    }
+
     public function test_only_daf_users_can_record_operations_and_disbursements_require_proof(): void
     {
         Storage::fake('local');
         $fixture = $this->createFixture();
         $action = $fixture['action'];
 
-        $this->actingAs($fixture['daf_service'])
+        $response = $this->actingAs($fixture['daf_service'])
             ->get(route('workspace.daf.financements.index', ['action_id' => $action->id]))
             ->assertOk()
+            ->assertSee('data-finance-page-header', false)
+            ->assertSee('data-finance-summary', false)
+            ->assertSee('Filtrer le portefeuille')
+            ->assertSee('100 000 FCFA')
             ->assertSee('Enregistrer une operation DAF')
-            ->assertSee('Nouvelle demande');
+            ->assertSee('Nouvelle demande')
+            ->assertSee('form-shell reco-form-shell', false)
+            ->assertSee('form-section reco-form-section', false)
+            ->assertSee('form-grid reco-form-grid', false)
+            ->assertSee('form-actions reco-form-footer', false);
+        $this->assertDoesNotMatchRegularExpression('/<details[^>]*data-finance-operation-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+        $response->assertSee('name="proof"', false);
 
         $this->actingAs($fixture['operational_service'])
             ->post(route('workspace.finances.transactions.store', $action), $this->operationPayload())

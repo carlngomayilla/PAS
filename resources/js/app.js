@@ -13,3 +13,5 @@ import './ui-enhancements';
 import './data-table-enhancements';
 import './premium-process-bubble';
 import './action-detail-tabs';
+import './pta-suivi-ui';
+import './pta-form-disclosure';

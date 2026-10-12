@@ -139,6 +139,11 @@
     @endphp
 
     <div class="app-screen-flow pta-registration-screen">
+        <x-ui.page-title class="mb-4 app-screen-block" eyebrow="PTA" :title="$isEdit ? 'Modifier un PTA existant' : 'Enregistrer un nouveau PTA'">
+            <x-slot:actions>
+                <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Retour liste</a>
+            </x-slot:actions>
+        </x-ui.page-title>
         @if ($isEdit)
             @include('workspace.planning-unlocks._lock-banner', [
                 'target' => $row,
@@ -147,7 +152,7 @@
         @endif
 
         <section class="showcase-panel pta-form-panel mb-4 app-screen-block">
-            <form method="POST" enctype="multipart/form-data" class="form-shell pta-form-shell" action="{{ $isEdit ? route('workspace.pta.update', $row) : route('workspace.pta.store') }}">
+            <form method="POST" enctype="multipart/form-data" class="form-shell reco-form-shell pta-form-shell" action="{{ $isEdit ? route('workspace.pta.update', $row) : route('workspace.pta.store') }}">
                 @csrf
                 @if ($isEdit)
                     @method('PUT')
@@ -155,9 +160,9 @@
 
                 <input id="titre" name="titre" type="hidden" value="{{ $defaultTitle }}">
 
-                <div class="form-section pta-scope-section">
+                <section class="form-section reco-form-section pta-scope-section">
                     <h2 class="form-section-title">Périmètre</h2>
-                    <div class="form-grid">
+                    <div class="form-grid reco-form-grid">
                         <div class="md:col-span-2">
                             <label for="objectif_operationnel_id">Objectif opérationnel transmis au service</label>
                             <select id="objectif_operationnel_id" name="objectif_operationnel_id" required>
@@ -234,9 +239,9 @@
                             <textarea id="objectif_operationnel_description" class="hidden" rows="4" readonly>{{ old('objectif_operationnel_description', $selectedObjectifDescription) }}</textarea>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="form-section pta-actions-section">
+                <section class="form-section reco-form-section pta-actions-section">
                     <div class="pta-actions-header mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 class="form-section-title mb-0">Actions liées à l'objectif opérationnel</h2>
@@ -274,15 +279,15 @@
                     @if ($responsableOptions->isEmpty())
                         <p class="field-hint mt-3 text-[#f9b13c]">Aucun utilisateur actif disponible pour votre périmètre.</p>
                     @endif
-                </div>
+                </section>
 
                 {{-- Barre d'enregistrement collante : reste visible pendant le
                      defilement d'un formulaire long (roadmap RM4). --}}
-                <div class="form-actions form-actions-sticky" data-pta-sticky-actions>
+                <footer class="form-actions reco-form-footer form-actions-sticky" data-pta-sticky-actions>
                     <span class="form-actions-state" data-pta-dirty-state hidden>Modifications non enregistrées</span>
                     <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour le PTA' : 'Enregistrer le PTA' }}</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Retour</a>
-                </div>
+                </footer>
             </form>
         </section>
 

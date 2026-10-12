@@ -38,8 +38,21 @@ class ReportingReportCatalogTest extends TestCase
             ->assertSee('Rapport Consolidé DG')
             ->assertSee('Direction / service')
             ->assertSee('Comparaison visuelle')
+            ->assertSee('reporting-export-eyebrow', false)
             ->assertSee('data-report-direction-comparison', false)
             ->assertSee('data-report-service-comparison', false);
+    }
+
+    public function test_pta_reporting_keeps_the_scoped_action_details_modal_available(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.reporting', ['report_type' => 'pta']))
+            ->assertOk()
+            ->assertSee('reporting-advanced-filters', false)
+            ->assertSee('data-pta-modal', false)
+            ->assertSee("Détail de l'action et des preuves", false);
     }
 
     public function test_excel_export_can_target_financing_report_only(): void

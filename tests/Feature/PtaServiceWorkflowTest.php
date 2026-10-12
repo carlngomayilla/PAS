@@ -29,6 +29,8 @@ class PtaServiceWorkflowTest extends TestCase
                 'objectif_operationnel_id' => $fixture['otherObjective']->id,
             ]))
             ->assertOk()
+            ->assertSee('Enregistrer un nouveau PTA')
+            ->assertSee(route('workspace.pta.index'), false)
             ->assertSee('Objectif transmis au service cible')
             ->assertDontSee('Objectif transmis a un autre service')
             ->assertDontSee('name="service_id"', false)

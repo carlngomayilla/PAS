@@ -43,19 +43,13 @@
     @endphp
 
     <div class="app-screen-flow">
-        <section class="showcase-hero mb-4 app-screen-block">
-            <div class="showcase-hero-body">
-                <div>
-                    <span class="showcase-eyebrow">PAO</span>
-                    <h1 class="showcase-title">{{ $isEdit ? 'Modifier un PAO existant' : 'Enregistrer un nouveau PAO' }}</h1>
-                </div>
-                <div class="showcase-action-row">
-                    <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour liste</a>
-                </div>
-            </div>
-        </section>
+        <x-ui.page-title class="mb-4 app-screen-block" eyebrow="PAO" :title="$isEdit ? 'Modifier un PAO existant' : 'Enregistrer un nouveau PAO'">
+            <x-slot:actions>
+                <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour liste</a>
+            </x-slot:actions>
+        </x-ui.page-title>
 <section class="showcase-panel mb-4 app-screen-block">
-            <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pao.update', $row) : route('workspace.pao.store') }}">
+            <form method="POST" class="form-shell reco-form-shell" action="{{ $isEdit ? route('workspace.pao.update', $row) : route('workspace.pao.store') }}">
                 @csrf
                 @if ($isEdit)
                     @method('PUT')
@@ -72,9 +66,9 @@
                     </div>
                 @endif
 
-                <div class="form-section">
+                <div class="form-section reco-form-section">
                     <h2 class="form-section-title">Périmètre PAO</h2>
-                    <div class="form-grid">
+                    <div class="form-grid reco-form-grid">
                         <div class="md:col-span-2">
                             <label for="pas_axe_id">Axe stratégique</label>
                             <select id="pas_axe_id" name="pas_axe_id" required>
@@ -131,7 +125,7 @@
                     </div>
                 </div>
 
-                <div class="form-section">
+                <div class="form-section reco-form-section">
                     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 class="form-section-title">Déclinaison opérationnelle</h2>
@@ -141,13 +135,13 @@
 
                     <div id="operational-objectives-list" class="space-y-4">
                         @foreach ($oldOperationalObjectives as $objectiveIndex => $objective)
-                            <div class="operational-objective-block rounded-lg border border-[#3996d3]/20 bg-white p-4 shadow-sm" data-operational-objective-block>
+                            <div class="operational-objective-block reco-form-section rounded-lg border border-[#3996d3]/20 bg-white p-4 shadow-sm" data-operational-objective-block>
                                 <input type="hidden" name="objectifs_operationnels[{{ $objectiveIndex }}][id]" value="{{ $objective['id'] ?? '' }}">
                                 <div class="mb-3 flex items-center justify-between gap-3">
                                     <h3 class="text-sm font-bold text-[#1c203d]" data-operational-objective-title>Objectif opérationnel {{ $objectiveIndex + 1 }}</h3>
                                     <button class="btn btn-secondary text-xs" type="button" data-remove-operational-objective @if ($objectiveIndex === 0) hidden @endif>Supprimer</button>
                                 </div>
-                                <div class="form-grid">
+                                <div class="form-grid reco-form-grid">
                                     <div class="md:col-span-2">
                                         <label for="objectifs_operationnels_{{ $objectiveIndex }}_pas_objectif_id">Objectif stratégique rattaché</label>
                                         <select id="objectifs_operationnels_{{ $objectiveIndex }}_pas_objectif_id" name="objectifs_operationnels[{{ $objectiveIndex }}][pas_objectif_id]" required data-operational-strategic-objective>
@@ -206,7 +200,7 @@
                     </div>
                 </div>
 
-                <div class="form-actions form-actions-sticky">
+                <div class="form-actions form-actions-sticky reco-form-footer">
                     <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour</a>
                 </div>

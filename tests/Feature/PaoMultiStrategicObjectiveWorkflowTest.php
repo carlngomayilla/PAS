@@ -26,6 +26,16 @@ class PaoMultiStrategicObjectiveWorkflowTest extends TestCase
         $fixture = $this->createFixture();
 
         $this->actingAs($fixture['admin'])
+            ->get(route('workspace.pao.create'))
+            ->assertOk()
+            ->assertSee('Enregistrer un nouveau PAO')
+            ->assertSee('form-shell reco-form-shell', false)
+            ->assertSee('form-section reco-form-section', false)
+            ->assertSee('form-grid reco-form-grid', false)
+            ->assertSee('form-actions form-actions-sticky reco-form-footer', false)
+            ->assertSee(route('workspace.pao.index'), false);
+
+        $this->actingAs($fixture['admin'])
             ->post(route('workspace.pao.store'), $this->validPayload($fixture))
             ->assertRedirect(route('workspace.pao.index'))
             ->assertSessionHasNoErrors();

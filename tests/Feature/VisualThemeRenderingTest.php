@@ -48,5 +48,29 @@ class VisualThemeRenderingTest extends TestCase
                 file_put_contents($directory.'/'.$name.'.html', $response->getContent());
             }
         }
+
+        $user->forceFill(['role' => User::ROLE_SUPER_ADMIN, 'is_agent' => false])->save();
+        $screens = [
+            'pas' => route('workspace.pas.show', $pas),
+            'pao' => route('workspace.pao.show', $pao),
+            'pta' => route('workspace.pta.show', $pta),
+            'pilotage' => route('workspace.pilotage'),
+            'historical' => route('workspace.imports.historical.index'),
+            'reporting' => route('workspace.reporting', ['report_type' => 'pta']),
+            'pta-suivi' => route('pta.suivi.index', ['annee' => 'all']),
+            'finance' => route('workspace.daf.financements.index'),
+            'tasks' => route('workspace.tasks.index'),
+            'alertes' => route('workspace.notifications.index', ['tab' => 'alertes']),
+            'notifications' => route('workspace.notifications.index'),
+        ];
+
+        foreach ($screens as $name => $url) {
+            $response = $this->actingAs($user)->get($url)->assertOk();
+            $response->assertSee('<main', false);
+
+            if (getenv('PAS_VISUAL_FIXTURE_EXPORT') === '1') {
+                file_put_contents(base_path('output/ui-theme-fixtures/'.$name.'.html'), $response->getContent());
+            }
+        }
     }
 }

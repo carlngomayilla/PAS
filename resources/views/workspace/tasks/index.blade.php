@@ -76,11 +76,11 @@
             </x-slot:actions>
         </x-ui.page-title>
 
-        <section class="app-screen-block border-y border-slate-200 bg-white/70 py-4 dark:border-slate-700 dark:bg-slate-900/55" aria-label="Synthèse personnelle">
+        <x-ui.section-card class="app-screen-block" title="Charge en attente" aria-label="Synthèse personnelle">
             <p class="mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Charge en attente — ces compteurs mesurent ce qu’il vous reste à traiter, indépendamment du score de vos traitements déjà terminés.
             </p>
-            <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(135px,1fr))]">
+            <x-ui.kpi-grid min="180px">
                 @php
                     $metricHints = [
                         'À traiter' => 'Nombre de tâches ouvertes qui vous sont assignées.',
@@ -91,12 +91,15 @@
                     ];
                 @endphp
                 @foreach ($summaryMetrics as $metric)
-                    <div class="border-l-4 pl-3 {{ $metric['tone'] }}" title="{{ $metricHints[$metric['label']] ?? '' }}">
-                        <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $metric['label'] }}</span>
-                        <strong class="mt-1 block text-2xl">{{ number_format((int) $metric['value'], 0, ',', ' ') }}</strong>
-                    </div>
+                    <x-ui.stat-card
+                        :title="$metric['label']"
+                        :value="number_format((int) $metric['value'], 0, ',', ' ')"
+                        :tone="match ($metric['label']) { 'En retard' => 'danger', 'Sous 24 h' => 'gold', default => 'blue' }"
+                        :href="route('workspace.tasks.index', array_merge(request()->except(['page', 'vue']), ['vue' => match ($metric['label']) { 'En retard' => 'retard', 'Sous 24 h' => 'a_24h', 'Critiques' => 'critiques', 'Sans échéance' => 'sans_echeance', default => 'toutes' }]))"
+                        :aria-label="$metricHints[$metric['label']] ?? ''"
+                    />
                 @endforeach
-            </div>
+            </x-ui.kpi-grid>
 
             @if ($components->isNotEmpty())
                 <details class="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
@@ -121,9 +124,9 @@
                     </div>
                 </details>
             @endif
-        </section>
+        </x-ui.section-card>
 
-        <section class="app-screen-block mt-4" aria-labelledby="task-queue-title">
+        <x-ui.section-card class="app-screen-block mt-4" aria-labelledby="task-queue-title">
             <nav class="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px dark:border-slate-700" aria-label="Vues de la file de tâches">
                 @foreach ($taskViews as $view)
                     @php
@@ -204,7 +207,7 @@
 
             <div class="mt-3 grid gap-3">
                 @forelse ($items as $task)
-                    <article class="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 pl-5 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-labelledby="task-{{ $loop->index }}-subject">
+                    <article class="app-card relative overflow-hidden p-4 pl-5" aria-labelledby="task-{{ $loop->index }}-subject">
                         <span class="absolute inset-y-0 left-0 w-1 {{ $priorityBar($task) }}" aria-hidden="true"></span>
 
                         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_11rem_10rem_12rem] lg:items-start">
@@ -292,6 +295,6 @@
             @if ($taskPaginator->hasPages())
                 <x-ui.pagination class="mt-5" :paginator="$taskPaginator" label="tâches" />
             @endif
-        </section>
+        </x-ui.section-card>
     </div>
 @endsection

@@ -8,6 +8,32 @@ use Tests\TestCase;
 
 class PremiumUiComponentsTest extends TestCase
 {
+    public function test_compact_metric_cards_preserve_links_values_and_complete_context(): void
+    {
+        $html = Blade::render('<x-stat-card-link href="/workspace/actions?statut=achevee" label="Actions achevées" value="232" meta="Contexte complet conservé pour la lecture du responsable" badge="Validées" />');
+
+        $this->assertStringContainsString('href="/workspace/actions?statut=achevee"', $html);
+        $this->assertStringContainsString('Actions achevées', $html);
+        $this->assertStringContainsString('232', $html);
+        $this->assertStringContainsString('Contexte complet conservé pour la lecture du responsable', $html);
+        $this->assertStringContainsString('Validées', $html);
+        $this->assertStringNotContainsString('line-clamp-2', $html);
+
+        $empty = Blade::render('<x-ui.stat-card label="Actions" :value="0" hide-when-empty />');
+        $visible = Blade::render('<x-ui.stat-card label="Actions" :value="0" />');
+        $this->assertSame('', trim($empty));
+        $this->assertStringContainsString('Actions', $visible);
+    }
+
+    public function test_data_table_preserves_description_without_optional_title_and_actions(): void
+    {
+        $html = Blade::render('<x-ui.data-table description="Périmètre courant"><tbody><tr><td>Action visible</td></tr></tbody></x-ui.data-table>');
+
+        $this->assertStringContainsString('Périmètre courant', $html);
+        $this->assertStringContainsString('Action visible', $html);
+        $this->assertStringNotContainsString('<h3', $html);
+    }
+
     public function test_page_title_keeps_content_separate_from_optional_actions(): void
     {
         $plain = Blade::render('<x-ui.page-title title="Suivi des actions" subtitle="Contexte" />');
@@ -118,10 +144,13 @@ class PremiumUiComponentsTest extends TestCase
     public function test_pta_ajax_actions_keep_button_labels_stable_and_release_the_global_loader(): void
     {
         $ptaForm = file_get_contents(resource_path('views/workspace/pta/form.blade.php'));
-        $ptaTracking = file_get_contents(resource_path('views/workspace/pta-suivi/index.blade.php'));
+        $ptaTracking = file_get_contents(resource_path('js/pta-suivi-ui.js'));
+        $applicationJavascript = file_get_contents(resource_path('js/app.js'));
 
         $this->assertIsString($ptaForm);
         $this->assertIsString($ptaTracking);
+        $this->assertIsString($applicationJavascript);
+        $this->assertStringContainsString("import './pta-suivi-ui';", $applicationJavascript);
         $this->assertStringNotContainsString("textContent = 'Envoi…'", $ptaForm);
         $this->assertStringNotContainsString("textContent = 'Sauvegarde…'", $ptaForm);
         $this->assertStringNotContainsString("textContent = 'Enregistrement...'", $ptaTracking);
@@ -178,6 +207,19 @@ class PremiumUiComponentsTest extends TestCase
         $this->assertStringContainsString('.app-form-surface', $styles);
         $this->assertStringContainsString('.app-form-control:focus-visible', $styles);
         $this->assertStringContainsString('html.dark body.admin-theme-scope .app-form-control', $styles);
+    }
+
+    public function test_recommendation_style_metrics_and_pta_secondary_actions_remain_readable_on_mobile_dark_theme(): void
+    {
+        $styles = file_get_contents(resource_path('css/ui-system.css'));
+
+        $this->assertIsString($styles);
+        $this->assertStringContainsString('html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .reco-metric-label', $styles);
+        $this->assertStringContainsString('color: #c8d7e5 !important;', $styles);
+        $this->assertStringContainsString('.pta-registration-screen [data-action-summary]', $styles);
+        $this->assertStringContainsString('color: #b9c9d8 !important;', $styles);
+        $this->assertStringContainsString('.pta-registration-screen :where([data-add-rmo], [data-add-sub-action])', $styles);
+        $this->assertStringContainsString('white-space: normal !important;', $styles);
     }
 
     public function test_password_toggle_is_a_centered_accessible_icon_control(): void

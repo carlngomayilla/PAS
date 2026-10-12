@@ -39,11 +39,11 @@
 <a
     href="{{ $href }}"
     style="--dashboard-card-accent: {{ $resolvedColors['accent'] }}; --dashboard-card-bg: {{ $resolvedColors['background'] }};"
-    {{ $attributes->class([$cardClass, 'dashboard-primary-kpi-card group relative no-kpi-band stat-card-link stat-card flex min-h-32 min-w-[150px] flex-1 flex-col justify-between overflow-hidden p-4', $resolvedTone ? 'showcase-tone-card showcase-tone-card-'.$resolvedTone : null]) }}
+    {{ $attributes->class([$cardClass, 'reco-metric-card dashboard-primary-kpi-card group relative no-kpi-band stat-card-link stat-card flex min-h-32 min-w-[150px] flex-1 flex-col justify-between overflow-hidden p-4', $resolvedTone ? 'showcase-tone-card showcase-tone-card-'.$resolvedTone : null]) }}
 >
     <span class="dashboard-primary-kpi-glow" aria-hidden="true"></span>
     <div class="relative z-10 flex items-start justify-between gap-3">
-        <p class="{{ $labelClass }} max-w-[12rem] leading-5">{{ $label }}</p>
+        <p class="reco-metric-label {{ $labelClass }} max-w-[12rem] leading-5">{{ $label }}</p>
         <span class="dashboard-primary-kpi-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 19V9m6 10V5m6 14v-7m4 7H2"/>
@@ -52,9 +52,9 @@
     </div>
     <div class="relative z-10 mt-4 flex items-end justify-between gap-3">
         <div class="min-w-0">
-            <p class="{{ $valueClass }} text-3xl font-black tracking-tight" @if($valueStyle) style="{{ $valueStyle }}" @endif>{{ $value }}</p>
+            <p class="reco-metric-value {{ $valueClass }} text-3xl font-black tracking-tight" @if($valueStyle) style="{{ $valueStyle }}" @endif>{{ $value }}</p>
             @if ($meta)
-                <p class="{{ $metaClass }} mt-1 line-clamp-2">{{ $meta }}</p>
+                <p class="reco-metric-description {{ $metaClass }} mt-1">{{ $meta }}</p>
             @endif
             @if ($badge)
                 <span class="app-badge app-badge-{{ $badgeTone }} mt-1">{{ $badge }}</span>

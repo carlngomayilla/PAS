@@ -45,12 +45,12 @@
             </x-slot:actions>
         </x-ui.page-title>
 
-        <section class="grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
-            <div class="border-l-4 border-[#20c76b] bg-white px-5 py-4 shadow-sm dark:bg-slate-900">
+        <section class="grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]" aria-label="Résumé du PTA">
+            <div class="app-card border-l-4 border-[var(--ui-brand)] px-5 py-4">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <p class="font-mono text-sm font-black text-[#168c4c]">{{ $row->code ?: 'PTA-'.$row->id }}</p>
+                            <p class="pta-record-code font-mono text-xs font-semibold tracking-wide">{{ $row->code ?: 'PTA-'.$row->id }}</p>
                             <span class="{{ $statusClasses((string) $row->statut) }}">{{ $workflowStatusLabel((string) $row->statut) }}</span>
                         </div>
                         <h2 class="mt-3 text-lg font-black text-[#17324a] dark:text-white">
@@ -69,31 +69,28 @@
                 </div>
             </div>
 
-            <div class="bg-[#17324a] px-5 py-4 text-white shadow-sm">
-                <p class="text-xs font-bold uppercase text-sky-200">Avancement moyen du PTA</p>
+            <div class="app-card border-l-4 border-[var(--ui-green)] px-5 py-4">
+                <p class="text-xs font-bold uppercase text-[var(--ui-brand)]">Avancement moyen du PTA</p>
                 <div class="mt-2 flex items-end justify-between gap-3">
-                    <strong class="text-3xl font-black">{{ number_format($progress, 1, ',', ' ') }}%</strong>
-                    <span class="text-xs font-semibold text-slate-200">{{ $summary['actions'] ?? 0 }} action(s)</span>
+                    <strong class="text-3xl font-black text-[var(--ui-text)]">{{ number_format($progress, 1, ',', ' ') }}%</strong>
+                    <span class="text-xs font-semibold text-[var(--ui-muted)]">{{ $summary['actions'] ?? 0 }} action(s)</span>
                 </div>
-                <div class="mt-3 h-2 overflow-hidden bg-slate-700">
-                    <div class="h-full bg-[#20c76b]" style="width: {{ max(0, min(100, $progress)) }}%"></div>
+                <div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--ui-surface-muted)]">
+                    <div class="h-full rounded-full bg-[var(--ui-green)]" style="width: {{ max(0, min(100, $progress)) }}%"></div>
                 </div>
             </div>
         </section>
 
         <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Synthese du PTA">
             @foreach ([
-                ['label' => 'Actions', 'value' => $summary['actions'] ?? 0, 'tone' => 'border-[#3996d3]'],
-                ['label' => 'Sous-actions', 'value' => $summary['sub_actions'] ?? 0, 'tone' => 'border-[#7656a8]'],
-                ['label' => 'À paramétrer', 'value' => $summary['unconfigured_actions'] ?? 0, 'tone' => 'border-[#f9b13c]'],
-                ['label' => 'En retard', 'value' => $summary['late_actions'] ?? 0, 'tone' => 'border-[#b42318]'],
-                ['label' => 'Reports actifs', 'value' => $summary['active_reports'] ?? 0, 'tone' => 'border-[#17324a]'],
-                ['label' => 'Validations en attente', 'value' => $summary['pending_validations'] ?? 0, 'tone' => 'border-[#20c76b]'],
+                ['label' => 'Actions', 'value' => $summary['actions'] ?? 0, 'tone' => 'blue'],
+                ['label' => 'Sous-actions', 'value' => $summary['sub_actions'] ?? 0, 'tone' => 'gold'],
+                ['label' => 'À paramétrer', 'value' => $summary['unconfigured_actions'] ?? 0, 'tone' => 'orange'],
+                ['label' => 'En retard', 'value' => $summary['late_actions'] ?? 0, 'tone' => 'danger'],
+                ['label' => 'Reports actifs', 'value' => $summary['active_reports'] ?? 0, 'tone' => 'navy'],
+                ['label' => 'Validations en attente', 'value' => $summary['pending_validations'] ?? 0, 'tone' => 'green'],
             ] as $metric)
-                <div class="border-t-4 {{ $metric['tone'] }} bg-white px-4 py-3 shadow-sm dark:bg-slate-900">
-                    <p class="text-xs font-bold uppercase text-slate-500">{{ $metric['label'] }}</p>
-                    <p class="mt-2 text-2xl font-black text-slate-900 dark:text-white">{{ $metric['value'] }}</p>
-                </div>
+                <x-ui.stat-card :title="$metric['label']" :value="$metric['value']" :tone="$metric['tone']" />
             @endforeach
         </section>
 
@@ -112,7 +109,7 @@
             </section>
         @endif
 
-        <section class="app-screen-block" aria-labelledby="pta-path-title">
+        <section class="app-screen-block app-card" aria-labelledby="pta-path-title">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
                 <div>
                     <p class="text-xs font-bold uppercase text-[#7656a8]">Rattachement administratif</p>
@@ -120,16 +117,16 @@
                 </div>
             </div>
 
-            <div class="grid border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:grid-cols-5">
+            <div class="grid overflow-hidden rounded-[var(--ui-radius-md)] border border-[var(--ui-border)] bg-[var(--ui-surface-subtle)] md:grid-cols-5">
                 @foreach ([
-                    ['label' => 'PAS', 'node' => $path['pas'] ?? [], 'href' => ($path['pas']['id'] ?? null) ? route('workspace.pas.show', $path['pas']['id']) : null, 'tone' => 'text-[#3996d3]'],
-                    ['label' => 'Axe strategique', 'node' => $path['axis'] ?? [], 'href' => null, 'tone' => 'text-[#7656a8]'],
-                    ['label' => 'Objectif strategique', 'node' => $path['strategic_objective'] ?? [], 'href' => null, 'tone' => 'text-[#7656a8]'],
-                    ['label' => 'PAO', 'node' => $path['pao'] ?? [], 'href' => ($path['pao']['id'] ?? null) ? route('workspace.pao.show', $path['pao']['id']) : null, 'tone' => 'text-[#17324a]'],
-                    ['label' => 'Objectif opérationnel', 'node' => $path['operational_objective'] ?? [], 'href' => null, 'tone' => 'text-[#168c4c]'],
+                    ['label' => 'PAS', 'node' => $path['pas'] ?? [], 'href' => ($path['pas']['id'] ?? null) ? route('workspace.pas.show', $path['pas']['id']) : null, 'tone' => 'hierarchy-path-tone hierarchy-path-tone-blue'],
+                    ['label' => 'Axe strategique', 'node' => $path['axis'] ?? [], 'href' => null, 'tone' => 'hierarchy-path-tone hierarchy-path-tone-violet'],
+                    ['label' => 'Objectif strategique', 'node' => $path['strategic_objective'] ?? [], 'href' => null, 'tone' => 'hierarchy-path-tone hierarchy-path-tone-violet'],
+                    ['label' => 'PAO', 'node' => $path['pao'] ?? [], 'href' => ($path['pao']['id'] ?? null) ? route('workspace.pao.show', $path['pao']['id']) : null, 'tone' => 'hierarchy-path-tone hierarchy-path-tone-navy'],
+                    ['label' => 'Objectif opérationnel', 'node' => $path['operational_objective'] ?? [], 'href' => null, 'tone' => 'hierarchy-path-tone hierarchy-path-tone-green'],
                 ] as $step)
-                    <div class="min-w-0 border-b border-slate-200 px-4 py-4 last:border-b-0 dark:border-slate-700 md:border-b-0 md:border-r md:last:border-r-0">
-                        <p class="text-xs font-black uppercase {{ $step['tone'] }}">{{ $step['label'] }}</p>
+                    <div class="min-w-0 border-b border-[var(--ui-border)] px-4 py-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+                        <p class="text-xs font-semibold uppercase tracking-wide {{ $step['tone'] }}">{{ $step['label'] }}</p>
                         <p class="mt-2 font-mono text-xs font-bold text-slate-500">{{ $step['node']['code'] ?? '-' }}</p>
                         @if ($step['href'])
                             <a class="mt-1 block text-sm font-bold text-slate-900 hover:text-[#3996d3] dark:text-white" href="{{ $step['href'] }}">{{ $step['node']['label'] ?? '-' }}</a>
@@ -141,10 +138,10 @@
             </div>
         </section>
 
-        <section class="app-screen-block" aria-labelledby="pta-actions-title">
+        <section class="app-screen-block app-card" aria-labelledby="pta-actions-title">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
                 <div>
-                    <p class="text-xs font-bold uppercase text-[#168c4c]">Execution et contrôle</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-[#087f45]">Execution et contrôle</p>
                     <h2 id="pta-actions-title" class="mt-1 text-xl font-black text-[#17324a] dark:text-white">Tableau des actions et sous-actions</h2>
                 </div>
                 <span class="text-sm font-semibold text-slate-500">{{ $actions->count() }} ligne(s)</span>
@@ -158,7 +155,7 @@
                     tone="warning"
                 />
             @else
-                <div class="app-table-wrapper overflow-x-auto">
+                <div class="app-table-wrapper overflow-x-auto" tabindex="0" role="region" aria-label="Tableau des actions et sous-actions">
                     <table class="app-table data-table min-w-[1680px]">
                         <thead>
                             <tr>
@@ -178,9 +175,9 @@
                             @foreach ($actions as $action)
                                 <tr>
                                     <td class="min-w-[290px] align-top">
-                                        <span class="font-mono text-xs font-black text-[#3996d3]">{{ $action['code'] }}</span>
+                                        <span class="pta-action-code font-mono text-xs font-semibold tracking-wide">{{ $action['code'] }}</span>
                                         <p class="mt-1 font-bold text-slate-900 dark:text-white">{{ $action['label'] }}</p>
-                                        <p class="mt-1 text-xs font-semibold text-[#7656a8]">
+                                        <p class="hierarchy-action-context mt-1 text-xs font-semibold">
                                             Axe : {{ $action['axis'] ?? 'Axe strategique non renseigne' }}
                                             <span class="text-slate-400">·</span>
                                             {{ $action['strategic_objective'] ?? 'Objectif strategique non renseigne' }}
@@ -203,7 +200,7 @@
                                         <p class="text-xs font-bold uppercase text-slate-500">Indicateur</p>
                                         <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{{ $action['indicator'] }}</p>
                                         <p class="mt-3 text-xs font-bold uppercase text-slate-500">Cible</p>
-                                        <p class="mt-1 text-sm font-semibold text-[#168c4c]">{{ $action['target'] }}</p>
+                                        <p class="pta-action-target mt-1 text-sm font-semibold">{{ $action['target'] }}</p>
                                         <p class="mt-2 text-xs leading-5 text-slate-500">Resultat : {{ $action['expected_result'] }}</p>
                                     </td>
                                     <td class="min-w-[180px] align-top">

@@ -851,7 +851,7 @@
         </div>
 
         <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table action-list-table min-w-[1200px] w-full text-sm">
+            <table class="app-table data-table action-list-table min-w-[1200px] w-full text-sm" data-mobile-cards>
                 <thead>
                     <tr>
                         <th>Action</th>
@@ -940,17 +940,43 @@
                         <tr>
                             <td class="min-w-[260px]">
                                 <div class="font-semibold text-slate-900">{{ $row->libelle }}</div>
-                                <p class="mt-1 text-xs font-medium text-slate-500">
-                                    ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }} · PTA : {{ $row->pta?->titre ?? '-' }}
-                                </p>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    Axe : {{ $rowAxis ? $optionLabel($rowAxis) : '-' }}
-                                    · Direction : {{ $rowDirection ? $optionLabel($rowDirection) : '-' }}
-                                    · Service : {{ $rowService ? $optionLabel($rowService) : '-' }}
-                                </p>
-                                @if ($row->description)
-                                    <p class="mt-1 max-w-sm text-sm text-slate-500">{{ $row->description }}</p>
-                                @endif
+                                <div class="hidden sm:block">
+                                    <p class="mt-1 text-xs font-medium text-slate-500">
+                                        ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }} · PTA : {{ $row->pta?->titre ?? '-' }}
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Axe : {{ $rowAxis ? $optionLabel($rowAxis) : '-' }}
+                                        · Direction : {{ $rowDirection ? $optionLabel($rowDirection) : '-' }}
+                                        · Service : {{ $rowService ? $optionLabel($rowService) : '-' }}
+                                    </p>
+                                    @if ($row->description)
+                                        <p class="mt-1 max-w-sm text-sm text-slate-500">{{ $row->description }}</p>
+                                    @endif
+                                </div>
+
+                                <details class="mt-2 sm:hidden" data-action-mobile-context>
+                                    <summary class="cursor-pointer text-xs font-semibold text-[var(--app-primary)]">Contexte et contrôles</summary>
+                                    <div class="mt-2 space-y-2 text-xs text-slate-600">
+                                        <p><span class="font-semibold text-slate-700">Référence :</span> ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</p>
+                                        <p><span class="font-semibold text-slate-700">PTA :</span> {{ $row->pta?->titre ?? '-' }}</p>
+                                        <p><span class="font-semibold text-slate-700">Axe :</span> {{ $rowAxis ? $optionLabel($rowAxis) : '-' }}</p>
+                                        <p><span class="font-semibold text-slate-700">Périmètre :</span> {{ $rowDirection ? $optionLabel($rowDirection) : '-' }} · {{ $rowService ? $optionLabel($rowService) : '-' }}</p>
+                                        @if ($row->description)
+                                            <p><span class="font-semibold text-slate-700">Précision :</span> {{ $row->description }}</p>
+                                        @endif
+                                        <p><span class="font-semibold text-slate-700">Justificatif :</span> {{ $rowCard['proof_label'] ?? 'Selon exécution' }} · {{ $row->justificatif_obligatoire ? 'preuve obligatoire' : 'preuve selon dossier' }}</p>
+                                        <p><span class="font-semibold text-slate-700">Validation :</span> {{ $validationStatusLabel($rowValidationStatus) }}</p>
+                                        @unless ($hideRowMetrics)
+                                            <p><span class="font-semibold text-slate-700">Progression théorique :</span> {{ number_format((float) ($row->progression_theorique ?? 0), 0) }} %</p>
+                                            @if ($row->usesQuantitativeProgress())
+                                                <p><span class="font-semibold text-slate-700">Quantité :</span> {{ number_format($realizedValue, 0, ',', ' ') }} / {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 0, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}</p>
+                                            @else
+                                                <p><span class="font-semibold text-slate-700">Sous-actions renseignées :</span> {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
+                                            @endif
+                                            <p><span class="font-semibold text-slate-700">Performance :</span> {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 0).'%' : '-' }}</p>
+                                        @endunless
+                                    </div>
+                                </details>
                             </td>
                             <td class="min-w-[180px]">
                                 <div class="font-medium text-slate-900">{{ $row->responsable?->name ?? '-' }}</div>
@@ -973,7 +999,7 @@
                                     {{ $actionStatusLabel($row->statut_dynamique ?: 'non_demarre') }}
                                 </span>
                             </td>
-                            <td class="min-w-[170px]">
+                            <td class="min-w-[170px]" data-mobile-hidden>
                                 <span class="{{ $rowToneStyles[$rowCard['proof_tone'] ?? 'neutral'] ?? $rowToneStyles['neutral'] }} px-3">
                                     {{ $rowCard['proof_label'] ?? 'Selon exécution' }}
                                 </span>
@@ -988,22 +1014,22 @@
                                 @else
                                 <div class="mb-2 flex items-center justify-between gap-2 text-xs">
                                     <span class="font-semibold text-slate-700">{{ number_format($progressValue, 0) }}%</span>
-                                    <span class="text-slate-500">Théo. {{ number_format((float) ($row->progression_theorique ?? 0), 0) }}%</span>
+                                    <span class="hidden text-slate-500 sm:inline">Théo. {{ number_format((float) ($row->progression_theorique ?? 0), 0) }}%</span>
                                 </div>
                                 <div class="showcase-progress-track">
                                     <span class="showcase-progress-bar {{ $progressColor }}" style="width: {{ $progressValue }}%"></span>
                                 </div>
                                 @if ($row->usesQuantitativeProgress())
-                                    <p class="mt-1 text-xs text-slate-500">
+                                    <p class="mt-1 hidden text-xs text-slate-500 sm:block">
                                         Quantité à réaliser {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 0, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}
                                         · Réalisé {{ number_format($realizedValue, 0, ',', ' ') }}
                                     </p>
                                 @else
-                                    <p class="mt-1 text-xs text-slate-500">Sous-actions : {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
+                                    <p class="mt-1 hidden text-xs text-slate-500 sm:block">Sous-actions : {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
                                 @endif
                                 @endif
                             </td>
-                            <td>
+                            <td data-mobile-hidden>
                                 <span class="{{ $validationStyles[$rowValidationStatus] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
                                     {{ $validationStatusLabel($rowValidationStatus) }}
                                 </span>

@@ -308,6 +308,68 @@ class HistoricalExecutionImportServiceTest extends TestCase
             ->assertSee('Reprise des executions', false);
     }
 
+    public function test_historical_import_index_renders_the_accessible_four_step_upload_flow(): void
+    {
+        $fixture = $this->fixture();
+
+        $this->actingAs($fixture['user'])
+            ->get(route('workspace.imports.historical.index'))
+            ->assertOk()
+            ->assertSee('Reprise des exécutions', false)
+            ->assertSee('Parcours sécurisé', false)
+            ->assertSee('data-historical-import-help', false)
+            ->assertSee('Étapes de la reprise historique', false)
+            ->assertSee('1. Choisir le fichier de reprise', false)
+            ->assertSee('name="file"', false)
+            ->assertSee(route('workspace.imports.historical.preview'), false)
+            ->assertSee('form-shell reco-form-shell', false)
+            ->assertSee('form-section reco-form-section', false)
+            ->assertSee('form-grid reco-form-grid', false)
+            ->assertSee('form-actions reco-form-footer', false)
+            ->assertSee('Aucune donnée n’est modifiée avant la confirmation.', false);
+    }
+
+    public function test_historical_preview_guides_confirmation_then_evidence_without_changing_the_import_routes(): void
+    {
+        $fixture = $this->fixture();
+        $preview = [
+            'global_errors' => [],
+            'rows' => [[
+                'line' => 2,
+                'status' => 'Valide',
+                'data' => [
+                    'code_action' => $fixture['action']->code,
+                    'action_libelle' => $fixture['action']->libelle,
+                    'statut_execution' => 'achevee',
+                    'date_debut_reelle' => '',
+                    'date_fin_reelle' => '',
+                    'progression_reelle' => 100,
+                ],
+                'message' => '',
+            ]],
+        ];
+        $import = $this->createImport($fixture['user'], $preview, 1);
+
+        $this->actingAs($fixture['user'])
+            ->get(route('workspace.imports.historical.show', $import))
+            ->assertOk()
+            ->assertSee('Progression de la reprise historique', false)
+            ->assertSee('3. Confirmer la reprise', false)
+            ->assertSee('Confirmer la reprise', false)
+            ->assertSee(route('workspace.imports.historical.confirm', $import), false)
+            ->assertDontSee('Ouvrir les actions', false);
+
+        $import->update(['status' => 'imported', 'updated_count' => 1]);
+
+        $this->actingAs($fixture['user'])
+            ->get(route('workspace.imports.historical.show', $import))
+            ->assertOk()
+            ->assertSee('Ajouter les justificatifs', false)
+            ->assertSee('Ouvrir les actions', false)
+            ->assertSee(route('workspace.actions.index'), false)
+            ->assertDontSee('Confirmer la reprise', false);
+    }
+
     public function test_preview_screen_exposes_file_level_format_errors(): void
     {
         $fixture = $this->fixture();
@@ -326,7 +388,8 @@ class HistoricalExecutionImportServiceTest extends TestCase
         $this->actingAs($fixture['user'])
             ->get(route('workspace.imports.historical.show', $import))
             ->assertOk()
-            ->assertSee('Le fichier ne respecte pas le format attendu', false)
+            ->assertSee('Le fichier doit être corrigé', false)
+            ->assertSee('Aucune confirmation n’est possible', false)
             ->assertSee('IMPORT_EXECUTION', false);
     }
 

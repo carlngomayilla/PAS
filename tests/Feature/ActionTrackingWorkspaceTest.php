@@ -63,6 +63,23 @@ class ActionTrackingWorkspaceTest extends TestCase
             ->assertSee('Renseigner l’avancement');
     }
 
+    public function test_actions_table_keeps_mobile_rows_focused_with_secondary_context_in_details(): void
+    {
+        $fixture = $this->createFixture(['description' => 'Détail administratif réservé au contexte de l’action.']);
+
+        $response = $this->actingAs($fixture['chef'])
+            ->get(route('workspace.actions.index'))
+            ->assertOk()
+            ->assertSee('data-mobile-cards', false)
+            ->assertSee('data-action-mobile-context', false)
+            ->assertSee('Contexte et contrôles', false)
+            ->assertSee('data-mobile-hidden', false)
+            ->assertSee('Faire le suivi', false)
+            ->assertSee('Renseigner l’avancement');
+
+        $this->assertSame(2, substr_count($response->getContent(), 'data-mobile-hidden'));
+    }
+
     public function test_removing_an_action_filter_resets_pagination_and_keeps_the_layout(): void
     {
         $fixture = $this->createFixture(['libelle' => 'Action filtre pagination']);

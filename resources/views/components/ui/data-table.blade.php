@@ -10,12 +10,12 @@
     'labelPlural' => 'lignes',
 ])
 
-<section {{ $attributes->merge(['class' => 'app-card data-table-shell']) }}>
-    @if ($title || ($slotActions ?? $actions))
+<section {{ $attributes->merge(['class' => 'reco-table-shell app-card data-table-shell']) }}>
+    @if ($title || $description || ($slotActions ?? $actions))
         <div class="app-card-header data-table-header">
-            @if ($title)
-                <div>
-                    <h3 class="data-table-title">{{ $title }}</h3>
+            @if ($title || $description)
+                <div class="min-w-0">
+                    @if ($title)<h3 class="data-table-title">{{ $title }}</h3>@endif
                     @if ($description)
                         <p class="data-table-subtitle mt-1 text-sm text-[var(--app-muted)]">{{ $description }}</p>
                     @endif
@@ -30,7 +30,7 @@
     @endif
 
     @isset($filters)
-        <div class="border-b border-slate-200 p-3" data-table-filter-region>
+        <div class="border-b border-[var(--app-border)] p-3" data-table-filter-region>
             {{ $filters }}
         </div>
     @endisset

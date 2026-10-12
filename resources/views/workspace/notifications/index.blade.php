@@ -119,7 +119,7 @@
         </nav>
 
         @if ($activeTab === 'alertes')
-            <section class="app-screen-block border-y border-slate-200 bg-white/70 py-4 dark:border-slate-700 dark:bg-slate-900/55" aria-label="Synthèse des alertes">
+            <section class="showcase-panel app-screen-block p-4" aria-label="Synthèse des alertes">
                 <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
                     @foreach ($alertMetrics as $metric)
                         <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
@@ -150,7 +150,7 @@
                     @endforeach
                 </nav>
 
-                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,.65fr)_minmax(180px,.8fr)_minmax(140px,.6fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
+                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="showcase-toolbar mt-4 grid min-w-0 gap-3 p-4 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,.65fr)_minmax(0,.8fr)_minmax(0,.6fr)_7rem_auto_auto]" aria-label="Filtres des alertes" data-auto-filter-form>
                     <input type="hidden" name="tab" value="alertes">
                     <input type="hidden" name="vue" value="{{ $alertView }}">
 
@@ -223,10 +223,10 @@
                                 ? ($alert['read_url'] ?? $alert['target_url'] ?? route('workspace.notifications.index', ['tab' => 'alertes']))
                                 : ($alert['target_url'] ?? route('workspace.notifications.index', ['tab' => 'alertes', 'vue' => 'historique']));
                         @endphp
-                        <article class="relative overflow-hidden rounded-lg border p-4 pl-5 shadow-sm {{ $isUnread ? 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900' : 'border-slate-200 bg-slate-50/60 dark:border-slate-700 dark:bg-slate-900/70' }}">
+                        <article class="showcase-panel relative overflow-hidden p-4 pl-5 {{ $isUnread ? 'border-slate-300 dark:border-slate-600' : 'border-slate-200 dark:border-slate-700' }}">
                             <span class="absolute inset-y-0 left-0 w-1 {{ $levelBars[$level] ?? $levelBars['info'] }}" aria-hidden="true"></span>
 
-                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_8rem] lg:items-start">
+                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_12rem_10rem_8rem] lg:items-start">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="{{ $levelBadges[$level] ?? $levelBadges['info'] }} px-2 py-0.5 text-xs">{{ $alert['niveau_label'] ?? ($levelLabels[$level] ?? ucfirst($level)) }}</span>
@@ -275,7 +275,7 @@
                 @endif
             </section>
         @else
-            <section class="app-screen-block border-y border-slate-200 bg-white/70 py-4 dark:border-slate-700 dark:bg-slate-900/55" aria-label="Synthèse des notifications">
+            <section class="showcase-panel app-screen-block p-4" aria-label="Synthèse des notifications">
                 <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(145px,1fr))]">
                     @foreach ($notificationMetrics as $metric)
                         <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
@@ -287,7 +287,7 @@
             </section>
 
             <section class="app-screen-block mt-4" aria-labelledby="notification-center-title">
-                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,.65fr)_minmax(170px,.75fr)_minmax(140px,.6fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
+                <form method="GET" action="{{ route('workspace.notifications.index') }}" class="showcase-toolbar grid min-w-0 gap-3 p-4 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,.65fr)_minmax(0,.75fr)_minmax(0,.6fr)_7rem_auto_auto]" aria-label="Filtres des notifications" data-auto-filter-form>
                     <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
                         Recherche
                         <input name="q" type="search" maxlength="100" value="{{ $notificationFilters['q'] ?? '' }}" placeholder="Titre, message, module..." class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 placeholder:text-slate-400 focus:border-[#3996D3] focus:outline-none focus:ring-2 focus:ring-[#3996D3]/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
@@ -359,10 +359,10 @@
                             $level = $normalizeNotificationLevel($data);
                             $isUnread = $notification->read_at === null;
                         @endphp
-                        <article class="relative overflow-hidden rounded-lg border p-4 pl-5 shadow-sm {{ $isUnread ? 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900' : 'border-slate-200 bg-slate-50/60 dark:border-slate-700 dark:bg-slate-900/70' }}">
+                        <article class="showcase-panel relative overflow-hidden p-4 pl-5 {{ $isUnread ? 'border-slate-300 dark:border-slate-600' : 'border-slate-200 dark:border-slate-700' }}">
                             <span class="absolute inset-y-0 left-0 w-1 {{ $levelBars[$level] ?? $levelBars['info'] }}" aria-hidden="true"></span>
 
-                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_8rem] lg:items-start">
+                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_10rem_10rem_8rem] lg:items-start">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="{{ $levelBadges[$level] ?? $levelBadges['info'] }} px-2 py-0.5 text-xs">{{ $levelLabels[$level] ?? 'Information' }}</span>

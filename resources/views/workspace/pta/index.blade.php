@@ -209,7 +209,7 @@
                         @endphp
                         <tr>
                             <td class="font-mono text-xs text-slate-600">{{ $row->id }}</td>
-                            <td class="font-mono text-xs font-semibold text-slate-800">{{ $row->code ?? '-' }}</td>
+                            <td class="font-mono text-[0.72rem] font-semibold tracking-wide text-slate-700">{{ $row->code ?? '-' }}</td>
                             <td class="font-semibold text-slate-900">{{ $row->titre }}</td>
                             <td>{{ $row->pao?->titre ?? '-' }}</td>
                             <td class="min-w-[220px]">

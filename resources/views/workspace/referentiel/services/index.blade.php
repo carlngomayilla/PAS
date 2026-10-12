@@ -28,7 +28,7 @@
 
         @include('workspace.referentiel.partials.navigation', ['active' => 'services'])
 
-        <section class="app-screen-block border-y border-slate-200 bg-white/70 py-4 dark:border-slate-700 dark:bg-slate-900/55" aria-label="Synthèse des services">
+        <section class="showcase-panel app-screen-block p-4" aria-label="Synthèse des services">
             <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(145px,1fr))]">
                 @foreach ($metrics as $metric)
                     <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
@@ -40,7 +40,7 @@
         </section>
 
         <section class="app-screen-block" aria-labelledby="services-list-title">
-            <form method="GET" action="{{ route('workspace.referentiel.services.index') }}" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-6 dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
+            <form method="GET" action="{{ route('workspace.referentiel.services.index') }}" class="showcase-toolbar grid min-w-0 gap-3 p-4 md:grid-cols-2 xl:grid-cols-6" aria-label="Filtres des services" data-auto-filter-form>
                 <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 md:col-span-2 dark:text-slate-400">
                     Recherche
                     <input name="q" type="search" maxlength="100" value="{{ $filters['q'] ?? '' }}" placeholder="Code ou libellé..." class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">

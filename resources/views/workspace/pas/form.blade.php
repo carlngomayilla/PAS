@@ -18,17 +18,11 @@
     @endphp
 
     <div class="app-screen-flow">
-        <section class="showcase-hero mb-4 app-screen-block">
-            <div class="showcase-hero-body">
-                <div>
-                    <span class="showcase-eyebrow">PAS</span>
-                    <h1 class="showcase-title">{{ $isEdit ? 'Modifier un PAS existant' : 'Enregistrer un nouveau PAS' }}</h1>
-                </div>
-                <div class="showcase-action-row">
-                    <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Retour liste</a>
-                </div>
-            </div>
-        </section>
+        <x-ui.page-title class="mb-4 app-screen-block" eyebrow="PAS" :title="$isEdit ? 'Modifier un PAS existant' : 'Enregistrer un nouveau PAS'">
+            <x-slot:actions>
+                <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Retour liste</a>
+            </x-slot:actions>
+        </x-ui.page-title>
         @if ($isEdit)
             @include('workspace.planning-unlocks._lock-banner', [
                 'target' => $row,
@@ -36,15 +30,15 @@
             ])
         @endif
 <section class="showcase-panel mb-4 app-screen-block">
-            <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pas.update', $row) : route('workspace.pas.store') }}">
+            <form method="POST" class="form-shell reco-form-shell" action="{{ $isEdit ? route('workspace.pas.update', $row) : route('workspace.pas.store') }}">
                 @csrf
                 @if ($isEdit)
                     @method('PUT')
                 @endif
 
-                <div class="form-section">
+                <div class="form-section reco-form-section">
                     <h2 class="form-section-title">Informations stratégiques</h2>
-                    <div class="form-grid">
+                    <div class="form-grid reco-form-grid">
                         <div>
                             <label for="titre">Titre du PAS</label>
                             <input id="titre" name="titre" type="text" value="{{ old('titre', $row->titre ?: 'PAS') }}" maxlength="255" required>
@@ -68,7 +62,7 @@
                     </div>
                 </div>
 
-                <div class="form-section">
+                <div class="form-section reco-form-section">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 class="form-section-title">Axes et objectifs stratégiques</h2>
@@ -80,7 +74,7 @@
                     <div id="axes-list" class="mt-4 space-y-4"></div>
                 </div>
 
-                <div class="form-actions">
+                <div class="form-actions reco-form-footer">
                     <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Retour</a>
                 </div>
@@ -160,7 +154,7 @@
 
             function createObjectifHtml(axeIndex, objectifIndex, objectif) {
                 return '' +
-                    '<div class="rounded-2xl border border-slate-200/85 p-3" data-objectif-index="' + objectifIndex + '">' +
+                    '<div class="rounded-2xl border border-slate-200/85 p-3 reco-form-section" data-objectif-index="' + objectifIndex + '">' +
                         '<input type="hidden" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][id]" value="' + escapeHtml(objectif.id || '') + '">' +
                         '<input type="hidden" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][code]" value="' + escapeHtml(objectif.code || '') + '">' +
                         '<div class="mb-2 flex items-center justify-between gap-2">' +
@@ -198,7 +192,7 @@
                     : [{}];
 
                 var card = document.createElement('div');
-                card.className = 'rounded-2xl border border-slate-200/85 p-4';
+                card.className = 'rounded-2xl border border-slate-200/85 p-4 reco-form-section';
                 card.setAttribute('data-axe-index', String(axeIndex));
                 card.setAttribute('data-next-objectif-index', '0');
                 card.innerHTML = '' +

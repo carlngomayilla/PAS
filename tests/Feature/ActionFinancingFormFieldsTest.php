@@ -2,10 +2,46 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class ActionFinancingFormFieldsTest extends TestCase
 {
+    public function test_secondary_action_sections_are_collapsed_without_losing_inputs(): void
+    {
+        $html = $this->renderActionBlock();
+        $this->assertMatchesRegularExpression('/data-action-secondary-section="resources"\s*>/', $html);
+        $this->assertMatchesRegularExpression('/data-action-secondary-section="risks"\s*>/', $html);
+        $this->assertMatchesRegularExpression('/data-action-secondary-section="financing"\s*>/', $html);
+        $this->assertStringContainsString('name="actions[0][niveau_risque]"', $html);
+        $this->assertStringContainsString('name="actions[0][ressources_details]"', $html);
+        $this->assertStringContainsString('name="actions[0][financement_requis]"', $html);
+    }
+
+    public function test_secondary_errors_and_required_financing_reveal_the_relevant_section(): void
+    {
+        $errors = new ViewErrorBag;
+        $errors->put('default', new MessageBag([
+            'actions.0.ressources_necessaires.0' => 'Ressource invalide.',
+            'actions.0.niveau_risque' => 'Risque invalide.',
+        ]));
+        $html = $this->renderActionBlock(['financement_requis' => true], $errors);
+        foreach (['resources', 'risks', 'financing'] as $section) {
+            $this->assertMatchesRegularExpression('/data-action-secondary-section="'.$section.'"\s+open/', $html);
+        }
+    }
+
+    private function renderActionBlock(array $rowData = [], ?ViewErrorBag $errors = null): string
+    {
+        return view('workspace.pta.partials.action-form-block', [
+            'index' => 0,
+            'rowData' => $rowData,
+            'responsableOptions' => collect(),
+            'errors' => $errors ?? new ViewErrorBag,
+        ])->render();
+    }
+
     public function test_financing_nature_field_is_visible_in_pta_action_block(): void
     {
         // Vue standalone workspace.actions.form.blade.php SUPPRIMEE (2026-05-29) :

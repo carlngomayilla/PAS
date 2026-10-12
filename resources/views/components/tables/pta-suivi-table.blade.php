@@ -7,7 +7,7 @@
 @php
     $isPdf = (string) $exportMode === 'pdf';
     $isInteractive = ! $isPdf && (string) $exportMode !== 'readonly';
-    $cellPreviewMode = $isInteractive ? 'readonly' : $exportMode;
+    $cellPreviewMode = $exportMode;
     $tableColumnCount = $isInteractive ? 19 : 18;
     $pasLabelColspan = $isInteractive ? 15 : 14;
     $hierarchyValueColspan = $isInteractive ? 8 : 7;

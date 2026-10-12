@@ -43,12 +43,12 @@
             </x-slot:actions>
         </x-ui.page-title>
 
-        <section class="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]">
-            <div class="border-l-4 border-[#7656a8] bg-white px-5 py-4 shadow-sm dark:bg-slate-900">
+        <section class="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]" aria-label="Résumé du PAO">
+            <div class="app-card border-l-4 border-[var(--ui-brand)] px-5 py-4">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p class="text-xs font-bold uppercase text-slate-500">Plan d'actions opérationnel annuel</p>
-                        <p class="mt-1 font-mono text-sm font-bold text-[#7656a8]">{{ $row->code ?: 'PAO-'.$row->id }}</p>
+                        <p class="hierarchy-card-code mt-1 font-mono text-sm font-bold">{{ $row->code ?: 'PAO-'.$row->id }}</p>
                         <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
                             <span>{{ $row->direction?->code }} - {{ $row->direction?->libelle ?? 'Direction non renseignee' }}</span>
                             <span>Exercice {{ $row->annee }}</span>
@@ -59,31 +59,28 @@
                 </div>
             </div>
 
-            <div class="bg-[#17324a] px-5 py-4 text-white shadow-sm">
-                <p class="text-xs font-bold uppercase text-sky-200">Avancement moyen visible</p>
+            <div class="app-card border-l-4 border-[var(--ui-green)] px-5 py-4">
+                <p class="text-xs font-bold uppercase text-[var(--ui-brand)]">Avancement moyen visible</p>
                 <div class="mt-2 flex items-end justify-between gap-3">
-                    <strong class="text-3xl font-black">{{ number_format($progress, 1, ',', ' ') }}%</strong>
-                    <span class="text-xs font-semibold text-slate-200">{{ $summary['actions'] ?? 0 }} action(s)</span>
+                    <strong class="text-3xl font-black text-[var(--ui-text)]">{{ number_format($progress, 1, ',', ' ') }}%</strong>
+                    <span class="text-xs font-semibold text-[var(--ui-muted)]">{{ $summary['actions'] ?? 0 }} action(s)</span>
                 </div>
-                <div class="mt-3 h-2 overflow-hidden bg-slate-700">
-                    <div class="h-full bg-[#20c76b]" style="width: {{ max(0, min(100, $progress)) }}%"></div>
+                <div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--ui-surface-muted)]">
+                    <div class="h-full rounded-full bg-[var(--ui-green)]" style="width: {{ max(0, min(100, $progress)) }}%"></div>
                 </div>
             </div>
         </section>
 
         <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Synthese du PAO">
             @foreach ([
-                ['label' => 'Obj. strategiques', 'value' => $summary['strategic_objectives'] ?? 0, 'tone' => 'border-[#3996d3]'],
-                ['label' => 'Services', 'value' => $summary['services'] ?? 0, 'tone' => 'border-[#20c76b]'],
-                ['label' => 'Obj. operationnels', 'value' => $summary['operational_objectives'] ?? 0, 'tone' => 'border-[#7656a8]'],
-                ['label' => 'PTA', 'value' => $summary['ptas'] ?? 0, 'tone' => 'border-[#f9b13c]'],
-                ['label' => 'Actions en retard', 'value' => $summary['late_actions'] ?? 0, 'tone' => 'border-[#b42318]'],
-                ['label' => 'Reports actifs', 'value' => $summary['active_reports'] ?? 0, 'tone' => 'border-[#17324a]'],
+                ['label' => 'Obj. strategiques', 'value' => $summary['strategic_objectives'] ?? 0, 'tone' => 'blue'],
+                ['label' => 'Services', 'value' => $summary['services'] ?? 0, 'tone' => 'green'],
+                ['label' => 'Obj. operationnels', 'value' => $summary['operational_objectives'] ?? 0, 'tone' => 'gold'],
+                ['label' => 'PTA', 'value' => $summary['ptas'] ?? 0, 'tone' => 'orange'],
+                ['label' => 'Actions en retard', 'value' => $summary['late_actions'] ?? 0, 'tone' => 'danger'],
+                ['label' => 'Reports actifs', 'value' => $summary['active_reports'] ?? 0, 'tone' => 'navy'],
             ] as $metric)
-                <div class="border-t-4 {{ $metric['tone'] }} bg-white px-4 py-3 shadow-sm dark:bg-slate-900">
-                    <p class="text-xs font-bold uppercase text-slate-500">{{ $metric['label'] }}</p>
-                    <p class="mt-2 text-2xl font-black text-slate-900 dark:text-white">{{ $metric['value'] }}</p>
-                </div>
+                <x-ui.stat-card :title="$metric['label']" :value="$metric['value']" :tone="$metric['tone']" />
             @endforeach
         </section>
 
@@ -102,7 +99,7 @@
             </section>
         @endif
 
-        <section class="app-screen-block" aria-labelledby="pao-hierarchy-title">
+        <section class="app-screen-block app-card" aria-labelledby="pao-hierarchy-title">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
                 <div>
                     <p class="text-xs font-bold uppercase text-[#7656a8]">Portefeuille opérationnel</p>
@@ -123,10 +120,10 @@
                                     </div>
                                     <p class="mt-2 text-xs font-semibold text-slate-500">{{ $strategicGroup['axis']['label'] }} | Echeance {{ $strategicGroup['deadline'] ?? '-' }}</p>
                                 </div>
-                                <div class="grid grid-cols-3 gap-5 text-center">
-                                    <div><strong class="block text-lg text-[#7656a8]">{{ $strategicGroup['operational_objectives_count'] }}</strong><span class="text-xs text-slate-500">Objectifs</span></div>
-                                    <div><strong class="block text-lg text-[#f59e0b]">{{ $strategicGroup['ptas_count'] }}</strong><span class="text-xs text-slate-500">PTA</span></div>
-                                    <div><strong class="block text-lg text-[#b42318]">{{ $strategicGroup['actions_count'] }}</strong><span class="text-xs text-slate-500">Actions</span></div>
+                                <div class="hierarchy-metric-grid grid grid-cols-3 gap-5 text-center">
+                                    <div><strong class="hierarchy-metric-count hierarchy-metric-count-violet block text-lg">{{ $strategicGroup['operational_objectives_count'] }}</strong><span class="text-xs text-slate-500">Objectifs</span></div>
+                                    <div><strong class="hierarchy-metric-count hierarchy-metric-count-amber block text-lg">{{ $strategicGroup['ptas_count'] }}</strong><span class="text-xs text-slate-500">PTA</span></div>
+                                    <div><strong class="hierarchy-metric-count hierarchy-metric-count-red block text-lg">{{ $strategicGroup['actions_count'] }}</strong><span class="text-xs text-slate-500">Actions</span></div>
                                 </div>
                             </div>
                         </summary>
@@ -137,7 +134,7 @@
                                     <article class="border-l-4 border-[#7656a8] bg-white dark:bg-slate-900">
                                         <header class="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
                                             <div class="min-w-0 flex-1">
-                                                <p class="font-mono text-xs font-black uppercase text-[#7656a8]">{{ $operationalObjective['code'] }}</p>
+                                                <p class="hierarchy-card-code font-mono text-xs font-black uppercase">{{ $operationalObjective['code'] }}</p>
                                                 <h4 class="mt-1 text-sm font-black text-slate-900 dark:text-white">{{ $operationalObjective['label'] }}</h4>
                                                 <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
                                                     <span>{{ $operationalObjective['service']['code'] }} - {{ $operationalObjective['service']['label'] }}</span>
@@ -154,10 +151,10 @@
                                         <div class="border-t border-slate-200 dark:border-slate-700">
                                             @forelse ($operationalObjective['ptas'] as $pta)
                                                 <div class="border-b border-slate-200 last:border-b-0 dark:border-slate-700">
-                                                    <div class="flex flex-wrap items-center justify-between gap-3 bg-[#17324a] px-4 py-3 text-white">
+                                                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ui-border)] bg-[var(--ui-surface-subtle)] px-4 py-3 text-[var(--ui-text)]">
                                                         <div>
-                                                            <p class="font-mono text-xs font-bold text-sky-200">{{ $pta['code'] }} | {{ $pta['service'] }}</p>
-                                                            <h5 class="mt-1 text-sm font-black">{{ $pta['label'] }}</h5>
+                                                            <p class="font-mono text-xs font-bold text-[var(--ui-brand)]">{{ $pta['code'] }} | {{ $pta['service'] }}</p>
+                                                            <h5 class="mt-1 text-sm font-black text-[var(--ui-text)]">{{ $pta['label'] }}</h5>
                                                         </div>
                                                         <div class="flex items-center gap-2">
                                                             <span class="anbg-badge anbg-badge-info">{{ $workflowStatusLabel($pta['status']) }}</span>
@@ -169,7 +166,7 @@
                                                     @if (empty($pta['actions']))
                                                         <div class="bg-amber-50 px-4 py-4 text-sm font-bold text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">Aucune action parametree dans ce PTA.</div>
                                                     @else
-                                                        <div class="overflow-x-auto">
+                                                        <div class="app-table-wrapper overflow-x-auto" tabindex="0" role="region" aria-label="Actions du PTA">
                                                             <table class="app-table data-table min-w-[1050px]">
                                                                 <thead>
                                                                     <tr>

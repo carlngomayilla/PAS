@@ -38,21 +38,20 @@
         $defaultContexts = ['none', 'dg', 'op'];
     @endphp
     <div class="app-screen-flow">
-    <section class="showcase-panel mb-4 app-screen-block">
-        <h1>{{ $isEdit ? 'Modifier utilisateur' : 'Nouvel utilisateur' }}</h1>
-    </section>
+    <x-ui.page-title class="mb-4 app-screen-block" eyebrow="Administration des comptes" :title="$isEdit ? 'Modifier utilisateur' : 'Nouvel utilisateur'" />
 
     <section class="showcase-panel mb-4 app-screen-block">
-        <form method="POST" enctype="multipart/form-data" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.utilisateurs.update', $row) : route('workspace.referentiel.utilisateurs.store') }}">
+        <form method="POST" enctype="multipart/form-data" class="form-shell reco-form-shell" action="{{ $isEdit ? route('workspace.referentiel.utilisateurs.update', $row) : route('workspace.referentiel.utilisateurs.store') }}">
             @csrf
             @if ($isEdit)
                 @method('PUT')
             @endif
 
-            <div class="form-section">
+            <div class="form-section reco-form-section">
                 <h2 class="form-section-title">Profil et rattachement</h2>
-                <div class="grid gap-4">
-                    <div>
+                <div class="form-grid reco-form-grid">
+                    <details class="action-advanced-filters" data-user-photo-options @if ($errors->has('profile_photo') || old('remove_profile_photo')) open @endif>
+                        <summary class="cursor-pointer font-semibold text-[var(--app-text)]">Photo de profil (facultatif)</summary>
                         <label for="profile_photo">Photo de profil</label>
                         <input id="profile_photo" name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp">
                         <p class="field-hint">JPG, PNG ou WEBP. Max 3 Mo.</p>
@@ -65,7 +64,7 @@
                                 </label>
                             </div>
                         @endif
-                    </div>
+                    </details>
                     <div>
                         <label for="name">Nom</label>
                         <input id="name" name="name" type="text" value="{{ old('name', $row->name) }}" required>
@@ -257,8 +256,8 @@
 
             </div>
 
-            <div class="form-section">
-                <h2 class="form-section-title">Sécurité du compte</h2>
+            <details class="form-section reco-form-section action-advanced-filters" data-user-security-options @if ($errors->hasAny(['password', 'password_confirmation'])) open @endif>
+                <summary class="form-section-title cursor-pointer">Mot de passe personnalisé (facultatif)</summary>
                 <div class="grid gap-4">
                     <div>
                         <label for="password">{{ $isEdit ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe (optionnel)' }}</label>
@@ -278,9 +277,9 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </details>
 
-            <div class="form-actions">
+            <div class="form-actions reco-form-footer">
                 <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Retour</a>
             </div>

@@ -39,17 +39,36 @@ class EssentialDashboardWorkflowTest extends TestCase
         $fixture = $this->createPlanningFixture();
         $this->createAction($fixture);
 
+        $filters = [
+            'exercice' => now()->year,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+        ];
+        $dashboardUrl = route('dashboard', [
+            'dashboardTab' => 'overview',
+            'exercice' => now()->year,
+            'periode' => 'all',
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+        ]);
+        $actionsUrl = route('workspace.actions.index', [
+            'annee' => now()->year,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+        ]);
+
         $this->actingAs($fixture['admin'])
-            ->get(route('workspace.pilotage', [
-                'exercice' => now()->year,
-                'direction_id' => $fixture['direction']->id,
-                'service_id' => $fixture['service']->id,
-            ]))
+            ->get(route('workspace.pilotage', $filters))
             ->assertOk()
             ->assertSee('Pilotage PAS/PAO/PTA')
-            ->assertSee('Contexte repris du dashboard')
+            ->assertSee('app-page-header', false)
+            ->assertSee('dashboard-primary-kpi-card', false)
+            ->assertSee(e($dashboardUrl), false)
+            ->assertSee(e($actionsUrl), false)
+            ->assertDontSee('Contexte repris du dashboard')
+            ->assertDontSee('Arborescence filtrée sur le même périmètre')
             ->assertSee('Dashboard filtré')
-            ->assertSee('Ouvrir la liste filtrée des actions')
+            ->assertSee('Voir les actions')
             ->assertSee('PAS dashboard')
             ->assertSee('PAO dashboard')
             ->assertSee('PTA dashboard')
@@ -120,6 +139,35 @@ class EssentialDashboardWorkflowTest extends TestCase
             ->assertSee('Suivi PTA')
             ->assertSee('Axe dashboard sans action')
             ->assertSee('Objectif dashboard sans action');
+    }
+
+    public function test_dashboard_pta_tracking_shortcut_preserves_scope_and_requires_permission(): void
+    {
+        $fixture = $this->createPlanningFixture();
+        $this->createAction($fixture);
+
+        $dashboardFilters = [
+            'dashboardTab' => 'overview',
+            'exercice' => now()->year,
+            'periode' => 'all',
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+        ];
+        $ptaSuiviUrl = route('pta.suivi.index', [
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'annee' => now()->year,
+        ]);
+
+        $this->actingAs($fixture['admin'])
+            ->get(route('dashboard', $dashboardFilters))
+            ->assertOk()
+            ->assertSee('href="'.e($ptaSuiviUrl).'"', false);
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('dashboard', $dashboardFilters))
+            ->assertOk()
+            ->assertDontSee('href="'.e($ptaSuiviUrl).'"', false);
     }
 
     public function test_suivi_evaluation_family_uses_same_profile(): void

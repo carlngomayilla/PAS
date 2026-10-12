@@ -2,63 +2,14 @@
 
 @section('content')
     <div class="app-screen-flow">
-    <section class="mb-4 app-screen-block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_48px_rgba(23,50,74,0.10)]">
-        <div class="h-1.5 bg-[linear-gradient(90deg,#1c203d_0%,#3996d3_52%,#8fc043_100%)]"></div>
-
-        <div class="bg-[linear-gradient(135deg,#ffffff_0%,#f8fbfd_58%,#eef6f9_100%)] px-5 py-5">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#17324a] text-lg font-bold text-white shadow-sm ring-4 ring-white">
-                        {{ $user->profile_initials }}
-                    </div>
-
-                    <div class="min-w-0">
-                        <span class="inline-flex rounded-full border border-[#3996d3]/25 bg-[#3996d3]/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[#1f6f9f]">Mon profil</span>
-                        <h1 class="mt-3 text-2xl font-bold leading-tight text-[#17324a] md:text-3xl">Paramètres personnels et sécurité</h1>
-                        <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-                            Règles de mot de passe : {{ $passwordPolicyHelp }}
-                        </p>
-                    </div>
-                </div>
-
-                <a class="btn btn-primary shrink-0 rounded-lg px-4 py-2.5 shadow-sm" href="{{ route('dashboard') }}">
-                    Retour dashboard
-                </a>
-            </div>
-
-            <div class="mt-5 grid gap-3 md:grid-cols-3">
-                <div class="rounded-lg border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
-                    <div class="flex items-center gap-2">
-                        <span class="h-2 w-2 rounded-full bg-[#3996d3]"></span>
-                        <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Profil</p>
-                    </div>
-                    <p class="mt-2 truncate text-sm font-semibold text-[#17324a]">{{ $profil['role_label'] }}</p>
-                </div>
-                <div class="rounded-lg border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
-                    <div class="flex items-center gap-2">
-                        <span class="h-2 w-2 rounded-full bg-[#8fc043]"></span>
-                        <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Portée</p>
-                    </div>
-                    <p class="mt-2 truncate text-sm font-semibold text-[#17324a]">{{ $profil['scope'] }}</p>
-                </div>
-                <div class="rounded-lg border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
-                    <div class="flex items-center gap-2">
-                        <span class="h-2 w-2 rounded-full bg-[#f9b13c]"></span>
-                        <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Rattachement</p>
-                    </div>
-                    <p class="mt-2 truncate text-sm font-semibold text-[#17324a]">
-                        {{ $user->direction?->libelle ?? 'Sans direction' }} / {{ $user->service?->libelle ?? 'Sans service' }}
-                    </p>
-                </div>
-            </div>
-
-            @if ($passwordExpired)
-                <p class="mt-4 rounded-lg border border-[#f9b13c]/40 bg-[#fff8d6] px-4 py-3 text-sm text-[#1c203d]">
-                    Mot de passe expire. Le renouvellement est obligatoire pour acceder aux autres modules.
-                </p>
-            @endif
-        </div>
-    </section>
+    <x-ui.page-title title="Paramètres personnels et sécurité" eyebrow="Mon profil" subtitle="Informations du compte, mot de passe et sessions actives." class="app-screen-block" data-profile-page-header>
+        <x-slot:actions><a class="btn btn-secondary" href="{{ route('dashboard') }}">Retour dashboard</a></x-slot:actions>
+    </x-ui.page-title>
+    @if ($passwordExpired)
+        <p class="app-screen-block rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100" role="alert">
+            Mot de passe expire. Le renouvellement est obligatoire pour acceder aux autres modules.
+        </p>
+    @endif
 
     <section class="app-screen-stack mb-4">
         <article class="showcase-panel app-screen-block">
@@ -71,8 +22,8 @@
                     </span>
                 @endif
                 <div>
-                    <p class="text-xl font-semibold text-slate-950">{{ $user->name }}</p>
-                    <p class="mt-1 text-sm text-slate-500">{{ $user->email }}</p>
+                    <p class="break-words text-xl font-semibold text-[var(--app-text)]">{{ $user->name }}</p>
+                    <p class="mt-1 break-all text-sm text-[var(--app-muted)]">{{ $user->email }}</p>
                 </div>
             </div>
             <div class="showcase-data-list">
@@ -113,14 +64,15 @@
     </section>
 
     <section class="showcase-panel mb-4 app-screen-block">
-        <form method="POST" enctype="multipart/form-data" class="form-shell" action="{{ route('workspace.profile.update') }}">
+        <form method="POST" enctype="multipart/form-data" class="form-shell reco-form-shell" action="{{ route('workspace.profile.update') }}">
             @csrf
             @method('PUT')
 
-            <div class="form-section">
+            <div class="form-section reco-form-section">
                 <h2 class="form-section-title">Informations personnelles</h2>
-                <div class="form-grid">
-                    <div>
+                <div class="form-grid reco-form-grid">
+                    <details class="action-advanced-filters" data-profile-photo-options @if ($errors->has('profile_photo') || old('remove_profile_photo')) open @endif>
+                        <summary class="cursor-pointer font-semibold text-[var(--app-text)]">Photo de profil (facultatif)</summary>
                         <label for="profile_photo">Photo de profil</label>
                         <div class="showcase-upload-zone">
                             <p class="text-sm font-semibold text-slate-800">Importer une nouvelle photo</p>
@@ -133,7 +85,7 @@
                                 Supprimer la photo actuelle
                             </label>
                         @endif
-                    </div>
+                    </details>
                     <div>
                         <label for="name">Nom complet</label>
                         <input id="name" name="name" type="text" value="{{ old('name', $user->name) }}" required>
@@ -145,9 +97,10 @@
                 </div>
             </div>
 
-            <div class="form-section">
-                <h2 class="form-section-title">Sécurité</h2>
-                <div class="form-grid">
+            <details class="form-section reco-form-section action-advanced-filters" data-profile-security-options @if ($passwordExpired || $errors->hasAny(['current_password', 'password', 'password_confirmation'])) open @endif>
+                <summary class="form-section-title cursor-pointer">Changer le mot de passe{{ $passwordExpired ? ' — obligatoire' : ' (facultatif)' }}</summary>
+                <p class="mb-4 text-sm text-[var(--app-muted)]">Règles de mot de passe : {{ $passwordPolicyHelp }}</p>
+                <div class="form-grid reco-form-grid">
                     <div>
                         <label for="current_password">Mot de passe actuel</label>
                         <div class="relative">
@@ -170,9 +123,9 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </details>
 
-            <div class="form-actions">
+            <div class="form-actions reco-form-footer">
                 <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">Enregistrer</button>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('dashboard') }}">Retour dashboard</a>
             </div>

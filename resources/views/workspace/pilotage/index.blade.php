@@ -6,94 +6,70 @@
     @php
         $actionRouteFilters = is_array($actionRouteFilters ?? null) ? $actionRouteFilters : [];
         $dashboardRouteFilters = is_array($dashboardRouteFilters ?? null) ? $dashboardRouteFilters : [];
-        $directionContext = is_array($directionContext ?? null) ? $directionContext : [];
-        $periodLabel = (string) ($periodLabel ?? 'Toutes périodes');
         $dashboardBackUrl = route('dashboard', ['dashboardTab' => 'overview'] + $dashboardRouteFilters);
         $actionsIndexUrl = route('workspace.actions.index', $actionRouteFilters);
-        $contextCards = [
-            ['label' => 'Exercice', 'value' => $actionRouteFilters['annee'] ?? 'Tous exercices'],
-            ['label' => 'Période', 'value' => $periodLabel],
-            ['label' => 'Direction', 'value' => $directionContext['selected_label'] ?? 'Pilotage global'],
-            ['label' => 'Service', 'value' => $directionContext['service_selected_label'] ?? 'Tous les services'],
-        ];
     @endphp
 
-    <div class="space-y-5">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-                <p class="text-sm font-semibold text-[var(--dashboard-muted)]">Pilotage hierarchique</p>
-                <h1 class="text-2xl font-semibold text-[var(--dashboard-text)]">PAS / PAO / PTA</h1>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <x-dashboard.drilldown-button :href="$dashboardBackUrl" label="Dashboard filtré" />
-                <x-dashboard.drilldown-button :href="$actionsIndexUrl" label="Voir les actions" />
-            </div>
-        </div>
+    <x-ui.page-stack gap="space-y-4">
+        <x-ui.page-title
+            eyebrow="Pilotage hiérarchique"
+            title="Pilotage PAS / PAO / PTA"
+            subtitle="Explorez la déclinaison des plans et les actions accessibles dans votre périmètre."
+        >
+            <x-slot:breadcrumbs>
+                <a class="text-[var(--ui-brand)] hover:underline" href="{{ $dashboardBackUrl }}">Dashboard</a>
+                <span aria-hidden="true">/</span>
+                <span>Pilotage PAS / PAO / PTA</span>
+            </x-slot:breadcrumbs>
 
-        <nav class="flex flex-wrap items-center gap-2 text-xs font-semibold text-[var(--dashboard-muted)]" aria-label="Fil d'Ariane">
-            <a class="text-[var(--dashboard-accent)] hover:underline" href="{{ $dashboardBackUrl }}">Dashboard</a>
-            <span aria-hidden="true">/</span>
-            <span>Pilotage PAS/PAO/PTA</span>
-        </nav>
+            <x-slot:actions>
+                <a class="btn btn-secondary" href="{{ $dashboardBackUrl }}">Dashboard filtré</a>
+                <a class="btn btn-primary" href="{{ $actionsIndexUrl }}">Voir les actions</a>
+            </x-slot:actions>
+        </x-ui.page-title>
 
-        <section class="rounded-[var(--dashboard-card-radius)] border border-[var(--dashboard-border)] bg-[var(--dashboard-surface)] p-4 shadow-sm" aria-labelledby="pilotage-context-title">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <p class="text-xs font-black uppercase tracking-[0.2em] text-[var(--dashboard-accent)]">Contexte repris du dashboard</p>
-                    <h2 id="pilotage-context-title" class="mt-1 text-lg font-semibold text-[var(--dashboard-text)]">Arborescence filtrée sur le même périmètre</h2>
-                    <p class="mt-1 text-sm text-[var(--dashboard-muted)]">Les indicateurs ci-dessous utilisent les filtres sécurisés appliqués à la vue de pilotage.</p>
-                </div>
-                <a class="btn btn-secondary btn-sm" href="{{ $actionsIndexUrl }}">Ouvrir la liste filtrée des actions</a>
-            </div>
-            <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                @foreach ($contextCards as $card)
-                    <div class="rounded-2xl border border-[var(--dashboard-border)] bg-[var(--dashboard-surface-muted)] px-3 py-2">
-                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--dashboard-muted)]">{{ $card['label'] }}</p>
-                        <p class="mt-1 truncate text-sm font-semibold text-[var(--dashboard-text)]" title="{{ $card['value'] }}">{{ $card['value'] }}</p>
-                    </div>
-                @endforeach
-            </div>
-        </section>
+        <x-ui.kpi-grid min="150px" aria-label="Synthèse du pilotage">
+            <x-ui.stat-card title="PAS" :value="$summary['pas_total']" tone="navy" />
+            <x-ui.stat-card title="PAO" :value="$summary['pao_total']" tone="blue" />
+            <x-ui.stat-card title="PTA" :value="$summary['pta_total']" tone="gold" />
+            <x-ui.stat-card title="Actions" :value="$summary['actions_total']" tone="orange" />
+            <x-ui.stat-card title="Exécution moyenne" :value="number_format((float) $summary['average_progress'], 1).'%'" tone="green" />
+        </x-ui.kpi-grid>
 
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <x-dashboard.kpi-card label="PAS" :value="$summary['pas_total']" tone="accent" />
-            <x-dashboard.kpi-card label="PAO" :value="$summary['pao_total']" tone="info" />
-            <x-dashboard.kpi-card label="PTA" :value="$summary['pta_total']" tone="info" />
-            <x-dashboard.kpi-card label="Actions" :value="$summary['actions_total']" tone="accent" />
-            <x-dashboard.kpi-card label="Execution moyenne" :value="number_format((float) $summary['average_progress'], 1).'%' " tone="success" />
-        </div>
-
-        <x-dashboard.section-card title="Arborescence">
+        <x-ui.section-card
+            title="Arborescence"
+            subtitle="Ouvrez un PAS puis un PAO pour consulter les PTA et les actions de votre périmètre."
+        >
             <div class="space-y-3" data-progressive-accordion-group>
                 @forelse ($tree as $pasNode)
                     @php
                         $pas = $pasNode['pas'];
                     @endphp
-                    <details class="rounded-[var(--dashboard-card-radius)] border border-[var(--dashboard-border)] bg-[var(--dashboard-surface-muted)] p-3" data-progressive-accordion-item {{ $loop->first ? 'open' : '' }}>
+                    <details class="app-card overflow-hidden p-0" data-progressive-accordion-item {{ $loop->first ? 'open' : '' }}>
                         <summary class="cursor-pointer list-none">
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    <p class="text-sm font-semibold text-[var(--dashboard-text)]">{{ $pas?->titre ?? 'PAS non rattache' }}</p>
-                                    <p class="text-xs text-[var(--dashboard-muted)]">
+                            <div class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-semibold text-[var(--ui-text)]">{{ $pas?->titre ?? 'PAS non rattache' }}</p>
+                                    <p class="text-xs text-[var(--ui-muted)]">
                                         {{ $pasNode['paos']->count() }} PAO - {{ $pasNode['ptas_count'] }} PTA - {{ $pasNode['actions_count'] }} actions
                                     </p>
                                 </div>
-                                <x-dashboard.status-badge status="info" :label="number_format((float) $pasNode['average_progress'], 1).' %'" />
+                                <x-ui.badge tone="info">{{ number_format((float) $pasNode['average_progress'], 1).' %' }}</x-ui.badge>
                             </div>
                         </summary>
 
-                        <div class="mt-3 space-y-3">
+                        <div class="space-y-3 border-t border-[var(--ui-border)] bg-[var(--ui-surface-subtle)] p-3">
                             @foreach ($pasNode['paos'] as $paoNode)
                                 @php
                                     $pao = $paoNode['pao'];
                                     $axis = $pao?->pasObjectif?->pasAxe;
                                     $objective = $pao?->pasObjectif;
                                 @endphp
-                                <div class="rounded-[var(--dashboard-card-radius)] border border-[var(--dashboard-border)] bg-[var(--dashboard-surface)] p-3">
+                                <article class="app-card p-3">
                                     <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                                        <div>
-                                            <p class="text-sm font-semibold text-[var(--dashboard-text)]">{{ $pao?->titre ?? 'PAO non rattache' }}</p>
-                                            <p class="text-xs text-[var(--dashboard-muted)]">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-[var(--ui-text)]">{{ $pao?->titre ?? 'PAO non rattache' }}</p>
+                                            <p class="text-xs text-[var(--ui-muted)]">
                                                 {{ $axis?->code ?? '-' }} {{ $axis?->libelle ?? '' }}
                                                 @if ($objective)
                                                     - {{ $objective->code ?? '' }} {{ $objective->libelle }}
@@ -101,8 +77,8 @@
                                             </p>
                                         </div>
                                         <div class="flex flex-wrap gap-2">
-                                            <x-dashboard.status-badge status="info" :label="$pao?->statut ?? '-'" />
-                                            <x-dashboard.status-badge status="success" :label="number_format((float) $paoNode['average_progress'], 1).' %'" />
+                                            <x-ui.badge tone="info">{{ $pao?->statut ?? '-' }}</x-ui.badge>
+                                            <x-ui.badge tone="success">{{ number_format((float) $paoNode['average_progress'], 1).' %' }}</x-ui.badge>
                                         </div>
                                     </div>
 
@@ -113,46 +89,51 @@
                                                 $displayedActionsCount = $pta->actions->take(3)->count();
                                                 $hiddenActionsCount = max(0, (int) $pta->actions_count - $displayedActionsCount);
                                             @endphp
-                                            <div class="rounded-md border border-[var(--dashboard-border)] p-3">
+                                            <div class="rounded-[var(--ui-radius-sm)] border border-[var(--ui-border)] bg-[var(--ui-surface-subtle)] p-3">
                                                 <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
-                                                    <div>
-                                                        <p class="text-sm font-medium text-[var(--dashboard-text)]">{{ $pta->titre }}</p>
-                                                        <p class="text-xs text-[var(--dashboard-muted)]">
+                                                    <div class="min-w-0">
+                                                        <p class="text-sm font-medium text-[var(--ui-text)]">{{ $pta->titre }}</p>
+                                                        <p class="text-xs text-[var(--ui-muted)]">
                                                             {{ $pta->direction?->code ?? '-' }} / {{ $pta->service?->code ?? '-' }}
                                                             - {{ $pta->actions_count }} action(s)
                                                         </p>
                                                     </div>
-                                                    <x-dashboard.progress-axis
-                                                        label="Execution"
-                                                        :value="$pta->actions_avg_progression_reelle ?? 0"
-                                                        :target="100"
-                                                    />
-                                                    <x-dashboard.drilldown-button :href="route('workspace.pta.show', $pta)" label="Détail PTA" />
+                                                    @php $ptaProgress = max(0, min(100, (float) ($pta->actions_avg_progression_reelle ?? 0))); @endphp
+                                                    <div class="min-w-[150px]">
+                                                        <div class="flex items-center justify-between gap-3 text-xs font-semibold text-[var(--ui-text-soft)]">
+                                                            <span>Exécution</span>
+                                                            <span>{{ number_format($ptaProgress, 0) }}%</span>
+                                                        </div>
+                                                        <div class="mt-2 h-2 overflow-hidden rounded-full bg-[var(--ui-surface-muted)]">
+                                                            <span class="block h-full rounded-full bg-[var(--ui-green)]" style="width: {{ $ptaProgress }}%"></span>
+                                                        </div>
+                                                    </div>
+                                                    <a class="btn btn-secondary btn-sm" href="{{ route('workspace.pta.show', $pta) }}">Détail PTA</a>
                                                 </div>
 
                                                 @if ($pta->actions->isNotEmpty())
-                                                    <div class="mt-3 space-y-2 border-t border-[var(--dashboard-border)] pt-3">
-                                                        <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[var(--dashboard-muted)]">
+                                                    <div class="mt-3 space-y-2 border-t border-[var(--ui-border)] pt-3">
+                                                        <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[var(--ui-muted)]">
                                                             <span>{{ $displayedActionsCount }} sur {{ $pta->actions_count }} action(s) affichée(s)</span>
-                                                            <a class="text-[var(--dashboard-accent)] hover:underline" href="{{ $ptaActionUrl }}">Voir toutes les actions de ce PTA</a>
+                                                            <a class="text-[var(--ui-brand)] hover:underline" href="{{ $ptaActionUrl }}">Voir toutes les actions de ce PTA</a>
                                                         </div>
                                                         @foreach ($pta->actions->take(3) as $action)
-                                                            <div class="grid gap-2 rounded-md bg-[var(--dashboard-surface-muted)] p-2 sm:grid-cols-[minmax(0,1fr)_120px_auto] sm:items-center">
+                                                            <div class="grid gap-2 rounded-[var(--ui-radius-sm)] border border-[var(--ui-border)] bg-[var(--ui-surface)] p-2 sm:grid-cols-[minmax(0,1fr)_120px_auto] sm:items-center">
                                                                 <div class="min-w-0">
-                                                                    <p class="truncate text-sm font-medium text-[var(--dashboard-text)]">{{ $action->libelle }}</p>
-                                                                    <p class="text-xs text-[var(--dashboard-muted)]">
+                                                                    <p class="truncate text-sm font-medium text-[var(--ui-text)]">{{ $action->libelle }}</p>
+                                                                    <p class="text-xs text-[var(--ui-muted)]">
                                                                         {{ $action->statut ?? 'Statut non renseigne' }}
                                                                         @if ($action->date_echeance)
                                                                             - echeance {{ $action->date_echeance->format('d/m/Y') }}
                                                                         @endif
                                                                     </p>
                                                                 </div>
-                                                                <x-dashboard.status-badge status="success" :label="number_format((float) ($action->progression_reelle ?? 0), 1).' %'" />
-                                                                <x-dashboard.drilldown-button :href="route('workspace.actions.suivi', $action)" label="Detail" class="px-2 py-1 text-xs" />
+                                                                <x-ui.badge tone="success">{{ number_format((float) ($action->progression_reelle ?? 0), 1).' %' }}</x-ui.badge>
+                                                                <a class="btn btn-secondary btn-sm" href="{{ route('workspace.actions.suivi', $action) }}">Détail</a>
                                                             </div>
                                                         @endforeach
                                                         @if ($hiddenActionsCount > 0)
-                                                            <p class="rounded-xl bg-[var(--dashboard-surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--dashboard-muted)]">{{ $hiddenActionsCount }} action(s) supplémentaire(s) accessible(s) dans la liste filtrée.</p>
+                                                            <p class="rounded-[var(--ui-radius-sm)] bg-[var(--ui-surface)] px-3 py-2 text-xs font-semibold text-[var(--ui-muted)]">{{ $hiddenActionsCount }} action(s) supplémentaire(s) accessible(s) dans la liste filtrée.</p>
                                                         @endif
 
                                                     </div>
@@ -160,14 +141,14 @@
                                             </div>
                                         @endforeach
                                     </div>
-                                </div>
+                                </article>
                             @endforeach
                         </div>
                     </details>
                 @empty
-                    <x-dashboard.empty-state title="Aucune hierarchie disponible" message="Aucun PTA n'est accessible dans votre perimetre actuel." />
+                    <x-ui.empty-state title="Aucune hiérarchie disponible" message="Aucun PTA n'est accessible dans votre périmètre actuel." icon="chart" tone="info" />
                 @endforelse
             </div>
-        </x-dashboard.section-card>
-    </div>
+        </x-ui.section-card>
+    </x-ui.page-stack>
 @endsection

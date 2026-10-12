@@ -8,11 +8,30 @@ use App\Services\RoleRegistryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class ReferentielUtilisateurProfilePhotoTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_optional_photo_and_password_controls_open_when_their_fields_have_errors(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $response = $this->actingAs($admin)->get(route('workspace.referentiel.utilisateurs.create'))->assertOk();
+        $this->assertDoesNotMatchRegularExpression('/<details[^>]*data-user-(?:photo|security)-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+        $response->assertSee('name="agent_matricule"', false)->assertSee('name="role"', false);
+
+        $errors = new ViewErrorBag;
+        $errors->put('default', new MessageBag([
+            'profile_photo' => ['Photo refusée.'],
+            'password' => ['Mot de passe refusé.'],
+        ]));
+        $response = $this->withSession(['errors' => $errors])->get(route('workspace.referentiel.utilisateurs.create'))->assertOk();
+        $this->assertMatchesRegularExpression('/<details[^>]*data-user-photo-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+        $this->assertMatchesRegularExpression('/<details[^>]*data-user-security-options[^>]*\\sopen(?:\\s|>)/u', $response->getContent());
+    }
 
     private const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0n8AAAAASUVORK5CYII=';
 

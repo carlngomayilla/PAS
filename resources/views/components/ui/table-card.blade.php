@@ -3,7 +3,7 @@
     'subtitle' => null,
 ])
 
-<x-ui.section-card :title="$title" :subtitle="$subtitle" {{ $attributes->merge(['class' => 'mb-4']) }}>
+<x-ui.section-card :title="$title" :subtitle="$subtitle" {{ $attributes->merge(['class' => 'reco-table-shell mb-4']) }}>
     @isset($actions)
         <x-slot:actions>{{ $actions }}</x-slot:actions>
     @endisset

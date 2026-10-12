@@ -19,6 +19,21 @@ class PasProgressiveHierarchyTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_authorized_writer_can_open_the_compact_pas_form(): void
+    {
+        $fixture = $this->createFixture();
+
+        $this->actingAs($fixture['admin'])
+            ->get(route('workspace.pas.create'))
+            ->assertOk()
+            ->assertSee('Enregistrer un nouveau PAS')
+            ->assertSee('form-shell reco-form-shell', false)
+            ->assertSee('form-section reco-form-section', false)
+            ->assertSee('form-grid reco-form-grid', false)
+            ->assertSee('form-actions reco-form-footer', false)
+            ->assertSee(route('workspace.pas.index'), false);
+    }
+
     public function test_global_reader_sees_the_complete_progressive_hierarchy_and_its_gaps(): void
     {
         $fixture = $this->createFixture();
@@ -26,7 +41,13 @@ class PasProgressiveHierarchyTest extends TestCase
         $this->actingAs($fixture['admin'])
             ->get(route('workspace.pas.show', $fixture['pas']))
             ->assertOk()
+            ->assertSee('aria-label="Résumé du PAS"', false)
+            ->assertSee('dashboard-primary-kpi-card', false)
+            ->assertSee('aria-label="Objectifs opérationnels du PAO"', false)
             ->assertSee('Du PAS jusqu\'aux actions', false)
+            ->assertSee('hierarchy-metric-count hierarchy-metric-count-violet', false)
+            ->assertSee('hierarchy-metric-count hierarchy-metric-count-amber', false)
+            ->assertSee('hierarchy-metric-count hierarchy-metric-count-red', false)
             ->assertSee($fixture['primary_axis']->libelle)
             ->assertSee($fixture['empty_objective']->libelle)
             ->assertSee($fixture['primary_pao']->titre)

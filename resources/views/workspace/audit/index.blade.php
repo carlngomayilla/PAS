@@ -54,7 +54,7 @@
             </x-slot:actions>
         </x-ui.page-title>
 
-        <section class="app-screen-block border-y border-slate-200 bg-white/70 py-4 dark:border-slate-700 dark:bg-slate-900/55" aria-label="Synthèse du journal filtré">
+        <section class="showcase-panel app-screen-block p-4" aria-label="Synthèse du journal filtré">
             <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(145px,1fr))]">
                 @foreach ($summaryMetrics as $metric)
                     <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
@@ -82,7 +82,7 @@
                 @endforeach
             </nav>
 
-            <form method="GET" action="{{ route('workspace.audit.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-4 dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
+            <form method="GET" action="{{ route('workspace.audit.index') }}" class="showcase-toolbar mt-4 grid min-w-0 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Filtres du journal d’audit" data-auto-filter-form>
                 @if ($activeScope !== '')
                     <input type="hidden" name="operation_scope" value="{{ $activeScope }}">
                 @endif
@@ -186,7 +186,7 @@
                         $style = $categoryStyles[$category] ?? $categoryStyles['standard'];
                         $hasValues = ($log['before_json'] ?? '') !== '' || ($log['after_json'] ?? '') !== '';
                     @endphp
-                    <article class="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 pl-5 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-labelledby="audit-entry-{{ $log['id'] }}">
+                    <article class="showcase-panel relative overflow-hidden p-4 pl-5" aria-labelledby="audit-entry-{{ $log['id'] }}">
                         <span class="absolute inset-y-0 left-0 w-1 {{ $style['bar'] }}" aria-hidden="true"></span>
 
                         <div class="grid gap-4 lg:grid-cols-[10rem_13rem_minmax(0,1fr)_13rem] lg:items-start">

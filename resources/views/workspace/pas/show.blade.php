@@ -29,8 +29,8 @@
             </x-slot:actions>
         </x-ui.page-title>
 
-        <section class="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.5fr)]">
-            <div class="border-l-4 border-[#17324a] bg-white px-5 py-4 shadow-sm dark:bg-slate-900">
+        <section class="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.5fr)]" aria-label="Résumé du PAS">
+            <div class="app-card border-l-4 border-[var(--ui-brand)] px-5 py-4">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p class="text-xs font-bold uppercase text-slate-500">Plan d'actions stratégique</p>
@@ -45,33 +45,30 @@
                 </div>
             </div>
 
-            <div class="bg-[#17324a] px-5 py-4 text-white shadow-sm">
-                <p class="text-xs font-bold uppercase text-sky-200">Couverture stratégique</p>
+            <div class="app-card border-l-4 border-[var(--ui-green)] px-5 py-4">
+                <p class="text-xs font-bold uppercase text-[var(--ui-brand)]">Couverture stratégique</p>
                 <div class="mt-2 flex items-end justify-between gap-3">
-                    <strong class="text-3xl font-black">{{ $coverage }}%</strong>
-                    <span class="text-xs font-semibold text-slate-200">
+                    <strong class="text-3xl font-black text-[var(--ui-text)]">{{ $coverage }}%</strong>
+                    <span class="text-xs font-semibold text-[var(--ui-muted)]">
                         {{ (int) ($summary['strategic_objectives'] ?? 0) - (int) ($summary['strategic_objectives_without_operational'] ?? 0) }} / {{ $summary['strategic_objectives'] ?? 0 }} objectifs declines
                     </span>
                 </div>
-                <div class="mt-3 h-2 overflow-hidden bg-slate-700">
-                    <div class="h-full bg-[#20c76b]" style="width: {{ $coverage }}%"></div>
+                <div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--ui-surface-muted)]">
+                    <div class="h-full rounded-full bg-[var(--ui-green)]" style="width: {{ $coverage }}%"></div>
                 </div>
             </div>
         </section>
 
         <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Synthese du PAS">
             @foreach ([
-                ['label' => 'Axes', 'value' => $summary['axes'] ?? 0, 'tone' => 'border-[#3996d3]'],
-                ['label' => 'Objectifs strategiques', 'value' => $summary['strategic_objectives'] ?? 0, 'tone' => 'border-[#17324a]'],
-                ['label' => 'PAO', 'value' => $summary['paos'] ?? 0, 'tone' => 'border-[#20c76b]'],
-                ['label' => 'Objectifs operationnels', 'value' => $summary['operational_objectives'] ?? 0, 'tone' => 'border-[#7656a8]'],
-                ['label' => 'PTA', 'value' => $summary['ptas'] ?? 0, 'tone' => 'border-[#f9b13c]'],
-                ['label' => 'Actions', 'value' => $summary['actions'] ?? 0, 'tone' => 'border-[#b42318]'],
+                ['label' => 'Axes', 'value' => $summary['axes'] ?? 0, 'tone' => 'blue'],
+                ['label' => 'Objectifs strategiques', 'value' => $summary['strategic_objectives'] ?? 0, 'tone' => 'navy'],
+                ['label' => 'PAO', 'value' => $summary['paos'] ?? 0, 'tone' => 'green'],
+                ['label' => 'Objectifs operationnels', 'value' => $summary['operational_objectives'] ?? 0, 'tone' => 'gold'],
+                ['label' => 'PTA', 'value' => $summary['ptas'] ?? 0, 'tone' => 'orange'],
+                ['label' => 'Actions', 'value' => $summary['actions'] ?? 0, 'tone' => 'danger'],
             ] as $metric)
-                <div class="border-t-4 {{ $metric['tone'] }} bg-white px-4 py-3 shadow-sm dark:bg-slate-900">
-                    <p class="text-xs font-bold uppercase text-slate-500">{{ $metric['label'] }}</p>
-                    <p class="mt-2 text-2xl font-black text-slate-900 dark:text-white">{{ $metric['value'] }}</p>
-                </div>
+                <x-ui.stat-card :title="$metric['label']" :value="$metric['value']" :tone="$metric['tone']" />
             @endforeach
         </section>
 
@@ -90,7 +87,7 @@
             </section>
         @endif
 
-        <section class="app-screen-block" aria-labelledby="pas-hierarchy-title">
+        <section class="app-screen-block app-card" aria-labelledby="pas-hierarchy-title">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
                 <div>
                     <p class="text-xs font-bold uppercase text-[#3996d3]">Architecture d'execution</p>
@@ -111,11 +108,11 @@
                                     </div>
                                     <p class="mt-2 text-xs font-semibold text-slate-500">Periode {{ $axis['period'] }}</p>
                                 </div>
-                                <div class="grid grid-cols-4 gap-4 text-center">
-                                    <div><strong class="block text-lg text-[#17324a] dark:text-white">{{ $axis['objectives_count'] }}</strong><span class="text-xs text-slate-500">Obj. strat.</span></div>
-                                    <div><strong class="block text-lg text-[#7656a8]">{{ $axis['operational_objectives_count'] }}</strong><span class="text-xs text-slate-500">Obj. op.</span></div>
-                                    <div><strong class="block text-lg text-[#f59e0b]">{{ $axis['ptas_count'] }}</strong><span class="text-xs text-slate-500">PTA</span></div>
-                                    <div><strong class="block text-lg text-[#b42318]">{{ $axis['actions_count'] }}</strong><span class="text-xs text-slate-500">Actions</span></div>
+                                <div class="hierarchy-metric-grid grid grid-cols-4 gap-4 text-center">
+                                    <div><strong class="hierarchy-metric-count hierarchy-metric-count-navy block text-lg">{{ $axis['objectives_count'] }}</strong><span class="text-xs text-slate-500">Obj. strat.</span></div>
+                                    <div><strong class="hierarchy-metric-count hierarchy-metric-count-violet block text-lg">{{ $axis['operational_objectives_count'] }}</strong><span class="text-xs text-slate-500">Obj. op.</span></div>
+                                    <div><strong class="hierarchy-metric-count hierarchy-metric-count-amber block text-lg">{{ $axis['ptas_count'] }}</strong><span class="text-xs text-slate-500">PTA</span></div>
+                                    <div><strong class="hierarchy-metric-count hierarchy-metric-count-red block text-lg">{{ $axis['actions_count'] }}</strong><span class="text-xs text-slate-500">Actions</span></div>
                                 </div>
                             </div>
                         </summary>
@@ -153,10 +150,10 @@
                                         <div class="border-t border-slate-200 dark:border-slate-700">
                                             @forelse ($objective['paos'] as $pao)
                                                 <div class="border-b border-slate-200 last:border-b-0 dark:border-slate-700">
-                                                    <div class="flex flex-wrap items-center justify-between gap-3 bg-[#17324a] px-4 py-3 text-white">
+                                                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ui-border)] bg-[var(--ui-surface-subtle)] px-4 py-3 text-[var(--ui-text)]">
                                                         <div class="min-w-0">
-                                                            <p class="text-xs font-bold uppercase text-sky-200">{{ $pao['code'] }} | {{ $pao['year'] }} | {{ $pao['direction'] }}</p>
-                                                            <h5 class="mt-1 text-sm font-black">{{ $pao['label'] }}</h5>
+                                                            <p class="text-xs font-bold uppercase text-[var(--ui-brand)]">{{ $pao['code'] }} | {{ $pao['year'] }} | {{ $pao['direction'] }}</p>
+                                                            <h5 class="mt-1 text-sm font-black text-[var(--ui-text)]">{{ $pao['label'] }}</h5>
                                                         </div>
                                                         <div class="flex items-center gap-2">
                                                             <span class="anbg-badge anbg-badge-info">{{ $workflowStatusLabel($pao['status']) }}</span>
@@ -170,7 +167,7 @@
                                                             Ce PAO ne contient encore aucun objectif opérationnel visible dans votre périmètre.
                                                         </div>
                                                     @else
-                                                        <div class="overflow-x-auto">
+                                                        <div class="app-table-wrapper overflow-x-auto" tabindex="0" role="region" aria-label="Objectifs opérationnels du PAO">
                                                             <table class="app-table data-table min-w-[900px]">
                                                                 <thead>
                                                                     <tr>
