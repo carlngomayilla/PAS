@@ -3215,31 +3215,30 @@ body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-shell-header .
     color: #ffffff !important;
 }
 
-/* Keep the compact rail and make every label readable while it is expanded. */
+/* Keep module names visible by default on desktop. A navigation rail that only
+   reveals its labels on hover makes the operating perimeter hard to scan. */
 @media (min-width: 64rem) {
     body.admin-theme-scope[data-ui-version="institutional-v2"] :where(.app-main, .admin-content-shell) {
-        padding-left: var(--app-sidebar-collapsed-width) !important;
+        padding-left: var(--app-sidebar-width) !important;
         transition: padding-left 180ms ease;
     }
 
     body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar,
     body.admin-theme-scope[data-ui-version="institutional-v2"] .app-sidebar {
         top: 0 !important;
-        width: var(--app-sidebar-collapsed-width) !important;
-        min-width: var(--app-sidebar-collapsed-width) !important;
-        max-width: var(--app-sidebar-collapsed-width) !important;
+        width: var(--app-sidebar-width) !important;
+        min-width: var(--app-sidebar-width) !important;
+        max-width: var(--app-sidebar-width) !important;
         height: 100vh !important;
         overflow: hidden !important;
     }
 
-    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar :where(
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-collapsed #admin-sidebar :where(
         .app-sidebar-section-title,
         [data-sidebar-label],
         .app-sidebar-badge,
         .app-sidebar-logo-full
     ) {
-        /* The collapsed rail keeps icons only; labels are restored by the
-           expanded state below, which is driven by admin-shell.js. */
         width: 0 !important;
         max-width: 0 !important;
         margin: 0 !important;
@@ -3279,6 +3278,87 @@ body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-shell-header .
         white-space: normal !important;
         overflow-wrap: anywhere !important;
         text-overflow: clip !important;
+    }
+
+    /* The legacy glass layer still contains compact-rail declarations keyed to
+       hover. Explicitly restore readable module names unless a future compact
+       control opts in with data-sidebar-compact. */
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-header {
+        padding-inline: 1rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logo {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex-basis: auto !important;
+        margin-inline: 0 !important;
+        padding: 0.7rem !important;
+        border-radius: 0.75rem !important;
+        overflow: visible !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logo-full {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        max-width: 9.5rem !important;
+        max-height: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logo-flame {
+        display: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge
+    ) {
+        width: auto !important;
+        max-width: none !important;
+        margin: revert !important;
+        padding: revert !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-section-title {
+        margin: 1rem 0 0.4rem !important;
+        padding: 0 0.65rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) :where(.app-sidebar-link, .app-sidebar-logout) {
+        justify-content: flex-start !important;
+        gap: 0.7rem !important;
+        padding-inline: 0.8rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) :where(.app-sidebar-menu, .app-sidebar-footer) {
+        padding-inline: 0.75rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-footer > form {
+        width: 100% !important;
+        height: auto !important;
+        flex-basis: auto !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logout {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        padding: 0.65rem 0.8rem !important;
+        border-radius: 0.75rem !important;
     }
 
     body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar .app-sidebar-link {
@@ -3746,6 +3826,72 @@ html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .reco-metri
 
 html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .reco-metric-description {
     color: #aec1d1 !important;
+}
+
+/* The action workspace is a reading and decision surface. Keep the circuit
+   restrained so the next responsible role and its command remain prominent. */
+body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-workspace-panel,
+body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel {
+    border: 1px solid #d9e4ed !important;
+    border-left: 3px solid #0d5093 !important;
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    box-shadow: 0 8px 24px rgb(7 35 66 / 6%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel::before {
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel :where(
+    .action-stepper-title,
+    .action-stepper-copy strong
+) {
+    color: #17324a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel :where(
+    .action-tracking-kicker,
+    .action-stepper-copy small
+) {
+    color: #526174 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel .action-stepper-pill {
+    border-color: rgb(13 80 147 / 22%) !important;
+    background: rgb(13 80 147 / 8%) !important;
+    color: #0d5093 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] :is(
+    .action-workspace-panel,
+    .action-stepper-panel
+) {
+    border-color: #27445f !important;
+    border-left-color: #3996d3 !important;
+    background: #0c1626 !important;
+    box-shadow: 0 12px 30px rgb(0 0 0 / 18%) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel :where(
+    .action-stepper-title,
+    .action-stepper-copy strong
+) {
+    color: #e5f1fb !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel :where(
+    .action-tracking-kicker,
+    .action-stepper-copy small
+) {
+    color: #aec1d1 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] .action-stepper-panel .action-stepper-pill {
+    border-color: #2a4664 !important;
+    background: #123b64 !important;
+    color: #e5f1fb !important;
 }
 
 /* Hierarchical PAS/PAO counters use stable contrast pairs in both themes. */

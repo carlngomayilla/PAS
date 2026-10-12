@@ -343,6 +343,7 @@ class ActionTrackingWorkspaceTest extends TestCase
         $script = (string) file_get_contents(resource_path('js/action-detail-tabs.js'));
         $appScript = (string) file_get_contents(resource_path('js/app.js'));
         $styles = (string) file_get_contents(resource_path('css/anbg-glass.css'));
+        $uiStyles = (string) file_get_contents(resource_path('css/ui-system.css'));
 
         $this->assertStringContainsString("'action-echeances'", (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php')));
         $this->assertStringContainsString("'action-status': 'action-validation'", $script);
@@ -357,6 +358,10 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertStringContainsString('[data-action-tab-panel][hidden]', $styles);
         $this->assertStringContainsString('.action-stepper-panel', $styles);
         $this->assertStringContainsString('.action-detail-hero,', $styles);
+        $this->assertStringContainsString('action-workspace-panel', (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php')));
+        $this->assertStringContainsString('.action-workspace-panel,', $uiStyles);
+        $this->assertStringContainsString('.sidebar-collapsed #admin-sidebar', $uiStyles);
+        $this->assertStringContainsString('data-sidebar-compact', $uiStyles);
     }
 
     public function test_chef_workspace_prioritizes_the_submitted_action_review(): void

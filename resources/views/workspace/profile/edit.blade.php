@@ -63,7 +63,7 @@
         </article>
     </section>
 
-    <section class="showcase-panel mb-4 app-screen-block">
+    <section class="mb-4 app-screen-block">
         <form method="POST" enctype="multipart/form-data" class="form-shell reco-form-shell" action="{{ route('workspace.profile.update') }}">
             @csrf
             @method('PUT')

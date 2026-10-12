@@ -45,6 +45,7 @@ class ProfileWebTest extends TestCase
             ->assertOk()
             ->assertSee('Mon profil')
             ->assertSee('data-profile-page-header', false)
+            ->assertDontSee('<section class="showcase-panel mb-4 app-screen-block">', false)
             ->assertSee('Règles de mot de passe')
             ->assertSee($user->email);
     }

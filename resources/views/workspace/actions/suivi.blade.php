@@ -462,7 +462,7 @@
         </div>
     </section>
 
-    <section class="mb-4 border-y border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950" aria-label="Poste de traitement de l'action">
+    <section class="action-workspace-panel mb-4 border-y border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950" aria-label="Poste de traitement de l'action">
         <div class="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.8fr)]">
             <div class="p-4 sm:p-5 lg:border-r lg:border-slate-200 dark:lg:border-slate-700">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
