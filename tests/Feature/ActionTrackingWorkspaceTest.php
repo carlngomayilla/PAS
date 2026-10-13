@@ -364,6 +364,28 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertStringContainsString('data-sidebar-compact', $uiStyles);
     }
 
+    public function test_action_tracking_uses_only_the_execution_form_as_an_accordion(): void
+    {
+        $fixture = $this->createFixture();
+        $template = (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php'));
+        $enhancements = (string) file_get_contents(resource_path('js/ui-enhancements.js'));
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.suivi', $fixture['action']))
+            ->assertOk()
+            ->assertSee('data-action-execution-disclosure', false)
+            ->assertSee('Formulaire d’exécution', false);
+
+        $this->assertStringContainsString(
+            '<details class="form-step-accordion action-execution-disclosure mt-2"',
+            $template
+        );
+        $this->assertStringContainsString('data-action-execution-disclosure', $template);
+        $this->assertStringContainsString('$executionFormHasErrors || $v2FormFrozen', $template);
+        $this->assertStringNotContainsString('initActionAccordions', $enhancements);
+        $this->assertStringContainsString("if (section.querySelector('form')) return;", $enhancements);
+    }
+
     public function test_chef_workspace_prioritizes_the_submitted_action_review(): void
     {
         $fixture = $this->createFixture();

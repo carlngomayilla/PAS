@@ -737,11 +737,17 @@
              Visible tant que l'utilisateur est responsable ; FIGÉ (fieldset disabled)
              dès la soumission, réouvert uniquement après rejet motivé du chef. --}}
         @if (($v2ActionResponsible ?? false))
-            @php $v2FormFrozen = ($v2ActionFrozen ?? false); @endphp
+            @php
+                $v2FormFrozen = ($v2ActionFrozen ?? false);
+                $executionFormHasErrors = $errors->hasAny(['general', 'quantite_realisee', 'difficulte', 'justificatif', 'commentaire']);
+            @endphp
             @if ($v2FormFrozen)
                 <p class="action-section-note mb-2">Formulaire figé pendant les visas Chef, Planification et SCIQ. Il se rouvre automatiquement en cas de demande de correction.</p>
             @endif
-            <form class="mt-2 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm @if ($v2FormFrozen) opacity-70 @endif" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
+            <details class="form-step-accordion action-execution-disclosure mt-2" data-action-execution-disclosure @if ($executionFormHasErrors || $v2FormFrozen) open @endif>
+                <summary>Formulaire d’exécution</summary>
+                <div class="form-step-body">
+            <form class="@if ($v2FormFrozen) opacity-70 @endif" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
                 @csrf
                 @error('general') <p class="field-error mb-2">{{ $message }}</p> @enderror
                 <fieldset @disabled($v2FormFrozen)>
@@ -778,6 +784,8 @@
                     </div>
                 @endunless
             </form>
+                </div>
+            </details>
         @endif
 
         {{-- FORMULAIRES AGENT — sous-actions (action composée) --}}

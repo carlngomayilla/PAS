@@ -246,35 +246,13 @@ import { gsap } from 'gsap';
         section.dataset.accordionReady = '1';
     }
 
-    function initActionAccordions() {
-        var openByDefault = { 'action-validation': true, 'action-status': true };
-
-        var selectors = [
-            '#action-validation',
-            '#action-fiche',
-            '#action-financement',
-            '#action-status',
-            '#action-weeks',
-            '#action-cloture',
-            '#action-review-chef',
-            '#action-review-direction',
-            '#action-discussion',
-            '#action-justificatifs',
-            '#action-logs'
-        ].join(', ');
-
-        document.querySelectorAll(selectors).forEach(function (section) {
-            var startOpen = openByDefault[section.id] === true;
-            applyAccordion(section, startOpen);
-        });
-    }
-
     function initTableAccordions() {
         document.querySelectorAll('.showcase-panel, article.showcase-panel').forEach(function (section) {
             if (section instanceof HTMLDetailsElement) return;
             if (section.dataset.accordionReady === '1') return;
             if (section.classList.contains('hidden')) return;
             if (section.dataset.keepAccordion === '0') return;
+            if (section.querySelector('form')) return;
 
             var table = section.querySelector('table');
             if (!table) return;
@@ -1127,7 +1105,6 @@ import { gsap } from 'gsap';
         initPaginationSummary();
         initTableRowClick();
         initEmptyTableSections();
-        initActionAccordions();
         initTableAccordions();
         initTableDataLabels();
         initDeadLinks();

@@ -9601,9 +9601,9 @@ body.admin-theme-scope .dealdeck-dashboard .chart-export-btn {
 
 body.admin-theme-scope .dealdeck-dashboard [data-dashboard-panel="charts"].active {
     display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
-    grid-auto-rows: 0.5rem;
-    grid-auto-flow: dense;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+    grid-auto-flow: row;
     gap: 1rem;
     align-items: start;
 }

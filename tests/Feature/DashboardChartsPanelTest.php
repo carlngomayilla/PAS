@@ -69,4 +69,26 @@ class DashboardChartsPanelTest extends TestCase
         $this->assertStringContainsString('function activateTab(key, syncUrl)', $script);
         $this->assertStringContainsString('Promise.resolve(render()).finally(() => {', $script);
     }
+
+    /**
+     * Les sections de l'onglet Graphiques portent elles-memes plusieurs cartes
+     * et canevas. Elles doivent donc utiliser des lignes de grille naturelles,
+     * sans quoi les cartes suivantes recouvrent les graphiques precedents.
+     */
+    public function test_charts_tab_uses_natural_grid_rows_for_full_chart_sections(): void
+    {
+        $styles = (string) file_get_contents(resource_path('css/app.css'));
+
+        $selector = 'body.admin-theme-scope .dealdeck-dashboard [data-dashboard-panel="charts"].active';
+        $start = strpos($styles, $selector);
+
+        $this->assertNotFalse($start);
+
+        $rules = substr($styles, $start, 360);
+
+        $this->assertStringContainsString('grid-template-columns: minmax(0, 1fr);', $rules);
+        $this->assertStringContainsString('grid-auto-rows: auto;', $rules);
+        $this->assertStringContainsString('grid-auto-flow: row;', $rules);
+        $this->assertStringNotContainsString('grid-auto-rows: 0.5rem;', $rules);
+    }
 }
