@@ -42,6 +42,7 @@ class PersonalTaskWorkflowTest extends TestCase
             ->assertSee('Validation chef')
             ->assertSee('En retard')
             ->assertSee('Charge en attente')
+            ->assertSee('personal-task-kpi-grid', false)
             ->assertSee(route('workspace.tasks.index', ['vue' => 'retard']), false)
             ->assertSee('Action a valider');
 

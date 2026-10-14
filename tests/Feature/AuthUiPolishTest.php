@@ -80,28 +80,30 @@ class AuthUiPolishTest extends TestCase
         $this->assertStringNotContainsString('name="trimestre"', $layout);
     }
 
-    public function test_admin_navigation_keeps_labels_visible_and_exposes_an_accessible_compact_control(): void
+    public function test_admin_navigation_uses_a_hover_expanding_compact_rail_without_a_persistent_control(): void
     {
         $layout = (string) file_get_contents(resource_path('views/layouts/admin.blade.php'));
         $sidebar = (string) file_get_contents(resource_path('views/components/admin/sidebar.blade.php'));
         $script = (string) file_get_contents(resource_path('js/ui-enhancements.js'));
         $adminShell = (string) file_get_contents(resource_path('js/admin-shell.js'));
         $css = (string) file_get_contents(resource_path('css/anbg-glass.css'));
+        $systemCss = (string) file_get_contents(resource_path('css/ui-system.css'));
 
         $this->assertStringContainsString('admin-navbar-back-button', $layout);
         $this->assertStringNotContainsString('anbg:sidebar:collapsed', $layout);
         $this->assertStringContainsString('data-sidebar-keyboard-expand', $sidebar);
         $this->assertStringNotContainsString('data-sidebar-auto-expand', $sidebar);
-        $this->assertStringContainsString('id="admin-sidebar-compact-toggle"', $sidebar);
-        $this->assertStringContainsString('aria-controls="admin-sidebar"', $sidebar);
-        $this->assertStringContainsString('aria-expanded="true"', $sidebar);
+        $this->assertStringNotContainsString('admin-sidebar-compact-toggle', $sidebar);
         $this->assertStringNotContainsString('initSidebarCollapse', $script);
         $this->assertStringContainsString('data-sidebar-keyboard-expanded', $adminShell);
-        $this->assertStringContainsString('anbg:sidebar:compact', $adminShell);
-        $this->assertStringContainsString('function setSidebarCompact(compact, persist)', $adminShell);
+        $this->assertStringNotContainsString('anbg:sidebar:compact', $adminShell);
+        $this->assertStringNotContainsString('setSidebarCompact', $adminShell);
         $this->assertStringNotContainsString('setSidebarAutoExpanded', $adminShell);
         $this->assertStringContainsString('#admin-sidebar:hover', $css);
         $this->assertStringContainsString('#admin-sidebar[data-sidebar-keyboard-expanded="true"]', $css);
+        $this->assertStringContainsString('padding-left: var(--app-sidebar-collapsed-width)', $systemCss);
+        $this->assertStringContainsString('.sidebar-desktop-expanded #admin-sidebar', $systemCss);
+        $this->assertStringNotContainsString('data-sidebar-compact="true"', $systemCss);
         $this->assertStringNotContainsString('#admin-sidebar:has(:focus-visible)', $css);
         $this->assertStringNotContainsString('#admin-sidebar:focus-within', $css);
         $this->assertStringContainsString('.admin-navbar-back-button', $css);

@@ -189,7 +189,6 @@
     var sidebar = document.getElementById('admin-sidebar');
     var openButton = document.getElementById('admin-sidebar-open');
     var closeButton = document.getElementById('admin-sidebar-close');
-    var compactToggle = document.getElementById('admin-sidebar-compact-toggle');
     var overlay = document.getElementById('admin-overlay');
     var sidebarKeyboardNavigation = false;
     var notificationsWrapper = document.getElementById('header-notifications');
@@ -276,39 +275,12 @@
         }
 
         var isDesktop = window.matchMedia('(min-width: 1024px)').matches;
-        var isCompact = sidebar.getAttribute('data-sidebar-compact') === 'true';
-        var isExpanded = !isCompact && (typeof forceExpanded === 'boolean'
+        var isExpanded = typeof forceExpanded === 'boolean'
             ? forceExpanded
             : sidebar.matches(':hover')
-                || sidebar.getAttribute('data-sidebar-keyboard-expanded') === 'true');
+                || sidebar.getAttribute('data-sidebar-keyboard-expanded') === 'true';
 
         document.body.classList.toggle('sidebar-desktop-expanded', isDesktop && isExpanded);
-    }
-
-    function setSidebarCompact(compact, persist) {
-        if (!sidebar) {
-            return;
-        }
-
-        sidebar.toggleAttribute('data-sidebar-compact', compact);
-        document.body.classList.toggle('sidebar-collapsed', compact);
-        document.body.classList.remove('sidebar-desktop-expanded');
-
-        if (compactToggle) {
-            var label = compact ? 'Développer la barre latérale' : 'Réduire la barre latérale';
-
-            compactToggle.setAttribute('aria-expanded', compact ? 'false' : 'true');
-            compactToggle.setAttribute('aria-label', label);
-            compactToggle.setAttribute('title', label);
-        }
-
-        if (persist !== false) {
-            try {
-                window.localStorage.setItem('anbg:sidebar:compact', compact ? 'true' : 'false');
-            } catch (error) {}
-        }
-
-        syncDesktopSidebarLayout(false);
     }
 
     function setSidebarKeyboardExpanded(expanded) {
@@ -375,15 +347,6 @@
 
     if (openButton) {
         openButton.addEventListener('click', openSidebar);
-    }
-    if (compactToggle) {
-        compactToggle.addEventListener('click', function () {
-            if (!window.matchMedia('(min-width: 1024px)').matches) {
-                return;
-            }
-
-            setSidebarCompact(sidebar.getAttribute('data-sidebar-compact') !== 'true');
-        });
     }
     if (closeButton) {
         closeButton.addEventListener('click', closeSidebar);
@@ -873,14 +836,6 @@
         }
 
         closeSidebar(false);
-    }
-
-    if (sidebar) {
-        try {
-            setSidebarCompact(window.localStorage.getItem('anbg:sidebar:compact') === 'true', false);
-        } catch (error) {
-            setSidebarCompact(false, false);
-        }
     }
 
     syncSidebarForViewport();

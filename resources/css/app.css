@@ -11114,6 +11114,30 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         }
     }
 
+    /* Les KPI restent de courts indicateurs de décision : une grille stable
+       évite que trois cartes prennent chacune toute la largeur de la page. */
+    .app-kpi-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(var(--app-kpi-min, 11rem), 1fr)) !important;
+        gap: 0.8rem !important;
+        align-items: stretch;
+    }
+
+    .app-kpi-grid > :where(.stat-card, .stat-card-link) {
+        width: auto !important;
+        min-height: 7.25rem !important;
+    }
+
+    .personal-task-kpi-grid > :where(.stat-card, .stat-card-link) {
+        min-height: 6.75rem !important;
+    }
+
+    @media (max-width: 47.99rem) {
+        .app-kpi-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .premium-loading-orb,
         .premium-loading-particle,

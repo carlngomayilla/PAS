@@ -3215,30 +3215,31 @@ body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-shell-header .
     color: #ffffff !important;
 }
 
-/* Keep module names visible by default on desktop. A navigation rail that only
-   reveals its labels on hover makes the operating perimeter hard to scan. */
+/* Keep the compact rail and make every label readable while it is expanded. */
 @media (min-width: 64rem) {
     body.admin-theme-scope[data-ui-version="institutional-v2"] :where(.app-main, .admin-content-shell) {
-        padding-left: var(--app-sidebar-width) !important;
+        padding-left: var(--app-sidebar-collapsed-width) !important;
         transition: padding-left 180ms ease;
     }
 
     body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar,
     body.admin-theme-scope[data-ui-version="institutional-v2"] .app-sidebar {
         top: 0 !important;
-        width: var(--app-sidebar-width) !important;
-        min-width: var(--app-sidebar-width) !important;
-        max-width: var(--app-sidebar-width) !important;
+        width: var(--app-sidebar-collapsed-width) !important;
+        min-width: var(--app-sidebar-collapsed-width) !important;
+        max-width: var(--app-sidebar-collapsed-width) !important;
         height: 100vh !important;
         overflow: hidden !important;
     }
 
-    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-collapsed #admin-sidebar :where(
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar :where(
         .app-sidebar-section-title,
         [data-sidebar-label],
         .app-sidebar-badge,
         .app-sidebar-logo-full
     ) {
+        /* The collapsed rail keeps icons only; labels are restored by the
+           expanded state below, which is driven by admin-shell.js. */
         width: 0 !important;
         max-width: 0 !important;
         margin: 0 !important;
@@ -3274,112 +3275,10 @@ body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-shell-header .
         visibility: visible !important;
     }
 
-    /* The desktop preference is intentional: compact mode stays a rail even
-       while the pointer is over it, then the same control restores labels. */
-    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-collapsed #admin-sidebar,
-    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-collapsed .app-sidebar,
-    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar[data-sidebar-compact="true"] {
-        width: var(--app-sidebar-collapsed-width) !important;
-        min-width: var(--app-sidebar-collapsed-width) !important;
-        max-width: var(--app-sidebar-collapsed-width) !important;
-    }
-
-    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-collapsed :where(.app-main, .admin-content-shell) {
-        padding-left: var(--app-sidebar-collapsed-width) !important;
-    }
-
-    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-collapsed #admin-sidebar:hover,
-    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar[data-sidebar-compact="true"]:hover {
-        width: var(--app-sidebar-collapsed-width) !important;
-        min-width: var(--app-sidebar-collapsed-width) !important;
-        max-width: var(--app-sidebar-collapsed-width) !important;
-    }
-
     body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar [data-sidebar-label] {
         white-space: normal !important;
         overflow-wrap: anywhere !important;
         text-overflow: clip !important;
-    }
-
-    /* The legacy glass layer still contains compact-rail declarations keyed to
-       hover. Explicitly restore readable module names unless a future compact
-       control opts in with data-sidebar-compact. */
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-header {
-        padding-inline: 1rem !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logo {
-        width: auto !important;
-        min-width: 0 !important;
-        max-width: none !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        flex-basis: auto !important;
-        margin-inline: 0 !important;
-        padding: 0.7rem !important;
-        border-radius: 0.75rem !important;
-        overflow: visible !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logo-full {
-        display: block !important;
-        width: 100% !important;
-        height: auto !important;
-        max-width: 9.5rem !important;
-        max-height: none !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logo-flame {
-        display: none !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) :where(
-        .app-sidebar-section-title,
-        [data-sidebar-label],
-        .app-sidebar-badge
-    ) {
-        width: auto !important;
-        max-width: none !important;
-        margin: revert !important;
-        padding: revert !important;
-        overflow: visible !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-section-title {
-        margin: 1rem 0 0.4rem !important;
-        padding: 0 0.65rem !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) :where(.app-sidebar-link, .app-sidebar-logout) {
-        justify-content: flex-start !important;
-        gap: 0.7rem !important;
-        padding-inline: 0.8rem !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) :where(.app-sidebar-menu, .app-sidebar-footer) {
-        padding-inline: 0.75rem !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-footer > form {
-        width: 100% !important;
-        height: auto !important;
-        flex-basis: auto !important;
-    }
-
-    body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]):not([data-sidebar-compact="true"]) .app-sidebar-logout {
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: none !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        padding: 0.65rem 0.8rem !important;
-        border-radius: 0.75rem !important;
     }
 
     body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar .app-sidebar-link {

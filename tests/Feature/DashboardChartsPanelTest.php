@@ -71,6 +71,23 @@ class DashboardChartsPanelTest extends TestCase
     }
 
     /**
+     * Les graphiques de rôle et du PTA ne sont pas des graphiques « requested
+     * charts ». Ils doivent donc être montés explicitement lors de chaque rendu
+     * du tableau de bord, y compris après un changement de filtre ou d'onglet.
+     */
+    public function test_renderer_mounts_role_and_reporting_chart_families_with_the_dashboard_pta_payload(): void
+    {
+        $script = (string) file_get_contents(resource_path('js/dashboard-render.js'));
+
+        $this->assertStringContainsString(
+            'reportingCharts.pta_quarterly || payload.charts?.pta_quarterly || {}',
+            $script
+        );
+        $this->assertStringContainsString("safeRenderStep('role charts', mountRoleCharts);", $script);
+        $this->assertStringContainsString("safeRenderStep('reporting charts', mountReportingCharts);", $script);
+    }
+
+    /**
      * Les sections de l'onglet Graphiques portent elles-memes plusieurs cartes
      * et canevas. Elles doivent donc utiliser des lignes de grille naturelles,
      * sans quoi les cartes suivantes recouvrent les graphiques precedents.

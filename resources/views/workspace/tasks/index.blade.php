@@ -80,7 +80,7 @@
             <p class="mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Charge en attente — ces compteurs mesurent ce qu’il vous reste à traiter, indépendamment du score de vos traitements déjà terminés.
             </p>
-            <x-ui.kpi-grid min="180px">
+            <x-ui.kpi-grid class="personal-task-kpi-grid" min="180px">
                 @php
                     $metricHints = [
                         'À traiter' => 'Nombre de tâches ouvertes qui vous sont assignées.',

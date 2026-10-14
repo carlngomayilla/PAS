@@ -25,6 +25,18 @@ class PremiumUiComponentsTest extends TestCase
         $this->assertStringContainsString('Actions', $visible);
     }
 
+    public function test_kpi_grid_keeps_metric_cards_in_a_compact_responsive_grid(): void
+    {
+        $html = Blade::render('<x-ui.kpi-grid min="180px"><x-ui.stat-card title="À traiter" value="2" /></x-ui.kpi-grid>');
+        $styles = file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringContainsString('app-kpi-grid', $html);
+        $this->assertStringContainsString('--app-kpi-min: 180px', $html);
+        $this->assertIsString($styles);
+        $this->assertStringContainsString('grid-template-columns: repeat(auto-fit, minmax(var(--app-kpi-min, 11rem), 1fr)) !important;', $styles);
+        $this->assertStringContainsString('.personal-task-kpi-grid', $styles);
+    }
+
     public function test_data_table_preserves_description_without_optional_title_and_actions(): void
     {
         $html = Blade::render('<x-ui.data-table description="Périmètre courant"><tbody><tr><td>Action visible</td></tr></tbody></x-ui.data-table>');

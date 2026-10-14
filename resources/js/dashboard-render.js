@@ -3552,7 +3552,11 @@ function bootDashboardRender(force = false) {
         ({ element }) => (d.urls || [])[element?.index] || '');
     });
 
-    const ptaQuarterly = reportingCharts.pta_quarterly || {};
+    // Les graphiques PTA sont calculés par le payload principal du tableau de
+    // bord. Les anciens écrans de reporting peuvent encore les fournir dans
+    // leur propre bloc : conserver cette source en priorité maintient leur
+    // compatibilité sans masquer les données du périmètre courant.
+    const ptaQuarterly = reportingCharts.pta_quarterly || payload.charts?.pta_quarterly || {};
     const ptaAxisRates = ptaQuarterly.axis_rates || { labels: [], values: [], urls: [] };
     const ptaServiceRates = ptaQuarterly.service_rates || { labels: [], values: [], urls: [] };
     const ptaMonthlyRates = ptaQuarterly.monthly_rates || { labels: [], values: [], urls: [] };
@@ -3789,6 +3793,8 @@ function bootDashboardRender(force = false) {
         }
 
         safeRenderStep('requested charts', mountRequestedCharts);
+        safeRenderStep('role charts', mountRoleCharts);
+        safeRenderStep('reporting charts', mountReportingCharts);
       }
 
       if (hasD3) {

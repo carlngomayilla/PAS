@@ -428,20 +428,6 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
-
-                    <button
-                        type="button"
-                        id="admin-sidebar-compact-toggle"
-                        class="app-sidebar-collapse-toggle"
-                        aria-label="Réduire la barre latérale"
-                        aria-controls="admin-sidebar"
-                        aria-expanded="true"
-                        title="Réduire la barre latérale"
-                    >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 6-6 6 6 6" />
-                        </svg>
-                    </button>
                 </div>
             </div>
 
