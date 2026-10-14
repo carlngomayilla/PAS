@@ -102,4 +102,15 @@ jobs:
           fi
 
           git reset --hard origin/main
+
+          test -f .env
+          test -r .env
+          test -w .env
+          if grep -qE '^SECURITY_PASSWORD_MIN_LENGTH=' .env; then
+            sed -i -E 's/^SECURITY_PASSWORD_MIN_LENGTH=.*/SECURITY_PASSWORD_MIN_LENGTH=8/' .env
+          else
+            printf '\nSECURITY_PASSWORD_MIN_LENGTH=8\n' >> .env
+          fi
+          sed -i -E '/^SECURITY_PASSWORD_EXPIRE_DAYS=/d' .env
+
           SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh

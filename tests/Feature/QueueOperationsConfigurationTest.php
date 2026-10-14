@@ -82,7 +82,22 @@ class QueueOperationsConfigurationTest extends TestCase
         $workflow = (string) file_get_contents(base_path('.github/workflows/deploy-production.yml'));
         $this->assertStringContainsString('Saving tracked production changes to ${DEPLOY_BACKUP_PATH}', $workflow);
         $this->assertStringContainsString('git reset --hard origin/main', $workflow);
+        $this->assertStringContainsString("test -f .env\n          test -r .env\n          test -w .env", $workflow);
+        $this->assertStringContainsString("sed -i -E 's/^SECURITY_PASSWORD_MIN_LENGTH=.*/SECURITY_PASSWORD_MIN_LENGTH=8/' .env", $workflow);
+        $this->assertStringContainsString("sed -i -E '/^SECURITY_PASSWORD_EXPIRE_DAYS=/d' .env", $workflow);
         $this->assertStringContainsString('SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh', $workflow);
+        $this->assertLessThan(
+            strpos($workflow, "sed -i -E 's/^SECURITY_PASSWORD_MIN_LENGTH=.*/SECURITY_PASSWORD_MIN_LENGTH=8/' .env"),
+            strrpos($workflow, 'git reset --hard origin/main'),
+        );
+        $this->assertLessThan(
+            strpos($workflow, 'SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh'),
+            strpos($workflow, "sed -i -E 's/^SECURITY_PASSWORD_MIN_LENGTH=.*/SECURITY_PASSWORD_MIN_LENGTH=8/' .env"),
+        );
+        $this->assertLessThan(
+            strpos($workflow, 'SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh'),
+            strpos($workflow, "sed -i -E '/^SECURITY_PASSWORD_EXPIRE_DAYS=/d' .env"),
+        );
         $this->assertLessThan(
             strpos($workflow, 'SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh'),
             strrpos($workflow, 'git reset --hard origin/main'),
