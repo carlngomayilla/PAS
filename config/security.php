@@ -3,7 +3,6 @@
 return [
     'passwords' => [
         'min_length' => (int) env('SECURITY_PASSWORD_MIN_LENGTH', 8),
-        'expire_days' => (int) env('SECURITY_PASSWORD_EXPIRE_DAYS', 90),
         'history_size' => (int) env('SECURITY_PASSWORD_HISTORY_SIZE', 5),
         'require_letters' => (bool) env('SECURITY_PASSWORD_REQUIRE_LETTERS', true),
         'require_mixed_case' => (bool) env('SECURITY_PASSWORD_REQUIRE_MIXED_CASE', false),

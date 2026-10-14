@@ -82,7 +82,11 @@ class QueueOperationsConfigurationTest extends TestCase
         $workflow = (string) file_get_contents(base_path('.github/workflows/deploy-production.yml'));
         $this->assertStringContainsString('Saving tracked production changes to ${DEPLOY_BACKUP_PATH}', $workflow);
         $this->assertStringContainsString('git reset --hard origin/main', $workflow);
-        $this->assertStringContainsString('GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh', $workflow);
+        $this->assertStringContainsString('SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh', $workflow);
+        $this->assertLessThan(
+            strpos($workflow, 'SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh'),
+            strrpos($workflow, 'git reset --hard origin/main'),
+        );
     }
 
     public function test_ci_has_an_isolated_php_84_redis_horizon_job(): void

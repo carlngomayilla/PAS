@@ -142,25 +142,42 @@ class StatefulSanctumAuthenticationTest extends TestCase
         ]);
     }
 
-    public function test_expired_password_is_json_without_accept_for_bearer_and_keeps_token(): void
+    public function test_bearer_token_with_a_password_older_than_ninety_days_remains_usable(): void
     {
         $user = User::factory()->create([
             'password_changed_at' => now()->subDays(91),
         ]);
-        $personalToken = $user->createToken('expired-password-client');
+        $personalToken = $user->createToken('longstanding-password-client');
 
         $this->withHeader('Authorization', 'Bearer '.$personalToken->plainTextToken)
             ->get('/api/v1/me')
-            ->assertForbidden()
-            ->assertHeader('content-type', 'application/json')
-            ->assertJsonPath('code', 'password_expired');
+            ->assertOk()
+            ->assertHeader('content-type', 'application/json');
 
         $this->assertDatabaseHas('personal_access_tokens', [
             'id' => $personalToken->accessToken->getKey(),
         ]);
     }
 
-    public function test_expired_password_stateful_session_can_still_logout(): void
+    public function test_bearer_token_with_a_temporary_password_must_change_it_before_using_the_api(): void
+    {
+        $user = User::factory()->create([
+            'password_changed_at' => null,
+        ]);
+        $personalToken = $user->createToken('temporary-password-client');
+
+        $this->withHeader('Authorization', 'Bearer '.$personalToken->plainTextToken)
+            ->get('/api/v1/me')
+            ->assertForbidden()
+            ->assertHeader('content-type', 'application/json')
+            ->assertJsonPath('code', 'password_change_required');
+
+        $this->assertDatabaseHas('personal_access_tokens', [
+            'id' => $personalToken->accessToken->getKey(),
+        ]);
+    }
+
+    public function test_stateful_session_with_a_password_older_than_ninety_days_remains_usable(): void
     {
         $user = User::factory()->create([
             'password_changed_at' => now()->subDays(91),
@@ -171,9 +188,8 @@ class StatefulSanctumAuthenticationTest extends TestCase
 
         $this->withHeader('Origin', 'http://localhost:3000')
             ->get('/api/v1/me')
-            ->assertForbidden()
-            ->assertHeader('content-type', 'application/json')
-            ->assertJsonPath('code', 'password_expired');
+            ->assertOk()
+            ->assertHeader('content-type', 'application/json');
 
         $this->assertTrue(Auth::guard('web')->check());
 

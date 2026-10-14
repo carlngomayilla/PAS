@@ -17,7 +17,7 @@ class PasswordPolicyForceRenewalTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_password_is_marked_expired_when_never_changed(): void
+    public function test_temporary_password_requires_a_change_before_the_first_login(): void
     {
         /** @var PasswordPolicyService $policy */
         $policy = app(PasswordPolicyService::class);
@@ -27,24 +27,10 @@ class PasswordPolicyForceRenewalTest extends TestCase
             'created_at' => now()->subDay(),
         ]);
 
-        $this->assertTrue($policy->isExpired($user));
+        $this->assertTrue($policy->requiresPasswordChange($user));
     }
 
-    public function test_password_never_changed_still_forces_renewal_when_periodic_expiration_is_disabled(): void
-    {
-        config(['security.passwords.expire_days' => 0]);
-
-        /** @var PasswordPolicyService $policy */
-        $policy = app(PasswordPolicyService::class);
-
-        $user = User::factory()->create([
-            'password_changed_at' => null,
-        ]);
-
-        $this->assertTrue($policy->isExpired($user));
-    }
-
-    public function test_password_is_not_expired_when_recently_changed(): void
+    public function test_password_change_is_not_required_after_a_personal_password_is_set(): void
     {
         /** @var PasswordPolicyService $policy */
         $policy = app(PasswordPolicyService::class);
@@ -53,21 +39,19 @@ class PasswordPolicyForceRenewalTest extends TestCase
             'password_changed_at' => now(),
         ]);
 
-        $this->assertFalse($policy->isExpired($user));
+        $this->assertFalse($policy->requiresPasswordChange($user));
     }
 
-    public function test_password_is_expired_when_older_than_threshold(): void
+    public function test_password_change_is_not_required_after_ninety_days(): void
     {
         /** @var PasswordPolicyService $policy */
         $policy = app(PasswordPolicyService::class);
 
-        $threshold = (int) config('security.passwords.expire_days', 90);
-
         $user = User::factory()->create([
-            'password_changed_at' => now()->subDays($threshold + 1),
+            'password_changed_at' => now()->subDays(91),
         ]);
 
-        $this->assertTrue($policy->isExpired($user));
+        $this->assertFalse($policy->requiresPasswordChange($user));
     }
 
     public function test_medium_password_policy_accepts_letters_and_numbers_without_symbols(): void

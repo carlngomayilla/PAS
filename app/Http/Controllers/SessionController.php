@@ -118,10 +118,10 @@ class SessionController extends Controller
             $defaultRoute = route('admin.dashboard');
         }
 
-        if ($user instanceof User && $this->passwordPolicy->isExpired($user)) {
+        if ($user instanceof User && $this->passwordPolicy->requiresPasswordChange($user)) {
             return redirect()
                 ->route('workspace.profile.edit')
-                ->withErrors(['password' => $this->passwordPolicy->expirationMessage()]);
+                ->withErrors(['password' => $this->passwordPolicy->passwordChangeRequiredMessage()]);
         }
 
         return redirect()->to($defaultRoute);

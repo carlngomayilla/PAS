@@ -55,17 +55,17 @@ class GenerateReportJob implements ShouldQueue
     ): void {
         $user = User::query()->findOrFail($this->userId);
         $format = strtolower($this->format);
-        $passwordExpired = $passwordPolicy->isExpired($user);
+        $passwordChangeRequired = $passwordPolicy->requiresPasswordChange($user);
 
         // A16 — Le job peut s executer apres revocation des droits ou
         // suspension du compte. On re-verifie les conditions d acces avant de
         // generer un export potentiellement sensible. En cas d echec, on logge
         // et on sort silencieusement (le job ne doit pas etre retry).
-        if (! $this->stillAuthorizedToExport($user, $passwordExpired)) {
+        if (! $this->stillAuthorizedToExport($user, $passwordChangeRequired)) {
             Log::warning('Reporting export refused at job-time (A16).', [
                 'user_id' => $user->id,
                 'format' => $format,
-                'reason' => $this->disqualificationReason($user, $passwordExpired),
+                'reason' => $this->disqualificationReason($user, $passwordChangeRequired),
             ]);
 
             return;
@@ -173,9 +173,9 @@ class GenerateReportJob implements ShouldQueue
      * (et plus seulement au moment du dispatch). Refuse si :
      *   - le compte est inactif ou suspendu,
      *   - la permission planning.read ou reporting.read a ete revoquee,
-     *   - le mot de passe est expire (force renewal).
+     *   - le mot de passe provisoire doit encore etre remplace.
      */
-    private function stillAuthorizedToExport(User $user, bool $passwordExpired): bool
+    private function stillAuthorizedToExport(User $user, bool $passwordChangeRequired): bool
     {
         if (method_exists($user, 'isSuspended') && $user->isSuspended()) {
             return false;
@@ -189,10 +189,10 @@ class GenerateReportJob implements ShouldQueue
             return false;
         }
 
-        return ! $passwordExpired;
+        return ! $passwordChangeRequired;
     }
 
-    private function disqualificationReason(User $user, bool $passwordExpired): string
+    private function disqualificationReason(User $user, bool $passwordChangeRequired): string
     {
         if (! (bool) ($user->is_active ?? false)) {
             return 'account_inactive';
@@ -206,8 +206,8 @@ class GenerateReportJob implements ShouldQueue
         if (! $user->hasPermission('reporting.read')) {
             return 'permission_revoked_reporting_read';
         }
-        if ($passwordExpired) {
-            return 'password_expired';
+        if ($passwordChangeRequired) {
+            return 'password_change_required';
         }
 
         return 'unknown';

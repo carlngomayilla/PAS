@@ -10,7 +10,6 @@ use App\Services\Exports\ReportingWorkbookExporter;
 use App\Services\Security\PasswordPolicyService;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
 use RuntimeException;
@@ -232,11 +231,9 @@ class GenerateReportJobReliabilityTest extends TestCase
         $this->assertStringNotContainsString('super-secret', json_encode($payload, JSON_THROW_ON_ERROR));
     }
 
-    public function test_job_refuses_an_export_when_the_password_expires_after_dispatch(): void
+    public function test_job_keeps_an_export_available_when_the_password_is_older_than_ninety_days(): void
     {
-        config(['security.passwords.expire_days' => 90]);
         Storage::fake('local');
-        Log::spy();
 
         $user = User::factory()->create([
             'role' => User::ROLE_SUPER_ADMIN,
@@ -249,12 +246,19 @@ class GenerateReportJobReliabilityTest extends TestCase
             'password_changed_at' => now()->subDays(91),
         ])->save();
 
+        $sourcePath = tempnam(sys_get_temp_dir(), 'pas-report-');
+        $this->assertNotFalse($sourcePath);
+        $this->assertNotFalse(file_put_contents((string) $sourcePath, 'workbook'));
+
         $analytics = Mockery::mock(ReportingAnalyticsService::class);
-        $analytics->shouldNotReceive('buildPayload');
+        $analytics->shouldReceive('buildPayload')
+            ->once()
+            ->with(Mockery::on(fn (User $candidate): bool => $candidate->is($user)), true, true)
+            ->andReturn(['generatedAt' => now()]);
         $templates = Mockery::mock(ExportTemplateResolver::class);
-        $templates->shouldNotReceive('resolve');
+        $templates->shouldReceive('resolve')->once()->andReturnNull();
         $workbook = Mockery::mock(ReportingWorkbookExporter::class);
-        $workbook->shouldNotReceive('create');
+        $workbook->shouldReceive('create')->once()->andReturn((string) $sourcePath);
 
         $job->handle(
             $analytics,
@@ -263,16 +267,9 @@ class GenerateReportJobReliabilityTest extends TestCase
             app(PasswordPolicyService::class)
         );
 
-        $this->assertSame([], Storage::disk('local')->allFiles('exports/reporting'));
-        $this->assertCount(0, $user->refresh()->notifications);
-        Log::shouldHaveReceived('warning')
-            ->once()
-            ->with(
-                'Reporting export refused at job-time (A16).',
-                Mockery::on(static fn (array $context): bool => ($context['user_id'] ?? null) === $user->id
-                    && ($context['format'] ?? null) === 'excel'
-                    && ($context['reason'] ?? null) === 'password_expired')
-            );
+        $this->assertCount(1, Storage::disk('local')->allFiles('exports/reporting'));
+        $this->assertCount(1, $user->refresh()->notifications);
+        $this->assertFileDoesNotExist((string) $sourcePath);
     }
 
     public function test_export_identifier_survives_queue_serialization(): void

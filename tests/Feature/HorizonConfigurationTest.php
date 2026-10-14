@@ -93,10 +93,8 @@ class HorizonConfigurationTest extends TestCase
         $this->get('/horizon')->assertForbidden();
     }
 
-    public function test_horizon_dashboard_redirects_a_super_administrator_with_an_expired_password(): void
+    public function test_horizon_dashboard_allows_a_super_administrator_with_a_password_older_than_ninety_days(): void
     {
-        config(['security.passwords.expire_days' => 90]);
-
         $superAdmin = User::factory()->create([
             'role' => User::ROLE_SUPER_ADMIN,
             'is_active' => true,
@@ -106,8 +104,7 @@ class HorizonConfigurationTest extends TestCase
 
         $this->actingAs($superAdmin)
             ->get('/horizon')
-            ->assertRedirect(route('workspace.profile.edit'))
-            ->assertSessionHasErrors('password');
+            ->assertOk();
     }
 
     public function test_horizon_dashboard_assets_receive_the_application_csp_nonce(): void

@@ -401,7 +401,7 @@ class ReferentielWebController extends Controller
                 'password_changed_at' => null,
             ]);
 
-            $this->passwordPolicy->persistPassword($created, $initialPassword, forceRenewal: true);
+            $this->passwordPolicy->persistPassword($created, $initialPassword, requiresChangeOnNextLogin: true);
             $this->chefUniteSync->sync($created);
 
             return $created->fresh();
@@ -481,7 +481,7 @@ class ReferentielWebController extends Controller
             $utilisateur->forceFill($payload)->save();
 
             if (! empty($validated['password'])) {
-                $this->passwordPolicy->persistPassword($utilisateur, (string) $validated['password'], forceRenewal: true);
+                $this->passwordPolicy->persistPassword($utilisateur, (string) $validated['password'], requiresChangeOnNextLogin: true);
                 $utilisateur->tokens()->delete();
             }
 
@@ -510,7 +510,7 @@ class ReferentielWebController extends Controller
         $before = Arr::except($utilisateur->toArray(), ['password']);
 
         DB::transaction(function () use ($utilisateur, $temporaryPassword): void {
-            $this->passwordPolicy->persistPassword($utilisateur, $temporaryPassword, forceRenewal: true);
+            $this->passwordPolicy->persistPassword($utilisateur, $temporaryPassword, requiresChangeOnNextLogin: true);
             $utilisateur->tokens()->delete();
         });
 
@@ -560,7 +560,7 @@ class ReferentielWebController extends Controller
                 }
 
                 $password = $this->passwordPolicy->generateInitialPassword();
-                $this->passwordPolicy->persistPassword($target, $password, forceRenewal: true);
+                $this->passwordPolicy->persistPassword($target, $password, requiresChangeOnNextLogin: true);
                 $target->tokens()->delete();
 
                 $generated[] = [

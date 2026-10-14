@@ -48,10 +48,10 @@ class AuthController extends Controller
             ], 403);
         }
 
-        if ($this->passwordPolicy->isExpired($user)) {
+        if ($this->passwordPolicy->requiresPasswordChange($user)) {
             return response()->json([
-                'message' => $this->passwordPolicy->expirationMessage(),
-                'code' => 'password_expired',
+                'message' => $this->passwordPolicy->passwordChangeRequiredMessage(),
+                'code' => 'password_change_required',
             ], 403);
         }
 

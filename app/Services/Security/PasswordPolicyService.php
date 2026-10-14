@@ -4,7 +4,6 @@ namespace App\Services\Security;
 
 use App\Models\PasswordHistory;
 use App\Models\User;
-use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -71,13 +70,13 @@ class PasswordPolicyService
         }
     }
 
-    public function persistPassword(User $user, string $plainPassword, bool $forceRenewal = false): void
+    public function persistPassword(User $user, string $plainPassword, bool $requiresChangeOnNextLogin = false): void
     {
         $hashedPassword = Hash::make($plainPassword);
 
         $user->forceFill([
             'password' => $hashedPassword,
-            'password_changed_at' => $forceRenewal ? null : now(),
+            'password_changed_at' => $requiresChangeOnNextLogin ? null : now(),
         ])->save();
 
         PasswordHistory::query()->create([
@@ -98,25 +97,16 @@ class PasswordPolicyService
             ->delete();
     }
 
-    public function isExpired(?User $user): bool
+    public function requiresPasswordChange(?User $user): bool
     {
         if (! $user instanceof User) {
             return false;
         }
 
-        // A08 — Force le renouvellement au 1er login pour tout user dont le mot
-        // de passe n a jamais ete change (seeder, import CSV, reset admin sans
-        // distribution). password_changed_at = NULL est le signal explicite.
-        if ($user->password_changed_at === null) {
-            return true;
-        }
-
-        $expireDays = (int) config('security.passwords.expire_days', 90);
-        if ($expireDays <= 0) {
-            return false;
-        }
-
-        return $user->password_changed_at->copy()->addDays($expireDays)->isPast();
+        // Un mot de passe temporaire est marque par NULL jusqu a son premier
+        // changement. Les mots de passe personnels ne sont pas soumis a une
+        // expiration periodique.
+        return $user->password_changed_at === null;
     }
 
     /**
@@ -137,19 +127,9 @@ class PasswordPolicyService
         );
     }
 
-    public function assertNotExpired(User $user): void
+    public function passwordChangeRequiredMessage(): string
     {
-        if ($this->isExpired($user)) {
-            throw new AuthenticationException($this->expirationMessage());
-        }
-    }
-
-    public function expirationMessage(): string
-    {
-        return sprintf(
-            'Votre mot de passe a expire. Veuillez le renouveler tous les %d jours.',
-            (int) config('security.passwords.expire_days', 90)
-        );
+        return 'Votre mot de passe provisoire doit etre remplacé avant d accéder aux autres modules.';
     }
 
     public function helpText(): string
@@ -175,10 +155,9 @@ class PasswordPolicyService
             : 'aucune complexite obligatoire';
 
         return sprintf(
-            'Mot de passe: %d caracteres minimum, %s, expiration tous les %d jours, historique des %d derniers mots de passe.',
+            'Mot de passe: %d caracteres minimum, %s, historique des %d derniers mots de passe. Aucun renouvellement periodique n est impose.',
             $this->minimumLength(),
             $requirementsText,
-            (int) config('security.passwords.expire_days', 90),
             (int) config('security.passwords.history_size', 5)
         );
     }

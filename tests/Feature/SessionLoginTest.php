@@ -6,6 +6,7 @@ use App\Models\User;
 use Database\Seeders\SyncOrgUsersPreservingPasswordsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class SessionLoginTest extends TestCase
@@ -122,27 +123,52 @@ class SessionLoginTest extends TestCase
 
     public function test_login_is_rate_limited_after_five_attempts(): void
     {
-        for ($attempt = 0; $attempt < 5; $attempt++) {
-            $this->post(route('login'), [
-                'email' => 'intrus@anbg.test',
-                'password' => 'wrong-password',
-            ])->assertSessionHasErrors('email');
-        }
+        $this->serverVariables = ['REMOTE_ADDR' => '203.0.113.'.random_int(1, 254)];
+        $identifier = 'intrus-'.Str::lower(Str::random(16)).'@anbg.test';
 
-        $this->post(route('login'), [
-            'email' => 'intrus@anbg.test',
-            'password' => 'wrong-password',
-        ])->assertStatus(429);
+        try {
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                $this->post(route('login'), [
+                    'email' => $identifier,
+                    'password' => 'wrong-password',
+                ])->assertSessionHasErrors('email');
+            }
+
+            $this->post(route('login'), [
+                'email' => $identifier,
+                'password' => 'wrong-password',
+            ])->assertStatus(429);
+        } finally {
+            $this->serverVariables = [];
+        }
     }
 
-    public function test_expired_password_user_is_redirected_to_profile_update_after_login(): void
+    public function test_user_with_a_password_older_than_ninety_days_can_login(): void
     {
         $user = User::factory()->create([
-            'email' => 'expired@anbg.test',
+            'email' => 'longstanding-password@anbg.test',
             'password' => Hash::make('Pass@12345'),
             'password_changed_at' => now()->subDays(120),
             'role' => User::ROLE_AGENT,
             'agent_matricule' => 'X1-01',
+        ]);
+
+        $this->post(route('login'), [
+            'email' => $user->email,
+            'password' => 'Pass@12345',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_user_with_a_temporary_password_is_redirected_to_the_profile_once(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'temporary-password@anbg.test',
+            'password' => Hash::make('Pass@12345'),
+            'password_changed_at' => null,
+            'role' => User::ROLE_AGENT,
+            'agent_matricule' => 'X1-02',
         ]);
 
         $this->post(route('login'), [

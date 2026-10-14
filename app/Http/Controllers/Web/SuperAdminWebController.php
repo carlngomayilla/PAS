@@ -1058,7 +1058,7 @@ class SuperAdminWebController extends Controller
                 'password_changed_at' => null,
             ]);
 
-            $this->passwordPolicy->persistPassword($managedUser, $initialPassword, forceRenewal: true);
+            $this->passwordPolicy->persistPassword($managedUser, $initialPassword, requiresChangeOnNextLogin: true);
             $this->chefUniteSync->sync($managedUser);
 
             return $managedUser->fresh(['direction:id,code,libelle', 'service:id,direction_id,code,libelle']) ?? $managedUser;
@@ -1151,7 +1151,7 @@ class SuperAdminWebController extends Controller
 
             if ($plainPassword !== null) {
                 $this->passwordPolicy->validateNotReused($managedUser, $plainPassword);
-                $this->passwordPolicy->persistPassword($managedUser, $plainPassword, forceRenewal: true);
+                $this->passwordPolicy->persistPassword($managedUser, $plainPassword, requiresChangeOnNextLogin: true);
                 $this->revokeSessionsForUser($managedUser);
             }
 
@@ -1265,7 +1265,7 @@ class SuperAdminWebController extends Controller
         $before = Arr::except($managedUser->toArray(), ['password']);
 
         DB::transaction(function () use ($managedUser, $temporaryPassword): void {
-            $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword, forceRenewal: true);
+            $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword, requiresChangeOnNextLogin: true);
             $this->revokeSessionsForUser($managedUser);
         });
         $managedUser->refresh();
@@ -1420,7 +1420,7 @@ class SuperAdminWebController extends Controller
 
                     if ($password !== '') {
                         $this->passwordPolicy->validateNotReused($existing, $password);
-                        $this->passwordPolicy->persistPassword($existing, $password, forceRenewal: true);
+                        $this->passwordPolicy->persistPassword($existing, $password, requiresChangeOnNextLogin: true);
                         $this->revokeSessionsForUser($existing);
                     }
 
@@ -1437,7 +1437,7 @@ class SuperAdminWebController extends Controller
                     'password' => 'temp-password-placeholder',
                     'password_changed_at' => null,
                 ]);
-                $this->passwordPolicy->persistPassword($createdUser, $password, forceRenewal: true);
+                $this->passwordPolicy->persistPassword($createdUser, $password, requiresChangeOnNextLogin: true);
 
                 $created++;
                 $this->recordAudit($request, 'super_admin', 'organization_user_import_create', $createdUser, null, Arr::except($createdUser->fresh()->toArray(), ['password']));
@@ -1557,7 +1557,7 @@ class SuperAdminWebController extends Controller
                         break;
                     case 'reset_password':
                         $temporaryPassword = $this->passwordPolicy->generateInitialPassword();
-                        $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword, forceRenewal: true);
+                        $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword, requiresChangeOnNextLogin: true);
                         $this->revokeSessionsForUser($managedUser);
                         $temporaryCredentials[] = [
                             'user' => (string) $managedUser->email,

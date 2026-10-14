@@ -38,7 +38,7 @@ class ProfileWebController extends Controller
             'user' => $user,
             'profil' => $user->profileInteractions(),
             'passwordPolicyHelp' => $this->passwordPolicy->helpText(),
-            'passwordExpired' => $this->passwordPolicy->isExpired($user),
+            'passwordChangeRequired' => $this->passwordPolicy->requiresPasswordChange($user),
             'activeSessions' => $this->activeSessions($request, $user),
         ]);
     }
@@ -46,7 +46,7 @@ class ProfileWebController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $user = $this->authUser($request);
-        $passwordExpired = $this->passwordPolicy->isExpired($user);
+        $passwordChangeRequired = $this->passwordPolicy->requiresPasswordChange($user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -54,7 +54,7 @@ class ProfileWebController extends Controller
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
             'remove_profile_photo' => ['nullable', 'boolean'],
             'current_password' => ['nullable', 'required_with:password', 'current_password'],
-            'password' => [$passwordExpired ? 'required' : 'nullable', 'string', $this->passwordPolicy->rule(! $passwordExpired), 'confirmed'],
+            'password' => [$passwordChangeRequired ? 'required' : 'nullable', 'string', $this->passwordPolicy->rule(! $passwordChangeRequired), 'confirmed'],
         ]);
 
         $payload = [

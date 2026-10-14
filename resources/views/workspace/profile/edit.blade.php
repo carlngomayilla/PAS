@@ -5,9 +5,9 @@
     <x-ui.page-title title="Paramètres personnels et sécurité" eyebrow="Mon profil" subtitle="Informations du compte, mot de passe et sessions actives." class="app-screen-block" data-profile-page-header>
         <x-slot:actions><a class="btn btn-secondary" href="{{ route('dashboard') }}">Retour dashboard</a></x-slot:actions>
     </x-ui.page-title>
-    @if ($passwordExpired)
+    @if ($passwordChangeRequired)
         <p class="app-screen-block rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100" role="alert">
-            Mot de passe expire. Le renouvellement est obligatoire pour acceder aux autres modules.
+            Mot de passe provisoire. Remplacez-le avant d acceder aux autres modules.
         </p>
     @endif
 
@@ -56,8 +56,8 @@
                 </article>
                 <article class="showcase-kpi-card">
                     <p class="showcase-kpi-label">Mot de passe</p>
-                    <p class="showcase-kpi-number text-[1.45rem]">{{ $passwordExpired ? 'Expire' : 'Valide' }}</p>
-                    <p class="showcase-kpi-meta">{{ $passwordExpired ? 'Renouvellement requis' : 'Conforme a la politique actuelle' }}</p>
+                    <p class="showcase-kpi-number text-[1.45rem]">{{ $passwordChangeRequired ? 'À modifier' : 'Valide' }}</p>
+                    <p class="showcase-kpi-meta">{{ $passwordChangeRequired ? 'Mot de passe provisoire' : 'Conforme a la politique actuelle' }}</p>
                 </article>
             </div>
         </article>
@@ -97,28 +97,28 @@
                 </div>
             </div>
 
-            <details class="form-section reco-form-section action-advanced-filters" data-profile-security-options @if ($passwordExpired || $errors->hasAny(['current_password', 'password', 'password_confirmation'])) open @endif>
-                <summary class="form-section-title cursor-pointer">Changer le mot de passe{{ $passwordExpired ? ' — obligatoire' : ' (facultatif)' }}</summary>
+            <details class="form-section reco-form-section action-advanced-filters" data-profile-security-options @if ($passwordChangeRequired || $errors->hasAny(['current_password', 'password', 'password_confirmation'])) open @endif>
+                <summary class="form-section-title cursor-pointer">Changer le mot de passe{{ $passwordChangeRequired ? ' — obligatoire' : ' (facultatif)' }}</summary>
                 <p class="mb-4 text-sm text-[var(--app-muted)]">Règles de mot de passe : {{ $passwordPolicyHelp }}</p>
                 <div class="form-grid reco-form-grid">
                     <div>
                         <label for="current_password">Mot de passe actuel</label>
                         <div class="relative">
-                            <input id="current_password" name="current_password" type="password" class="pr-14" @required($passwordExpired)>
+                            <input id="current_password" name="current_password" type="password" class="pr-14" @required($passwordChangeRequired)>
                             <x-auth.password-toggle target="current_password" />
                         </div>
                     </div>
                     <div>
                         <label for="password">Nouveau mot de passe</label>
                         <div class="relative">
-                            <input id="password" name="password" type="password" class="pr-14" @required($passwordExpired)>
+                            <input id="password" name="password" type="password" class="pr-14" @required($passwordChangeRequired)>
                             <x-auth.password-toggle target="password" />
                         </div>
                     </div>
                     <div>
                         <label for="password_confirmation">Confirmation</label>
                         <div class="relative">
-                            <input id="password_confirmation" name="password_confirmation" type="password" class="pr-14" @required($passwordExpired)>
+                            <input id="password_confirmation" name="password_confirmation" type="password" class="pr-14" @required($passwordChangeRequired)>
                             <x-auth.password-toggle target="password_confirmation" />
                         </div>
                     </div>

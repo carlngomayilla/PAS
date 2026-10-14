@@ -99,7 +99,7 @@ jobs:
             git status --short > "${DEPLOY_BACKUP_PATH}/status.txt"
             git diff --binary > "${DEPLOY_BACKUP_PATH}/unstaged.patch"
             git diff --cached --binary > "${DEPLOY_BACKUP_PATH}/staged.patch"
-            git reset --hard origin/main
           fi
 
-          GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh
+          git reset --hard origin/main
+          SKIP_GIT=1 GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh

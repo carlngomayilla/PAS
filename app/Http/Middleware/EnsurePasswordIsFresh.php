@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use App\Services\Security\PasswordPolicyService;
 use Closure;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -23,7 +22,7 @@ class EnsurePasswordIsFresh
             return $next($request);
         }
 
-        if (! $this->passwordPolicy->isExpired($user)) {
+        if (! $this->passwordPolicy->requiresPasswordChange($user)) {
             return $next($request);
         }
 
@@ -32,14 +31,14 @@ class EnsurePasswordIsFresh
         }
 
         if ($request->expectsJson() || $request->is('api/*')) {
-            return new JsonResponse([
-                'message' => $this->passwordPolicy->expirationMessage(),
-                'code' => 'password_expired',
+            return response()->json([
+                'message' => $this->passwordPolicy->passwordChangeRequiredMessage(),
+                'code' => 'password_change_required',
             ], 403);
         }
 
         return redirect()
             ->route('workspace.profile.edit')
-            ->withErrors(['password' => $this->passwordPolicy->expirationMessage()]);
+            ->withErrors(['password' => $this->passwordPolicy->passwordChangeRequiredMessage()]);
     }
 }
