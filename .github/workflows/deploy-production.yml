@@ -89,4 +89,17 @@ jobs:
           set -euo pipefail
           DEPLOY_PATH="${DEPLOY_PATH:-/var/www/pas-anbg/PAS}"
           cd "$DEPLOY_PATH"
+
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            DEPLOY_BACKUP_DIR="${PAS_DEPLOY_BACKUP_DIR:-${HOME}/pas-anbg-deploy-backups}"
+            DEPLOY_BACKUP_PATH="${DEPLOY_BACKUP_DIR}/working-tree-$(date '+%Y%m%d-%H%M%S')"
+
+            echo "Saving tracked production changes to ${DEPLOY_BACKUP_PATH}"
+            mkdir -p "$DEPLOY_BACKUP_PATH"
+            git status --short > "${DEPLOY_BACKUP_PATH}/status.txt"
+            git diff --binary > "${DEPLOY_BACKUP_PATH}/unstaged.patch"
+            git diff --cached --binary > "${DEPLOY_BACKUP_PATH}/staged.patch"
+            git reset --hard origin/main
+          fi
+
           GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh

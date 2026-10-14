@@ -65,6 +65,26 @@ class QueueOperationsConfigurationTest extends TestCase
         );
     }
 
+    public function test_deployment_snapshots_tracked_server_changes_before_resetting_to_the_verified_release(): void
+    {
+        $deployment = (string) file_get_contents(base_path('scripts/deploy.sh'));
+
+        $this->assertStringContainsString('git status --porcelain --untracked-files=no', $deployment);
+        $this->assertStringContainsString('PAS_DEPLOY_BACKUP_DIR', $deployment);
+        $this->assertStringContainsString('unstaged.patch', $deployment);
+        $this->assertStringContainsString('staged.patch', $deployment);
+        $this->assertStringContainsString('git reset --hard origin/main', $deployment);
+        $this->assertLessThan(
+            strpos($deployment, 'git reset --hard origin/main'),
+            strpos($deployment, 'git diff --binary > "${DEPLOY_BACKUP_PATH}/unstaged.patch"'),
+        );
+
+        $workflow = (string) file_get_contents(base_path('.github/workflows/deploy-production.yml'));
+        $this->assertStringContainsString('Saving tracked production changes to ${DEPLOY_BACKUP_PATH}', $workflow);
+        $this->assertStringContainsString('git reset --hard origin/main', $workflow);
+        $this->assertStringContainsString('GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh', $workflow);
+    }
+
     public function test_ci_has_an_isolated_php_84_redis_horizon_job(): void
     {
         $workflowPath = base_path('.github/workflows/tests.yml');

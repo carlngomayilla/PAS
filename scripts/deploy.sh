@@ -189,8 +189,24 @@ php artisan down --render="errors::503" --retry=15 || true
 trap 'php artisan up || true' EXIT
 
 if [ "${SKIP_GIT:-0}" != "1" ]; then
-    echo "==> git pull"
-    git pull --ff-only
+    echo "==> synchronisation git"
+    git fetch --prune origin main
+
+    if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+        DEPLOY_BACKUP_DIR="${PAS_DEPLOY_BACKUP_DIR:-${HOME}/pas-anbg-deploy-backups}"
+        DEPLOY_BACKUP_STAMP="$(date '+%Y%m%d-%H%M%S')"
+        DEPLOY_BACKUP_PATH="${DEPLOY_BACKUP_DIR}/working-tree-${DEPLOY_BACKUP_STAMP}"
+
+        echo "   modifications locales detectees : sauvegarde dans ${DEPLOY_BACKUP_PATH}"
+        mkdir -p "$DEPLOY_BACKUP_PATH"
+        git status --short > "${DEPLOY_BACKUP_PATH}/status.txt"
+        git diff --binary > "${DEPLOY_BACKUP_PATH}/unstaged.patch"
+        git diff --cached --binary > "${DEPLOY_BACKUP_PATH}/staged.patch"
+
+        git reset --hard origin/main
+    else
+        git pull --ff-only
+    fi
 fi
 
 echo "==> composer install (prod)"
