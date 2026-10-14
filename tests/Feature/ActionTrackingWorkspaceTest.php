@@ -360,8 +360,9 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertStringContainsString('.action-detail-hero,', $styles);
         $this->assertStringContainsString('action-workspace-panel', (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php')));
         $this->assertStringContainsString('.action-workspace-panel,', $uiStyles);
-        $this->assertStringContainsString('.sidebar-collapsed #admin-sidebar', $uiStyles);
-        $this->assertStringContainsString('data-sidebar-compact', $uiStyles);
+        $this->assertStringContainsString('#admin-sidebar:hover', $styles);
+        $this->assertStringContainsString('.sidebar-desktop-expanded #admin-sidebar', $uiStyles);
+        $this->assertStringNotContainsString('data-sidebar-compact', $uiStyles);
     }
 
     public function test_action_tracking_uses_only_the_execution_form_as_an_accordion(): void
