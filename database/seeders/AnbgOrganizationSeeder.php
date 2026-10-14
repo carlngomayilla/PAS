@@ -25,8 +25,8 @@ class AnbgOrganizationSeeder extends Seeder
     /**
      * Credentials temporaires genres pour les nouveaux comptes : on les expose
      * a la fin du run pour que l administrateur puisse les distribuer. La
-     * `password_changed_at = null` qu on inscrit en base force le renouvellement
-     * au premier login (cf. A08 + PasswordPolicyService::isExpired).
+     * `password_changed_at = null` qu on inscrit en base force un changement
+     * unique au premier login (cf. A08 + PasswordPolicyService::requiresPasswordChange).
      *
      * @var array<int, array{email:string, name:string, matricule:?string, temporary_password:string}>
      */

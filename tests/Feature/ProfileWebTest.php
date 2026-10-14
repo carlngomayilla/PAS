@@ -113,7 +113,7 @@ class ProfileWebTest extends TestCase
         $this->assertTrue(Hash::check('Password-Old@123', $user->password));
     }
 
-    public function test_expired_password_profile_update_requires_new_password(): void
+    public function test_temporary_password_profile_update_requires_new_password(): void
     {
         $user = User::factory()->create([
             'password' => Hash::make('Password-Old@123'),
@@ -134,7 +134,7 @@ class ProfileWebTest extends TestCase
         $this->assertTrue(Hash::check('Password-Old@123', $user->password));
     }
 
-    public function test_expired_password_renewal_requires_at_least_eight_characters(): void
+    public function test_temporary_password_renewal_requires_at_least_eight_characters(): void
     {
         $user = User::factory()->create([
             'password' => Hash::make('Password-Old@123'),
@@ -158,7 +158,7 @@ class ProfileWebTest extends TestCase
         $this->assertTrue(Hash::check('Password-Old@123', $user->password));
     }
 
-    public function test_expired_password_user_can_renew_password_from_profile(): void
+    public function test_temporary_password_user_can_renew_password_from_profile(): void
     {
         $user = User::factory()->create([
             'password' => Hash::make('Password-Old@123'),

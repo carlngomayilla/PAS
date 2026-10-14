@@ -184,7 +184,8 @@ class DashboardNextPilotEntrypointTest extends TestCase
         $productionEnvironment = (string) file_get_contents(base_path('.env.production.example'));
 
         $this->assertStringContainsString('SESSION_PARTITIONED_COOKIE=false', $productionEnvironment);
-        $this->assertStringContainsString('SECURITY_PASSWORD_MIN_LENGTH=12', $productionEnvironment);
+        $this->assertStringContainsString('SECURITY_PASSWORD_MIN_LENGTH=8', $productionEnvironment);
+        $this->assertStringNotContainsString('SECURITY_PASSWORD_EXPIRE_DAYS=', $productionEnvironment);
         $this->assertStringContainsString('SECURITY_PASSWORD_REQUIRE_MIXED_CASE=true', $productionEnvironment);
         $this->assertStringContainsString('SECURITY_PASSWORD_REQUIRE_SYMBOLS=true', $productionEnvironment);
         $this->assertStringContainsString('CACHE_VERSION_STORE=database', $productionEnvironment);

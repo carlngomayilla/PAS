@@ -7,6 +7,28 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-10-14 - Politique de mots de passe simplifiee
+
+### Changement
+
+- La longueur minimale est fixee a `8` caracteres dans les modeles
+  d environnement et la configuration par defaut.
+- Le renouvellement obligatoire tous les 90 jours est supprime pour les mots de
+  passe personnels.
+- Un mot de passe provisoire issu d une creation, d un import ou d une
+  reinitialisation reste soumis a un changement unique avant l acces aux autres
+  modules.
+
+### Validation
+
+- Les parcours web, API, Horizon et de generation de rapports couvrent un mot
+  de passe personnel de plus de 90 jours et le blocage d un mot de passe
+  provisoire.
+- Le modele d environnement de production est controle pour la longueur minimale
+  de `8` caracteres et l absence d une variable d expiration periodique.
+
+---
+
 ## 2026-08-14 - Alignement des contraintes PostgreSQL avec les workflows applicatifs
 
 ### Changement
