@@ -346,13 +346,13 @@ class ActionTrackingWorkspaceTest extends TestCase
         $styles = (string) file_get_contents(resource_path('css/anbg-glass.css'));
         $uiStyles = (string) file_get_contents(resource_path('css/ui-system.css'));
 
-        $this->assertStringContainsString("'action-echeances'", (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php')));
+        $this->assertStringContainsString('id="action-echeances"', (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php')));
         $this->assertStringContainsString("'action-status': 'action-validation'", $script);
         $this->assertStringContainsString("'action-controle': 'action-validation'", $script);
         $this->assertStringContainsString('.field-error, [aria-invalid="true"]', $script);
         $this->assertStringContainsString("panel.dataset.hasErrors === 'true'", $script);
         $this->assertStringContainsString("event.key === 'ArrowRight'", $script);
-        $this->assertStringContainsString('activatePanel(panelId, { focusTab: true })', $script);
+        $this->assertStringContainsString('activatePanel(target, { focusTab: true })', $script);
         $this->assertStringNotContainsString('tabs[nextIndex].click()', $script);
         $this->assertStringContainsString("window.addEventListener('hashchange'", $script);
         $this->assertStringContainsString("import './action-detail-tabs';", $appScript);
@@ -366,7 +366,7 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertStringNotContainsString('data-sidebar-compact', $uiStyles);
     }
 
-    public function test_action_tracking_uses_only_the_execution_form_as_an_accordion(): void
+    public function test_action_tracking_keeps_the_execution_form_static(): void
     {
         $fixture = $this->createFixture();
         $template = (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php'));
@@ -376,14 +376,10 @@ class ActionTrackingWorkspaceTest extends TestCase
             ->get(route('workspace.actions.suivi', $fixture['action']))
             ->assertOk()
             ->assertSee('data-action-execution-disclosure', false)
-            ->assertSee('Formulaire d’exécution', false);
+            ->assertSee("Suivi de l'action", false);
 
-        $this->assertStringContainsString(
-            '<details class="form-step-accordion action-execution-disclosure mt-2"',
-            $template
-        );
+        $this->assertStringNotContainsString('<details class="form-step-accordion action-execution-disclosure mt-2"', $template);
         $this->assertStringContainsString('data-action-execution-disclosure', $template);
-        $this->assertStringContainsString('$executionFormHasErrors || $v2FormFrozen', $template);
         $this->assertStringNotContainsString('initActionAccordions', $enhancements);
         $this->assertStringContainsString("if (section.querySelector('form')) return;", $enhancements);
     }

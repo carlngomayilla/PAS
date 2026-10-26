@@ -42,12 +42,12 @@ class PremiumUiComponentsTest extends TestCase
         $styles = file_get_contents(resource_path('css/ui-system.css'));
 
         $this->assertIsString($styles);
-        $this->assertStringContainsString('--app-kpi-height: 8rem;', $styles);
+        $this->assertStringContainsString('--app-kpi-height: 10.25rem;', $styles);
         $this->assertStringContainsString('.app-kpi-grid', $styles);
         $this->assertStringContainsString('.showcase-kpi-card', $styles);
         $this->assertStringContainsString('.reco-metric-card', $styles);
         $this->assertStringContainsString('.personal-task-kpi-grid', $styles);
-        $this->assertStringContainsString('grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;', $styles);
+        $this->assertStringContainsString('grid-template-columns: repeat(6, minmax(0, 1fr)) !important;', $styles);
         $this->assertStringContainsString('font-variant-numeric: tabular-nums;', $styles);
         $this->assertStringContainsString('html.dark body.admin-theme-scope[data-ui-version="institutional-v2"]', $styles);
     }

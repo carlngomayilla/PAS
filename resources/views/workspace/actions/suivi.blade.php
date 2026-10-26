@@ -446,7 +446,14 @@
     <section class="action-kpi-grid mb-4" aria-label="Indicateurs essentiels">
         <article class="action-kpi-card">
             <span class="action-kpi-icon" aria-hidden="true">↗</span>
-            <div><span class="action-kpi-label">Avancement réel</span><strong>{{ number_format($progressionReelle, 0, ',', ' ') }} %</strong><small>{{ $hideExecutorMetrics ? 'Selon les droits du profil' : 'Performance officielle' }}</small></div>
+            <div>
+                <span class="action-kpi-label">Avancement réel</span>
+                <strong>{{ number_format($progressionReelle, 0, ',', ' ') }} %</strong>
+                <small>{{ $hideExecutorMetrics ? 'Selon les droits du profil' : 'Performance officielle' }}</small>
+                @if ($executorMetricsReleased)
+                    <small>Performance provisoire : {{ number_format($declaredProgression, 0, ',', ' ') }} %</small>
+                @endif
+            </div>
         </article>
         <article class="action-kpi-card">
             <span class="action-kpi-icon is-success" aria-hidden="true">✓</span>

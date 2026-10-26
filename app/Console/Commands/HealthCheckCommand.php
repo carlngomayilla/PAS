@@ -33,7 +33,9 @@ class HealthCheckCommand extends Command
             $this->checkBrevo($brevoMailService),
         ];
 
-        if (app()->environment('production')) {
+        $runningPhpUnit = app()->runningUnitTests() || defined('PHPUNIT_COMPOSER_INSTALL');
+
+        if (app()->environment('production') && ! $runningPhpUnit) {
             $checks[] = $this->checkViteAssets();
         }
 

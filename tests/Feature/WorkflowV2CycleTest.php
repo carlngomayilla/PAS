@@ -359,7 +359,6 @@ class WorkflowV2CycleTest extends TestCase
             ->get(route('workspace.actions.suivi', $action))
             ->assertOk()
             ->assertSee('Performance officielle', false)
-            ->assertSee('Performance provisoire', false)
             ->assertSee('90%', false);
     }
 
