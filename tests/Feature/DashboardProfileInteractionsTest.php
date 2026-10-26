@@ -48,7 +48,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertDontSee('Analytique avancee');
         // Graphique « Repartition des statuts » retire pour tous les roles (2026-06-10).
         $charts->assertDontSee('dashboard-role-status-chart', false);
-        $charts->assertSee('dashboard-role-support-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
@@ -76,7 +76,12 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertOk();
         // Le graphique « Repartition des statuts » a ete retire pour tous les roles.
         $charts->assertDontSee('dashboard-role-status-chart', false);
-        $charts->assertSee('dashboard-role-trend-chart', false);
+        // La vue agent ne conserve pas les deux cartes secondaires peu
+        // exploitables (« Evolution mensuelle » et « Charge hebdo »).
+        $charts->assertDontSee('dashboard-role-trend-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
+        $charts->assertDontSee('Evolution mensuelle');
+        $charts->assertDontSee('Charge hebdo');
     }
 
     public function test_seeded_direction_user_sees_direction_dashboard_sections(): void
@@ -98,7 +103,7 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('dashboard-role-support-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
     }
 
     public function test_seeded_sciq_user_sees_suivi_evaluation_dashboard_sections(): void

@@ -250,6 +250,8 @@
             sidebar.removeAttribute('inert');
             sidebar.setAttribute('aria-hidden', 'false');
             overlay.classList.add('hidden');
+            // Desktop starts on the compact rail; hover/focus expands it.
+            syncDesktopSidebarLayout(false);
             if (openButton) {
                 openButton.setAttribute('aria-expanded', 'false');
             }
@@ -309,6 +311,12 @@
                 sidebar.getAttribute('data-sidebar-keyboard-expanded') === 'true'
             );
         });
+
+        document.addEventListener('pointermove', function (event) {
+            if (!sidebar.contains(event.target) && sidebar.getAttribute('data-sidebar-keyboard-expanded') !== 'true') {
+                syncDesktopSidebarLayout(false);
+            }
+        }, { passive: true });
 
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Tab') {
@@ -838,6 +846,11 @@
         closeSidebar(false);
     }
 
+    // Establish the desktop rail state on every full page load. Without this
+    // first sync, a restored browser pointer or a bfcache navigation could
+    // leave the previous expanded body class out of sync with the sidebar's
+    // actual hover state.
+    syncDesktopSidebarLayout();
     syncSidebarForViewport();
     window.addEventListener('resize', syncSidebarForViewport);
 

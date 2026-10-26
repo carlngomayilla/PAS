@@ -108,4 +108,14 @@ class DashboardChartsPanelTest extends TestCase
         $this->assertStringContainsString('grid-auto-flow: row;', $rules);
         $this->assertStringNotContainsString('grid-auto-rows: 0.5rem;', $rules);
     }
+
+    public function test_collapsed_chart_bodies_release_fixed_canvas_space(): void
+    {
+        $styles = (string) file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringContainsString('.chart-disclosure-collapsed .chart-disclosure-body', $styles);
+        $this->assertStringContainsString('height: 0 !important;', $styles);
+        $this->assertStringContainsString('min-height: 0 !important;', $styles);
+        $this->assertStringContainsString('padding-top: 0 !important;', $styles);
+    }
 }

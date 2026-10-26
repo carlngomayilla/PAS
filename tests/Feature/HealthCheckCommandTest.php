@@ -33,6 +33,19 @@ class HealthCheckCommandTest extends TestCase
         $this->assertStringContainsString('"label": "Base de donnees"', $output);
     }
 
+    public function test_production_health_check_verifies_the_global_vite_bundles(): void
+    {
+        $this->app->detectEnvironment(static fn (): string => 'production');
+
+        $exitCode = Artisan::call('anbg:health-check', ['--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+        $viteCheck = collect($payload['checks'])->firstWhere('label', 'Assets Vite');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame('ok', $viteCheck['status']);
+        $this->assertSame('4 bundles globaux presents et lisibles', $viteCheck['details']);
+    }
+
     public function test_health_check_fails_when_brevo_is_enabled_without_credentials(): void
     {
         config([

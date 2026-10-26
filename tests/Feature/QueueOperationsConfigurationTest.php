@@ -65,6 +65,20 @@ class QueueOperationsConfigurationTest extends TestCase
         );
     }
 
+    public function test_deployment_refuses_missing_app_key_and_verifies_vite_bundles(): void
+    {
+        $deployment = (string) file_get_contents(base_path('scripts/deploy.sh'));
+
+        $this->assertStringContainsString('APP_KEY_VALUE=', $deployment);
+        $this->assertStringContainsString('APP_KEY est absent ou vide', $deployment);
+        $this->assertStringContainsString('verify_vite_assets()', $deployment);
+        $this->assertStringContainsString('public/build/manifest.json', $deployment);
+        $this->assertStringContainsString('resources/css/ui-system.css', $deployment);
+        $this->assertStringContainsString('resources/js/app.js', $deployment);
+        $this->assertStringContainsString('npm run build', $deployment);
+        $this->assertStringContainsString('verification des assets front existants', $deployment);
+    }
+
     public function test_deployment_snapshots_tracked_server_changes_before_resetting_to_the_verified_release(): void
     {
         $deployment = (string) file_get_contents(base_path('scripts/deploy.sh'));

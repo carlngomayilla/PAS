@@ -1060,7 +1060,96 @@ class ActionTrackingWebController extends Controller
         return $secureStorage->preview($justificatif);
     }
 
+    public function replaceJustificatif(
+        Request $request,
+        Action $action,
+        Justificatif $justificatif,
+        SecureJustificatifStorage $secureStorage
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->ensureActionJustificatif($action, $justificatif);
+        $this->authorizeJustificatifMutation($user, $action, $justificatif, 'replaceJustificatif');
+        $validated = $request->validate([
+            'justificatif' => ['required', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+        ]);
+
+        $stored = null;
+        $oldPath = (string) $justificatif->chemin_stockage;
+        $before = $justificatif->toArray();
+        try {
+            $stored = $secureStorage->store($validated['justificatif'], 'justificatifs/'.date('Y/m'));
+            DB::transaction(function () use ($justificatif, $stored): void {
+                $justificatif->update([
+                    'nom_original' => $stored['nom_original'],
+                    'chemin_stockage' => $stored['path'],
+                    'est_chiffre' => $stored['est_chiffre'],
+                    'mime_type' => $stored['mime_type'],
+                    'taille_octets' => $stored['taille_octets'],
+                ]);
+            });
+            $secureStorage->deleteByPath($oldPath);
+        } catch (Throwable $exception) {
+            $secureStorage->deleteByPath($stored['path'] ?? null);
+
+            throw $exception;
+        }
+
+        $this->recordAudit($request, 'justificatif', 'replace', $justificatif->fresh(), $before, $justificatif->fresh()->toArray());
+
+        return back()->with('success', 'Justificatif remplace.');
+    }
+
+    public function deleteJustificatif(
+        Request $request,
+        Action $action,
+        Justificatif $justificatif,
+        SecureJustificatifStorage $secureStorage
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->ensureActionJustificatif($action, $justificatif);
+        $this->authorizeJustificatifMutation($user, $action, $justificatif, 'deleteJustificatif');
+        $before = $justificatif->toArray();
+        $path = (string) $justificatif->chemin_stockage;
+
+        DB::transaction(fn (): bool => $justificatif->delete());
+        $secureStorage->deleteByPath($path);
+        $this->recordAudit($request, 'justificatif', 'delete', $justificatif, $before, []);
+
+        return back()->with('success', 'Justificatif supprime.');
+    }
+
     // ── HELPERS ──────────────────────────────────────────────────────────────
+
+    private function ensureActionJustificatif(Action $action, Justificatif $justificatif): void
+    {
+        if ((string) $justificatif->justifiable_type !== Action::class
+            || (int) $justificatif->justifiable_id !== (int) $action->id
+            || $justificatif->sous_action_id !== null
+        ) {
+            abort(404);
+        }
+    }
+
+    private function authorizeJustificatifMutation(User $user, Action $action, Justificatif $justificatif, string $ability): void
+    {
+        if ($user->can($ability, [$action, $justificatif])) {
+            return;
+        }
+
+        if ((int) $justificatif->ajoute_par !== (int) $user->id) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        abort(409, 'Le justificatif est gele par le circuit de validation.');
+    }
 
     private function isDafFinanceReviewer(User $user): bool
     {

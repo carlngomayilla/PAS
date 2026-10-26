@@ -7,6 +7,7 @@
     'responsableOptions' => null,
     'showTarget' => false,
     'allowMainAction' => true,
+    'deadlineOnly' => false,
 ])
 
 @php
@@ -39,6 +40,14 @@
         </div>
     @endif
 
+    @if ($deadlineOnly)
+        <input type="hidden" name="change_fields[]" value="deadline">
+        <label class="block rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <span class="text-sm font-semibold text-slate-900 dark:text-white">Nouvelle échéance</span>
+            <input class="mt-2" name="requested_deadline" type="date" value="{{ $fieldValue('requested_deadline', 'deadline') }}" required>
+            <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">La date doit être postérieure à l’échéance actuelle.</span>
+        </label>
+    @else
     <fieldset class="space-y-3">
         <legend class="text-sm font-bold text-slate-900 dark:text-white">Paramètres demandés</legend>
 
@@ -123,4 +132,5 @@
             </label>
         </div>
     </fieldset>
+    @endif
 </div>

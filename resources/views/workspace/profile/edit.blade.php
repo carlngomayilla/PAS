@@ -1,7 +1,7 @@
 @extends('layouts.workspace')
 
 @section('content')
-    <div class="app-screen-flow">
+    <div class="app-screen-flow profile-page-flow">
     <x-ui.page-title title="Paramètres personnels et sécurité" eyebrow="Mon profil" subtitle="Informations du compte, mot de passe et sessions actives." class="app-screen-block" data-profile-page-header>
         <x-slot:actions><a class="btn btn-secondary" href="{{ route('dashboard') }}">Retour dashboard</a></x-slot:actions>
     </x-ui.page-title>
@@ -12,8 +12,8 @@
     @endif
 
     <section class="app-screen-stack mb-4">
-        <article class="showcase-panel app-screen-block">
-            <div class="mb-4 flex flex-wrap items-center gap-4">
+        <article class="showcase-panel app-screen-block profile-summary-card">
+            <div class="profile-summary-identity flex flex-wrap items-center gap-4">
                 @if ($user->profile_photo_url)
                     <img src="{{ $user->profile_photo_url }}" alt="Photo de {{ $user->name }}" class="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow-sm">
                 @else
@@ -26,7 +26,7 @@
                     <p class="mt-1 break-all text-sm text-[var(--app-muted)]">{{ $user->email }}</p>
                 </div>
             </div>
-            <div class="showcase-data-list">
+            <div class="showcase-data-list profile-summary-data">
                 <div class="showcase-data-point">
                     <p class="showcase-data-key">Rôle</p>
                     <p class="showcase-data-value">{{ $profil['role_label'] }}</p>
@@ -46,7 +46,7 @@
             </div>
         </article>
 
-        <article class="showcase-panel app-screen-block">
+        <article class="showcase-panel app-screen-block profile-security-card">
             <h2 class="showcase-panel-title">Synthèse sécurité</h2>
             <div class="mt-4 showcase-summary-grid">
                 <article class="showcase-kpi-card">
@@ -64,7 +64,7 @@
     </section>
 
     <section class="mb-4 app-screen-block">
-        <form method="POST" enctype="multipart/form-data" class="form-shell reco-form-shell" action="{{ route('workspace.profile.update') }}">
+        <form method="POST" enctype="multipart/form-data" class="form-shell reco-form-shell profile-form-shell" action="{{ route('workspace.profile.update') }}">
             @csrf
             @method('PUT')
 
@@ -132,7 +132,7 @@
         </form>
     </section>
 
-    <section class="showcase-panel app-screen-block">
+    <section class="showcase-panel app-screen-block profile-sessions-card">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Sessions actives</h2>

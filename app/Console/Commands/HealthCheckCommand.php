@@ -33,6 +33,10 @@ class HealthCheckCommand extends Command
             $this->checkBrevo($brevoMailService),
         ];
 
+        if (app()->environment('production')) {
+            $checks[] = $this->checkViteAssets();
+        }
+
         if ($this->shouldCheckHorizon()) {
             $checks[] = $this->checkHorizon($masterSupervisors);
         }
@@ -125,6 +129,80 @@ class HealthCheckCommand extends Command
             'label' => 'Spec OpenAPI',
             'status' => File::exists($path) ? 'ok' : 'fail',
             'details' => File::exists($path) ? 'docs/openapi.yaml present' : 'docs/openapi.yaml absent',
+        ];
+    }
+
+    /**
+     * @return array{label:string,status:string,details:string}
+     */
+    private function checkViteAssets(): array
+    {
+        $manifestPath = public_path('build/manifest.json');
+
+        if (! File::isFile($manifestPath) || ! File::isReadable($manifestPath)) {
+            return [
+                'label' => 'Assets Vite',
+                'status' => 'fail',
+                'details' => 'public/build/manifest.json absent ou illisible',
+            ];
+        }
+
+        try {
+            $manifest = json_decode(
+                File::get($manifestPath),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            return [
+                'label' => 'Assets Vite',
+                'status' => 'fail',
+                'details' => sprintf('manifest JSON invalide (%s)', class_basename($exception)),
+            ];
+        }
+
+        if (! is_array($manifest)) {
+            return [
+                'label' => 'Assets Vite',
+                'status' => 'fail',
+                'details' => 'manifest JSON invalide (racine non objet)',
+            ];
+        }
+
+        $entries = [
+            'resources/css/app.css',
+            'resources/css/anbg-glass.css',
+            'resources/css/ui-system.css',
+            'resources/js/app.js',
+        ];
+
+        foreach ($entries as $entry) {
+            $file = $manifest[$entry]['file'] ?? null;
+
+            if (! is_string($file) || $file === '' || str_starts_with($file, '/') || str_contains($file, '..')) {
+                return [
+                    'label' => 'Assets Vite',
+                    'status' => 'fail',
+                    'details' => sprintf('entrée absente ou invalide: %s', $entry),
+                ];
+            }
+
+            $assetPath = public_path('build/'.$file);
+
+            if (! File::isFile($assetPath) || ! File::isReadable($assetPath) || File::size($assetPath) < 1) {
+                return [
+                    'label' => 'Assets Vite',
+                    'status' => 'fail',
+                    'details' => sprintf('fichier bundle absent ou vide: %s', $file),
+                ];
+            }
+        }
+
+        return [
+            'label' => 'Assets Vite',
+            'status' => 'ok',
+            'details' => sprintf('%d bundles globaux presents et lisibles', count($entries)),
         ];
     }
 

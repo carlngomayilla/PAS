@@ -99,6 +99,8 @@ class DeadlineExtensionWebController extends Controller
     ): StreamedResponse {
         $this->authorizeRequestAccess($request, $deadlineExtensionRequest);
 
+        abort_if(trim((string) $deadlineExtensionRequest->attachment_path) === '', 404);
+
         $metadata = is_array($deadlineExtensionRequest->metadata) ? $deadlineExtensionRequest->metadata : [];
         $justificatif = $this->attachmentJustificatif([
             'chemin_stockage' => $deadlineExtensionRequest->attachment_path,
@@ -149,11 +151,9 @@ class DeadlineExtensionWebController extends Controller
         }
 
         $file = $request->file('piece_justificative');
-        if (! $file instanceof UploadedFile) {
-            abort(422, 'Piece justificative obligatoire.');
-        }
-
-        $storedFile = $secureStorage->store($file, 'reports-echeance/'.date('Y/m'));
+        $storedFile = $file instanceof UploadedFile
+            ? $secureStorage->store($file, 'reports-echeance/'.date('Y/m'))
+            : null;
         try {
             $deadlineExtensionRequest = $workflow->submit(
                 $action,
@@ -162,7 +162,9 @@ class DeadlineExtensionWebController extends Controller
                 $storedFile
             );
         } catch (Throwable $exception) {
-            $secureStorage->deleteByPath($storedFile['path']);
+            if (is_array($storedFile)) {
+                $secureStorage->deleteByPath($storedFile['path']);
+            }
 
             throw $exception;
         }
@@ -203,11 +205,9 @@ class DeadlineExtensionWebController extends Controller
         }
 
         $file = $request->file('piece_justificative');
-        if (! $file instanceof UploadedFile) {
-            abort(422, 'Piece justificative obligatoire.');
-        }
-
-        $storedFile = $secureStorage->store($file, 'reports-echeance/'.date('Y/m'));
+        $storedFile = $file instanceof UploadedFile
+            ? $secureStorage->store($file, 'reports-echeance/'.date('Y/m'))
+            : null;
         $before = $deadlineExtensionRequest->toArray();
         try {
             $resubmitted = $workflow->resubmit(
@@ -217,7 +217,9 @@ class DeadlineExtensionWebController extends Controller
                 $storedFile
             );
         } catch (Throwable $exception) {
-            $secureStorage->deleteByPath($storedFile['path']);
+            if (is_array($storedFile)) {
+                $secureStorage->deleteByPath($storedFile['path']);
+            }
 
             throw $exception;
         }

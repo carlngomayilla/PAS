@@ -456,6 +456,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.justificatifs.download');
             Route::get('actions/{action}/justificatifs/{justificatif}/preview', [ActionTrackingWebController::class, 'previewJustificatif'])
                 ->name('actions.justificatifs.preview');
+            Route::put('actions/{action}/justificatifs/{justificatif}', [ActionTrackingWebController::class, 'replaceJustificatif'])
+                ->name('actions.justificatifs.replace');
+            Route::delete('actions/{action}/justificatifs/{justificatif}', [ActionTrackingWebController::class, 'deleteJustificatif'])
+                ->name('actions.justificatifs.delete');
             // Routes legacy NON ré-implémentées en V2 (anomalies, reports d'échéance,
             // validation direction, suivi hebdo) → 410 Gone tant que non rouvertes.
             Route::any('actions/{action}/sous-actions/{sousAction}/review', static function () {

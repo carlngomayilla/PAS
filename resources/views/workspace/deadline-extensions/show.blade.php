@@ -125,7 +125,11 @@
                                 <p class="font-semibold text-slate-900">Version actuelle</p>
                                 <p class="text-sm text-slate-500">{{ $deadlineRequest->attachment_name ?: 'Piece justificative' }}</p>
                             </div>
-                            <a class="btn btn-secondary btn-sm" href="{{ route('workspace.deadline-extension.attachment', $deadlineRequest) }}">Télécharger</a>
+                            @if ($deadlineRequest->attachment_path)
+                                <a class="btn btn-secondary btn-sm" href="{{ route('workspace.deadline-extension.attachment', $deadlineRequest) }}">Télécharger</a>
+                            @else
+                                <span class="text-sm text-slate-500">Aucune pièce jointe</span>
+                            @endif
                         </div>
                         @foreach ($revisionHistory as $revisionIndex => $revision)
                             <div class="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -170,18 +174,17 @@
                             :selected-sub-action-id="$deadlineRequest->sous_action_id"
                             :changes="$requestedChanges"
                             :responsable-options="$responsableOptions"
+                            :deadline-only="true"
                         />
                         <div>
                             <label for="detail_motif">Motif actualise</label>
-                            <input id="detail_motif" name="motif" type="text" value="{{ old('motif', $deadlineRequest->motif) }}" maxlength="255" required>
-                        </div>
-                        <div>
-                            <label for="detail_justification">Justification completee</label>
-                            <textarea id="detail_justification" name="justification" rows="5" required>{{ old('justification', $deadlineRequest->justification) }}</textarea>
+                            <input id="detail_motif" name="motif" type="text" value="{{ old('motif', $deadlineRequest->motif) }}" minlength="5" maxlength="255" required>
+                            <span class="mt-1 block text-xs text-slate-500">5 caractères minimum.</span>
                         </div>
                         <div>
                             <label for="detail_piece">Nouvelle piece justificative</label>
-                            <input id="detail_piece" name="piece_justificative" type="file" accept="{{ $documentAccept }}" required>
+                            <input id="detail_piece" name="piece_justificative" type="file" accept="{{ $documentAccept }}">
+                            <span class="mt-1 block text-xs text-slate-500">Facultative</span>
                         </div>
                         <button class="btn btn-primary w-full" type="submit">Completer et retransmettre</button>
                     </form>

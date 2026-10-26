@@ -49,9 +49,9 @@ class StoreDeadlineExtensionRequest extends FormRequest
             'requested_unite' => [Rule::requiredIf(in_array(DeadlineExtensionChangeSet::FIELD_UNIT, $selectedFields, true)), 'nullable', 'string', 'max:100'],
             'requested_cible_prevue' => [Rule::requiredIf(in_array(DeadlineExtensionChangeSet::FIELD_TARGET, $selectedFields, true)), 'nullable', 'numeric', 'min:0', 'max:99999999999'],
             'motif' => ['required', 'string', 'min:5', 'max:255'],
-            'justification' => ['required', 'string', 'min:10', 'max:5000'],
+            'justification' => ['nullable', 'string', 'max:5000'],
             'piece_justificative' => [
-                'required',
+                'nullable',
                 'file',
                 'max:'.$documentPolicy->maxUploadKilobytes(),
                 $documentPolicy->mimesRule(),

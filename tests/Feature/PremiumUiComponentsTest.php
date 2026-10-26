@@ -37,6 +37,21 @@ class PremiumUiComponentsTest extends TestCase
         $this->assertStringContainsString('.personal-task-kpi-grid', $styles);
     }
 
+    public function test_workspace_stat_cards_share_a_responsive_visual_contract(): void
+    {
+        $styles = file_get_contents(resource_path('css/ui-system.css'));
+
+        $this->assertIsString($styles);
+        $this->assertStringContainsString('--app-kpi-height: 8rem;', $styles);
+        $this->assertStringContainsString('.app-kpi-grid', $styles);
+        $this->assertStringContainsString('.showcase-kpi-card', $styles);
+        $this->assertStringContainsString('.reco-metric-card', $styles);
+        $this->assertStringContainsString('.personal-task-kpi-grid', $styles);
+        $this->assertStringContainsString('grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;', $styles);
+        $this->assertStringContainsString('font-variant-numeric: tabular-nums;', $styles);
+        $this->assertStringContainsString('html.dark body.admin-theme-scope[data-ui-version="institutional-v2"]', $styles);
+    }
+
     public function test_data_table_preserves_description_without_optional_title_and_actions(): void
     {
         $html = Blade::render('<x-ui.data-table description="Périmètre courant"><tbody><tr><td>Action visible</td></tr></tbody></x-ui.data-table>');

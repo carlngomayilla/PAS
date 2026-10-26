@@ -64,6 +64,23 @@ class AuthUiPolishTest extends TestCase
         $this->assertStringContainsString('.login-input[data-password-toggle-target]', $guestCss);
     }
 
+    public function test_stat_cards_share_a_responsive_visual_contract(): void
+    {
+        $systemCss = (string) file_get_contents(resource_path('css/ui-system.css'));
+
+        $this->assertStringContainsString('.app-kpi-grid', $systemCss);
+        $this->assertStringContainsString('.showcase-summary-grid', $systemCss);
+        $this->assertStringContainsString('.reco-metric-card', $systemCss);
+        $this->assertStringContainsString('.showcase-kpi-card', $systemCss);
+        $this->assertStringContainsString('.dashboard-primary-kpi-card', $systemCss);
+        $this->assertStringContainsString('--app-kpi-height: 10.25rem;', $systemCss);
+        $this->assertStringContainsString('.personal-task-kpi-grid', $systemCss);
+        $this->assertStringContainsString('grid-template-columns: repeat(6, minmax(0, 1fr)) !important;', $systemCss);
+        $this->assertStringContainsString('grid-template-columns: repeat(3, minmax(0, 1fr)) !important;', $systemCss);
+        $this->assertStringContainsString('grid-template-columns: repeat(2, minmax(0, 1fr)) !important;', $systemCss);
+        $this->assertStringContainsString('grid-template-columns: 1fr !important;', $systemCss);
+    }
+
     public function test_admin_navbar_keeps_actions_grouped_without_filters(): void
     {
         $layout = (string) file_get_contents(resource_path('views/layouts/admin.blade.php'));

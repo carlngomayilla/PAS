@@ -165,7 +165,41 @@ stop_next_pilot_runtime() {
     fi
 }
 
+verify_vite_assets() {
+    local manifest_path="public/build/manifest.json"
+
+    if [ ! -s "$manifest_path" ]; then
+        echo "!! Manifeste Vite absent ou vide: $manifest_path" >&2
+        return 1
+    fi
+
+    php -r '
+        $manifest = json_decode((string) file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
+        foreach (["resources/css/app.css", "resources/css/anbg-glass.css", "resources/css/ui-system.css", "resources/js/app.js"] as $entry) {
+            $file = $manifest[$entry]["file"] ?? null;
+            if (! is_string($file) || $file === "" || str_starts_with($file, "/") || str_contains($file, "..")) {
+                fwrite(STDERR, "!! Entree Vite absente ou invalide: {$entry}\n");
+                exit(1);
+            }
+
+            $path = dirname($argv[1]).DIRECTORY_SEPARATOR.$file;
+            if (! is_file($path) || ! is_readable($path) || filesize($path) < 1) {
+                fwrite(STDERR, "!! Bundle Vite absent ou vide: {$path}\n");
+                exit(1);
+            }
+        }
+    ' "$manifest_path"
+}
+
 echo "==> Déploiement PAS ANBG — $(date '+%Y-%m-%d %H:%M:%S')"
+
+# Garde-fou : une clé d'application absente rend les sessions, cookies et
+# chiffrement indisponibles et provoque un 500 dès le premier rendu Laravel.
+APP_KEY_VALUE="$(sed -n 's/^APP_KEY[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | head -n 1)"
+if [ -z "$APP_KEY_VALUE" ] || [ "$APP_KEY_VALUE" = "null" ]; then
+    echo "!! APP_KEY est absent ou vide dans .env. Deploiement refuse." >&2
+    exit 1
+fi
 
 # Garde-fou : ne jamais déployer avec APP_DEBUG=true (perf + sécurité).
 if grep -qE '^APP_DEBUG\s*=\s*true' .env 2>/dev/null; then
@@ -217,6 +251,10 @@ if [ "${SKIP_NPM:-0}" != "1" ]; then
     npm ci
     npm run build
     npm run next:build
+    verify_vite_assets
+else
+    echo "==> verification des assets front existants"
+    verify_vite_assets
 fi
 
 echo "==> migrations"

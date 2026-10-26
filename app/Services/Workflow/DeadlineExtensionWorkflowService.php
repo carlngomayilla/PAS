@@ -21,9 +21,9 @@ class DeadlineExtensionWorkflowService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @param  array{path:string,mime_type:?string,taille_octets:int,nom_original:string,est_chiffre:bool}  $storedFile
+     * @param  array{path:string,mime_type:?string,taille_octets:int,nom_original:string,est_chiffre:bool}|null  $storedFile
      */
-    public function submit(Action $action, array $payload, User $actor, array $storedFile): DeadlineExtensionRequest
+    public function submit(Action $action, array $payload, User $actor, ?array $storedFile): DeadlineExtensionRequest
     {
         $action->loadMissing('pta:id,direction_id,service_id');
         $sousAction = $this->targetSousAction($action, $payload['sous_action_id'] ?? null);
@@ -50,14 +50,14 @@ class DeadlineExtensionWorkflowService
                 'requested_by' => $actor->id,
                 'motif' => (string) ($payload['motif'] ?? ''),
                 'justification' => (string) ($payload['justification'] ?? ''),
-                'attachment_path' => $storedFile['path'],
-                'attachment_name' => $storedFile['nom_original'],
-                'attachment_mime' => $storedFile['mime_type'],
-                'attachment_size' => $storedFile['taille_octets'],
+                'attachment_path' => $storedFile['path'] ?? null,
+                'attachment_name' => $storedFile['nom_original'] ?? null,
+                'attachment_mime' => $storedFile['mime_type'] ?? null,
+                'attachment_size' => $storedFile['taille_octets'] ?? null,
                 'is_critical' => $oldDeadline->isPast(),
                 'status' => DeadlineExtensionRequest::STATUS_SOUMISE,
                 'metadata' => [
-                    'encrypted_attachment' => $storedFile['est_chiffre'],
+                    'encrypted_attachment' => (bool) ($storedFile['est_chiffre'] ?? false),
                     'submitted_target_label' => $sousAction?->libelle ?? $action->libelle,
                 ],
             ]);
@@ -88,13 +88,13 @@ class DeadlineExtensionWorkflowService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @param  array{path:string,mime_type:?string,taille_octets:int,nom_original:string,est_chiffre:bool}  $storedFile
+     * @param  array{path:string,mime_type:?string,taille_octets:int,nom_original:string,est_chiffre:bool}|null  $storedFile
      */
     public function resubmit(
         DeadlineExtensionRequest $request,
         array $payload,
         User $actor,
-        array $storedFile
+        ?array $storedFile
     ): DeadlineExtensionRequest {
         $resubmitted = DB::transaction(function () use ($request, $payload, $actor, $storedFile): DeadlineExtensionRequest {
             $lockedRequest = DeadlineExtensionRequest::query()
@@ -153,7 +153,9 @@ class DeadlineExtensionWorkflowService
 
             $metadata['revision_history'] = $history;
             $metadata['revision_count'] = count($history);
-            $metadata['encrypted_attachment'] = $storedFile['est_chiffre'];
+            $metadata['encrypted_attachment'] = $storedFile !== null
+                ? (bool) $storedFile['est_chiffre']
+                : (bool) ($metadata['encrypted_attachment'] ?? false);
             $metadata['last_resubmitted_at'] = now()->toIso8601String();
             $metadata['last_resubmitted_by'] = $actor->id;
 
@@ -204,12 +206,12 @@ class DeadlineExtensionWorkflowService
                 'original_values' => $originalValues,
                 'applied_values' => null,
                 'approved_deadline' => null,
-                'motif' => (string) $payload['motif'],
-                'justification' => (string) $payload['justification'],
-                'attachment_path' => $storedFile['path'],
-                'attachment_name' => $storedFile['nom_original'],
-                'attachment_mime' => $storedFile['mime_type'],
-                'attachment_size' => $storedFile['taille_octets'],
+                'motif' => (string) ($payload['motif'] ?? ''),
+                'justification' => (string) ($payload['justification'] ?? ''),
+                'attachment_path' => $storedFile['path'] ?? $lockedRequest->attachment_path,
+                'attachment_name' => $storedFile['nom_original'] ?? $lockedRequest->attachment_name,
+                'attachment_mime' => $storedFile['mime_type'] ?? $lockedRequest->attachment_mime,
+                'attachment_size' => $storedFile['taille_octets'] ?? $lockedRequest->attachment_size,
                 'metadata' => $metadata,
             ], $resetFields))->save();
 

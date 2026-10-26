@@ -6,9 +6,6 @@
     $primaryRows = $roleDashboard['primary_rows'] ?? [];
     $secondaryRows = $roleDashboard['secondary_rows'] ?? [];
     $comparisonChart = $roleDashboard['comparison_chart'] ?? [];
-    $trendChart = $roleDashboard['trend_chart'] ?? [];
-    $supportChart = $roleDashboard['support_chart'] ?? [];
-    $hideRepeatedSupportChart = (bool) ($hideRepeatedSupportChart ?? false);
     $showOverview = (bool) ($roleDashboard['overview_enabled'] ?? true);
     // Un graphique s'affiche des lors que le role le declare, meme sans donnee :
     // la carte montre alors son etat vide. Auparavant elle disparaissait
@@ -16,15 +13,7 @@
     // manquaient selon le profil.
     $showComparisonChart = (bool) ($roleDashboard['comparison_chart_enabled'] ?? true)
         && $comparisonChart !== [];
-    $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true)
-        && $trendChart !== [];
-    $supportChartRepeatsMacroChart = $hideRepeatedSupportChart
-        && in_array((string) $dashboardRole, ['direction', 'dg', 'planification'], true);
-    $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true)
-        && $supportChart !== []
-        && ! $supportChartRepeatsMacroChart;
     $roleComparisonChartHeight = max(15, (count($comparisonChart['labels'] ?? []) * 2.1) + 4);
-    $roleSupportChartHeight = max(15, (count($supportChart['labels'] ?? []) * 2.1) + 4);
     $statisticalPolicy = is_array(($statisticalPolicy ?? null)) ? $statisticalPolicy : [];
     $officialPolicy = is_array(($officialPolicy ?? null)) ? $officialPolicy : [];
     $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
@@ -43,21 +32,6 @@
                 'value' => min(100, max(0, (float) ($values[$index] ?? 0))),
             ])
             ->all();
-    };
-    $roleFallbackPoints = static function (array $chart): string {
-        $labels = collect($chart['labels'] ?? [])->values();
-        $values = is_array(($chart['datasets'][0]['data'] ?? null)) ? $chart['datasets'][0]['data'] : [];
-        $steps = max(1, $labels->count() - 1);
-
-        return $labels
-            ->map(function ($label, int $index) use ($values, $steps): string {
-                $value = min(100, max(0, (float) ($values[$index] ?? 0)));
-                $x = 20 + (($index * 320) / $steps);
-                $y = 120 - ($value * 0.9);
-
-                return number_format($x, 0, '.', '').','.number_format($y, 0, '.', '');
-            })
-            ->implode(' ');
     };
     $validationTone = static function (string $status): string {
         return match ($status) {
@@ -110,65 +84,8 @@
     </article>
 @endif
 
-@if ($showChartBlocks && $showTrendChart)
-    <div class="space-y-4">
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="showcase-panel-title">{{ $trendChart['title'] ?? 'Evolution' }}</h2>
-                </div>
-                <span class="showcase-chip">{{ count($trendChart['labels'] ?? []) }} points</span>
-            </div>
-            <div class="dashboard-canvas">
-                <div id="dashboard-role-trend-chart" class="dashboard-chart-host">
-                    <div class="dashboard-chart-fallback" aria-hidden="true">
-                        <svg viewBox="0 0 360 140" preserveAspectRatio="none">
-                            <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
-                            <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                            <polyline points="{{ $roleFallbackPoints($trendChart) }}" fill="none" stroke="#F26522" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        </article>
-    </div>
-@endif
-
-@if (($showChartBlocks && $showSupportChart) || ($showTableBlocks && $showOverview))
+@if ($showTableBlocks && $showOverview)
 <div class="mt-4 space-y-4">
-    @if ($showChartBlocks && $showSupportChart)
-    <article class="showcase-panel">
-        <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-                <h2 class="showcase-panel-title">{{ $supportChart['title'] ?? 'Synthese' }}</h2>
-            </div>
-            <span class="showcase-chip">{{ count($supportChart['labels'] ?? []) }} lignes</span>
-        </div>
-        <div class="dashboard-chart-scroll-frame">
-        <div class="dashboard-canvas" style="height: {{ number_format($roleSupportChartHeight, 2, '.', '') }}rem;">
-            <div id="dashboard-role-support-chart" class="dashboard-chart-host">
-                <div class="dashboard-chart-fallback" aria-hidden="true">
-                    @if (count($supportChart['labels'] ?? []) > 0)
-                        <div class="dashboard-chart-fallback-bars">
-                            @foreach ($roleFallbackBars($supportChart) as $row)
-                                <div class="dashboard-chart-fallback-bar">
-                                    <span class="truncate">{{ $row['label'] }}</span>
-                                    <span class="dashboard-chart-fallback-track"><span class="dashboard-chart-fallback-fill" style="width: {{ $row['value'] }}%;"></span></span>
-                                    <span class="text-right">{{ number_format($row['value'], 0, ',', ' ') }}%</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <x-ui.empty-state title="Aucune donnée" message="Ce graphique sera alimenté dès que le périmètre aura des actions." icon="chart" tone="info" />
-                    @endif
-                </div>
-            </div>
-        </div>
-        </div>
-    </article>
-    @endif
-
-    @if ($showTableBlocks && $showOverview)
     <article class="showcase-panel">
         @if ($dashboardRole === 'agent')
             <div class="mb-4 flex items-center justify-between gap-3">
@@ -354,7 +271,6 @@
             </div>
         @endif
     </article>
-    @endif
 </div>
 @endif
 

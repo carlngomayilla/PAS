@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Action;
 use App\Models\Direction;
+use App\Models\Justificatif;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\Pas;
@@ -806,6 +807,68 @@ class ActionTrackingWorkspaceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $workflow->recordActionProgress($simpleFixture['action']->fresh(), ['quantite_realisee' => 50], $simpleFixture['agent']);
+    }
+
+    public function test_action_proof_can_be_replaced_or_deleted_only_by_its_agent_while_editable(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->createFixture();
+        $proof = Justificatif::query()->create([
+            'justifiable_type' => Action::class,
+            'justifiable_id' => $fixture['action']->id,
+            'categorie' => 'execution_quantitative',
+            'nom_original' => 'ancien.pdf',
+            'chemin_stockage' => 'justificatifs/ancien.pdf',
+            'mime_type' => 'application/pdf',
+            'taille_octets' => 20,
+            'ajoute_par' => $fixture['agent']->id,
+        ]);
+        Storage::disk('local')->put('justificatifs/ancien.pdf', 'old');
+
+        $this->actingAs($fixture['agent'])
+            ->put(route('workspace.actions.justificatifs.replace', [$fixture['action'], $proof]), [
+                'justificatif' => UploadedFile::fake()->create('nouveau.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect();
+
+        $proof->refresh();
+        $this->assertSame('nouveau.pdf', $proof->nom_original);
+        $this->assertFalse(Storage::disk('local')->exists('justificatifs/ancien.pdf'));
+
+        $this->actingAs($fixture['agent'])
+            ->delete(route('workspace.actions.justificatifs.delete', [$fixture['action'], $proof]))
+            ->assertRedirect();
+        $this->assertDatabaseMissing('justificatifs', ['id' => $proof->id]);
+    }
+
+    public function test_action_proof_mutations_reject_other_user_and_frozen_action(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->createFixture();
+        $proof = Justificatif::query()->create([
+            'justifiable_type' => Action::class,
+            'justifiable_id' => $fixture['action']->id,
+            'categorie' => 'execution_quantitative',
+            'nom_original' => 'preuve.pdf',
+            'chemin_stockage' => 'justificatifs/preuve.pdf',
+            'mime_type' => 'application/pdf',
+            'taille_octets' => 20,
+            'ajoute_par' => $fixture['agent']->id,
+        ]);
+
+        $other = User::factory()->create(['role' => User::ROLE_AGENT]);
+        $this->actingAs($other)
+            ->delete(route('workspace.actions.justificatifs.delete', [$fixture['action'], $proof]))
+            ->assertForbidden();
+
+        $fixture['action']->forceFill([
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+        ])->save();
+        $this->actingAs($fixture['agent'])
+            ->put(route('workspace.actions.justificatifs.replace', [$fixture['action'], $proof]), [
+                'justificatif' => UploadedFile::fake()->create('nouveau.pdf', 10, 'application/pdf'),
+            ])
+            ->assertStatus(409);
     }
 
     /**

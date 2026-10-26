@@ -25,7 +25,7 @@ class DeadlineExtensionWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_deadline_extension_requires_supporting_document(): void
+    public function test_deadline_extension_accepts_a_request_without_supporting_document(): void
     {
         $fixture = $this->createPlanningFixture();
         $action = $this->createAction($fixture, now()->addMonth()->toDateString());
@@ -35,11 +35,14 @@ class DeadlineExtensionWorkflowTest extends TestCase
                 'change_fields' => ['deadline'],
                 'requested_deadline' => now()->addMonths(2)->toDateString(),
                 'motif' => 'Contraintes operationnelles',
-                'justification' => 'Les ressources critiques sont indisponibles sur la periode initiale.',
             ])
-            ->assertSessionHasErrors('piece_justificative');
+            ->assertRedirect(route('workspace.actions.suivi', $action));
 
-        $this->assertDatabaseCount('deadline_extension_requests', 0);
+        $this->assertDatabaseCount('deadline_extension_requests', 1);
+        $this->assertDatabaseHas('deadline_extension_requests', [
+            'motif' => 'Contraintes operationnelles',
+            'attachment_path' => null,
+        ]);
     }
 
     public function test_deadline_extension_follows_rmo_chef_director_dg_and_applies_exact_changes(): void

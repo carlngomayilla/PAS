@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Models\Action;
+use App\Models\Justificatif;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Governance\DelegationService;
@@ -267,6 +268,22 @@ class ActionPolicy
         return $this->view($user, $action);
     }
 
+    /**
+     * Peut remplacer ou supprimer un justificatif d'execution appartenant a l'action.
+     */
+    public function replaceJustificatif(User $user, Action $action, Justificatif $justificatif): bool
+    {
+        return $this->canManageJustificatif($user, $action, $justificatif);
+    }
+
+    /**
+     * Le remplacement et la suppression suivent la meme regle de possession et de gel.
+     */
+    public function deleteJustificatif(User $user, Action $action, Justificatif $justificatif): bool
+    {
+        return $this->canManageJustificatif($user, $action, $justificatif);
+    }
+
     // -------------------------------------------------------------------------
     // Méthodes internes partagées
     // -------------------------------------------------------------------------
@@ -274,6 +291,35 @@ class ActionPolicy
     private function canManageAction(User $user, ?int $directionId, ?int $serviceId): bool
     {
         return ! $user->isAgent() && $this->canWriteService($user, $directionId, $serviceId);
+    }
+
+    private function canManageJustificatif(User $user, Action $action, Justificatif $justificatif): bool
+    {
+        if ((string) $justificatif->justifiable_type !== Action::class
+            || (int) $justificatif->justifiable_id !== (int) $action->id
+            || $justificatif->sous_action_id !== null
+            || (int) $justificatif->ajoute_par !== (int) $user->id
+            || ! $action->isResponsible($user)
+        ) {
+            return false;
+        }
+
+        return in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), [
+            ActionTrackingService::VALIDATION_NON_SOUMISE,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+        ], true) && ! in_array((string) ($action->statut_dynamique ?: $action->statut ?: ''), [
+            ActionTrackingService::STATUS_SUSPENDU,
+            ActionTrackingService::STATUS_ANNULE,
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE,
+            ActionTrackingService::STATUS_CLOTUREE,
+            'cloture',
+            'archive',
+        ], true);
     }
 
     private function isDafFinanceReviewer(User $user): bool

@@ -10,47 +10,66 @@ function initActionDetailTabs() {
     var panelIds = new Set(panels.map(function (panel) {
         return panel.id;
     }));
+    var groups = panels.reduce(function (result, panel) {
+        var groupId = panel.dataset.actionTabGroup || panel.id;
+        result[groupId] = result[groupId] || [];
+        result[groupId].push(panel);
+
+        return result;
+    }, {});
     var aliases = {
         'action-suivi': 'action-validation',
         'action-status': 'action-validation',
         'action-controle': 'action-validation',
     };
 
-    function resolvePanelId(hash) {
+    function resolveTarget(hash) {
         var requestedId = String(hash || '').replace(/^#/, '');
         var resolvedId = aliases[requestedId] || requestedId;
 
-        return panelIds.has(resolvedId) ? resolvedId : null;
+        if (groups[resolvedId]) {
+            return { groupId: resolvedId, panelId: groups[resolvedId][0].id };
+        }
+
+        if (!panelIds.has(resolvedId)) {
+            return null;
+        }
+
+        var panel = document.getElementById(resolvedId);
+        var groupId = panel?.dataset.actionTabGroup || resolvedId;
+
+        return { groupId: groupId, panelId: resolvedId };
     }
 
-    function activatePanel(panelId, options) {
-        var resolvedId = resolvePanelId(panelId);
+    function activatePanel(target, options) {
+        var resolvedTarget = typeof target === 'string' ? resolveTarget(target) : target;
 
-        if (!resolvedId) {
+        if (!resolvedTarget) {
             return;
         }
 
         tabs.forEach(function (tab) {
-            var isActive = tab.getAttribute('aria-controls') === resolvedId;
+            var isActive = tab.getAttribute('aria-controls') === resolvedTarget.groupId;
             tab.classList.toggle('active', isActive);
             tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
             tab.setAttribute('tabindex', isActive ? '0' : '-1');
         });
 
         panels.forEach(function (panel) {
-            var isActive = panel.id === resolvedId;
-            panel.classList.toggle('is-active', isActive);
-            panel.hidden = !isActive;
-            panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+            var isInActiveGroup = (panel.dataset.actionTabGroup || panel.id) === resolvedTarget.groupId;
+            var isFocusedPanel = panel.id === resolvedTarget.panelId;
+            panel.classList.toggle('is-active', isFocusedPanel);
+            panel.hidden = !isInActiveGroup;
+            panel.setAttribute('aria-hidden', isInActiveGroup ? 'false' : 'true');
         });
 
-        if (options && options.focusPanel) {
-            document.getElementById(resolvedId)?.focus({ preventScroll: true });
+        if (options?.focusPanel) {
+            document.getElementById(resolvedTarget.panelId)?.focus({ preventScroll: true });
         }
 
-        if (options && options.focusTab) {
+        if (options?.focusTab) {
             tabs.find(function (tab) {
-                return tab.getAttribute('aria-controls') === resolvedId;
+                return tab.getAttribute('aria-controls') === resolvedTarget.groupId;
             })?.focus({ preventScroll: true });
         }
     }
@@ -60,11 +79,12 @@ function initActionDetailTabs() {
             return panel.dataset.hasErrors === 'true'
                 || panel.querySelector('.field-error, [aria-invalid="true"]');
         });
-        var initialPanelId = errorPanel?.id
-            || resolvePanelId(window.location.hash)
-            || tabs[0]?.getAttribute('aria-controls');
+        var initialTarget = errorPanel
+            ? resolveTarget(errorPanel.id)
+            : resolveTarget(window.location.hash)
+                || resolveTarget(tabs[0]?.getAttribute('aria-controls'));
 
-        activatePanel(initialPanelId);
+        activatePanel(initialTarget);
     }
 
     tabsList.addEventListener('click', function (event) {
@@ -75,9 +95,10 @@ function initActionDetailTabs() {
         }
 
         event.preventDefault();
-        var panelId = tab.getAttribute('aria-controls');
-        activatePanel(panelId, { focusPanel: true });
-        window.history.pushState({ actionTab: panelId }, '', '#'+panelId);
+        var target = resolveTarget(tab.getAttribute('aria-controls'));
+        activatePanel(target, { focusPanel: true });
+        document.getElementById(target?.panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.history.pushState({ actionTab: tab.getAttribute('aria-controls') }, '', '#'+tab.getAttribute('aria-controls'));
     });
 
     tabsList.addEventListener('keydown', function (event) {
@@ -101,9 +122,9 @@ function initActionDetailTabs() {
         }
 
         event.preventDefault();
-        var panelId = tabs[nextIndex].getAttribute('aria-controls');
-        activatePanel(panelId, { focusTab: true });
-        window.history.pushState({ actionTab: panelId }, '', '#'+panelId);
+        var target = resolveTarget(tabs[nextIndex].getAttribute('aria-controls'));
+        activatePanel(target, { focusTab: true });
+        window.history.pushState({ actionTab: tabs[nextIndex].getAttribute('aria-controls') }, '', '#'+tabs[nextIndex].getAttribute('aria-controls'));
     });
 
     document.addEventListener('click', function (event) {
@@ -113,9 +134,9 @@ function initActionDetailTabs() {
             return;
         }
 
-        var panelId = resolvePanelId(link.getAttribute('href'));
-        if (panelId) {
-            activatePanel(panelId);
+        var target = resolveTarget(link.getAttribute('href'));
+        if (target) {
+            activatePanel(target);
         }
     });
 

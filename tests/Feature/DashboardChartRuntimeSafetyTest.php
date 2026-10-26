@@ -38,6 +38,17 @@ class DashboardChartRuntimeSafetyTest extends TestCase
         $this->assertStringContainsString("console.error('Impossible de redimensionner un graphique Plotly du tableau de bord.'", $resizeCharts);
     }
 
+    public function test_zero_only_chart_payloads_use_an_explicit_empty_state(): void
+    {
+        $script = $this->dashboardScript();
+        $mountChart = $this->functionSource($script, 'function mountChart(', 'function plotlyFigureHasData(');
+
+        $this->assertStringContainsString('function chartConfigHasVisibleData(config)', $script);
+        $this->assertStringContainsString('Math.abs(numeric) > 0.0001', $script);
+        $this->assertStringContainsString('Toutes les valeurs sont à 0 pour le périmètre et la période sélectionnés.', $mountChart);
+        $this->assertStringContainsString('mountChartEmptyState(', $mountChart);
+    }
+
     private function dashboardScript(): string
     {
         $script = file_get_contents(resource_path('js/dashboard-render.js'));

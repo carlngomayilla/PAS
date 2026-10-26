@@ -2509,18 +2509,12 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Mes alertes actives', $alertCount, 'Actions a surveiller', $this->alertCenterRoute(['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Actions a mettre a jour', $updateCount, 'Ecarts de progression', route('workspace.actions.index', ['sort' => 'progression_desc']), '#1C203D', '#E8F3FB', null, 'info'),
             ],
-            // Graphique « Repartition des statuts » retire pour tous les roles
-            // (demande metier 2026-06-10).
-            'trend_chart' => [
-                'title' => 'Evolution mensuelle',
-                'subtitle' => 'Volume, achèvement et retards par mois de démarrage.',
-                ...$this->buildRoleTrendChart($actions),
-            ],
-            'support_chart' => [
-                'title' => 'Charge hebdo',
-                'subtitle' => 'Actions planifiées par semaine de démarrage.',
-                ...$this->buildWeeklyLoadChart($actions),
-            ],
+            // Les deux graphiques secondaires de la vue agent ont été retirés
+            // pour garder une page d'exécution courte et directement
+            // exploitable. Les graphiques macro restent accessibles dans
+            // l'onglet Graphiques du tableau de bord.
+            'trend_chart' => [],
+            'support_chart' => [],
             'primary_rows' => $this->buildPriorityActionRows($actions, 8),
             'secondary_rows' => $this->buildLateActionRows($actions, 8),
         ];

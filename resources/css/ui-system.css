@@ -2538,6 +2538,64 @@ html.dark body[data-ui-version="institutional-v2"] :where(
     }
 }
 
+/* Final sidebar state contract. Older desktop rules set the full width with
+   a more specific selector, which prevented the compact rail from winning
+   after the pointer left. Explicitly make the non-hover state authoritative. */
+@media (min-width: 64rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]),
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar {
+        width: var(--app-sidebar-collapsed-width) !important;
+        min-width: var(--app-sidebar-collapsed-width) !important;
+        max-width: var(--app-sidebar-collapsed-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) ~ :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-collapsed-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ) {
+        width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+
+    /* Keep the active dashboard item from becoming a full-height pill in the
+       compact rail. Every item uses the same icon-sized hit area; the active
+       state may still tint that area without creating a visual pillar. */
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(.app-sidebar-link, .app-sidebar-logout) {
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        max-width: 2.75rem !important;
+        height: 2.75rem !important;
+        min-height: 2.75rem !important;
+        max-height: 2.75rem !important;
+        margin-inline: auto !important;
+        padding: 0 !important;
+        border-radius: 0.75rem !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) :where(.app-sidebar-link, .app-sidebar-logout),
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar :where(.app-sidebar-link, .app-sidebar-logout) {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 2.65rem !important;
+        max-height: none !important;
+        margin-inline: 0 !important;
+        border-radius: 0.8rem !important;
+    }
+}
+
 @media (max-width: 95rem) {
     body[data-ui-version="institutional-v2"] .dashboard-command-kpi-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2579,6 +2637,72 @@ html.dark body[data-ui-version="institutional-v2"] :where(
 
     body[data-ui-version="institutional-v2"] .dashboard-axis-metrics {
         display: none;
+    }
+}
+
+/* Profil : hiérarchie compacte et alignement stable avec les autres écrans. */
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-page-flow {
+    gap: 1rem;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-card {
+    display: grid;
+    grid-template-columns: minmax(18rem, 0.78fr) minmax(0, 1.22fr);
+    align-items: center;
+    gap: 2rem;
+    min-height: 0;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-identity {
+    min-width: 0;
+    margin: 0 !important;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-data {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem 1.25rem;
+    min-width: 0;
+    margin: 0;
+    padding-left: 1.5rem;
+    border-left: 1px solid var(--ui-border);
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-data .showcase-data-point {
+    min-width: 0;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-data .showcase-data-value {
+    overflow-wrap: anywhere;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-security-card,
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-sessions-card {
+    min-height: 0;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-security-card .showcase-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 56rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-card {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-data {
+        padding-top: 1.25rem;
+        padding-left: 0;
+        border-top: 1px solid var(--ui-border);
+        border-left: 0;
+    }
+}
+
+@media (max-width: 34rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-summary-data,
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .profile-security-card .showcase-summary-grid {
+        grid-template-columns: 1fr !important;
     }
 }
 
@@ -3321,6 +3445,7 @@ html.dark body.admin-theme-scope.anbg-glass-theme[data-ui-version="institutional
         radial-gradient(circle at 0 0, rgb(44 106 169 / 28%), transparent 17rem),
         linear-gradient(165deg, #0b416d 0%, #082d4e 58%, #061f38 100%) !important;
 }
+
 
 body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
     .app-card,
@@ -4129,5 +4254,1012 @@ html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .pta-suivi-
         overflow: visible;
         text-align: center;
         white-space: normal !important;
+    }
+}
+
+/* Desktop behavior: compact rail by default, full navigation on hover/focus. */
+@media (min-width: 64rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-collapsed-width) !important;
+        transition: padding-left 180ms ease;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar,
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-sidebar {
+        width: var(--app-sidebar-collapsed-width) !important;
+        min-width: var(--app-sidebar-collapsed-width) !important;
+        max-width: var(--app-sidebar-collapsed-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ) {
+        width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar,
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded .app-sidebar {
+        width: var(--app-sidebar-width) !important;
+        min-width: var(--app-sidebar-width) !important;
+        max-width: var(--app-sidebar-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ) {
+        width: auto !important;
+        max-width: none !important;
+        margin: revert !important;
+        padding: revert !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+}
+
+/* The action detail is a single readable work surface; the top links jump to sections. */
+body.admin-theme-scope[data-ui-version="institutional-v2"] .action-detail-tabs {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 20;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] [data-action-tab-panel] {
+    scroll-margin-top: 5.5rem;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] [data-action-tab-panel][hidden] {
+    display: none !important;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] [data-action-tab-panel] + [data-action-tab-panel] {
+    margin-top: 1rem;
+}
+
+/* Action detail visual contract: compact KPI row, white hero and two clear tabs. */
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero {
+    border-color: #d7e2ec !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #17324a !important;
+    box-shadow: 0 10px 28px rgb(23 50 74 / 8%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero :where(.action-detail-title, h1, h2, h3, p) {
+    color: #17324a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-title {
+    color: #17324a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero.action-detail-hero--light {
+    background-color: #ffffff !important;
+    background-image: none !important;
+}
+
+html body.admin-theme-scope.anbg-glass-theme .action-detail-hero.action-detail-hero--light {
+    background-color: #ffffff !important;
+    background-image: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero.action-detail-hero--light .action-detail-title,
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero.action-detail-hero--light h1,
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero.action-detail-hero--light p {
+    color: #17324a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-eyebrow {
+    background: #eaf4fb !important;
+    color: #14588a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-actions .btn-secondary {
+    border-color: #b9cde0 !important;
+    background: #ffffff !important;
+    color: #17324a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-actions .btn-warning {
+    border-color: #147dcc !important;
+    background: #147dcc !important;
+    color: #ffffff !important;
+}
+
+.action-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.action-main-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2.1fr) minmax(280px, 1fr);
+    gap: 0.85rem;
+    align-items: start;
+}
+
+.action-main-primary {
+    display: flex;
+    min-width: 0;
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: column;
+    gap: 0.85rem;
+    align-self: start;
+    margin-top: 0 !important;
+}
+
+.action-main-primary > [data-action-tab-panel] {
+    width: 100%;
+    margin-bottom: 0 !important;
+}
+
+.action-main-primary #action-justificatifs {
+    width: 100%;
+    min-width: 0;
+}
+
+.action-main-primary #action-logs,
+.action-main-primary #action-justificatifs {
+    align-self: stretch;
+    width: 100% !important;
+    max-width: none !important;
+    flex: 0 0 auto;
+}
+
+.action-main-layout [data-action-tab-panel] {
+    min-width: 0;
+    margin-bottom: 0.15rem !important;
+}
+
+.action-main-layout #action-validation,
+.action-main-layout #action-logs {
+    grid-column: 1;
+}
+
+/* Keep the evidence library directly below the primary tracking column and
+   give it the same readable width as the journal above it. */
+.action-main-layout #action-justificatifs.action-justificatifs-below-journal {
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
+}
+
+.action-main-layout #action-echeances,
+.action-main-layout #action-discussion,
+.action-main-layout #action-justificatifs {
+    grid-column: 2;
+}
+
+.action-main-layout #action-fiche,
+.action-main-layout #action-financement {
+    grid-column: 1 / -1;
+}
+
+.action-main-layout .showcase-panel,
+.action-main-layout .action-tracking-panel {
+    padding: 0.9rem !important;
+}
+
+.action-main-layout > .action-stepper-panel {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    margin-top: 0.15rem;
+}
+
+/* Keep one visual surface per section: inner forms should not look like cards
+   stacked inside another card. */
+.action-main-layout form.app-form-surface {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0.2rem 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.action-main-layout form.app-form-surface .form-section {
+    padding: 0.7rem 0 !important;
+}
+
+.action-main-layout form.app-form-surface .form-section:first-of-type {
+    padding-top: 0 !important;
+}
+
+.action-main-layout form.app-form-surface :where(input, select, textarea) {
+    min-height: 2.35rem;
+}
+
+.action-main-layout form.app-form-surface :where(.app-form-actions, .form-actions) {
+    gap: 0.5rem !important;
+    margin-top: 0.7rem !important;
+}
+
+@layer theme {
+    body.admin-theme-scope.anbg-glass-theme .action-main-layout form.app-form-surface {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0.2rem 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #action-echeances > div.grid.gap-4 {
+        grid-template-columns: minmax(0, 1.35fr) minmax(15rem, 0.65fr) !important;
+        gap: 0.75rem !important;
+    }
+}
+
+@media (max-width: 900px) {
+    body.admin-theme-scope.anbg-glass-theme #action-echeances > div.grid.gap-4 {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
+
+.action-main-layout .showcase-panel-title,
+.action-main-layout .action-tracking-title {
+    margin-bottom: 0.55rem !important;
+    font-size: 1rem !important;
+}
+
+.action-execution-static {
+    margin-top: 0.5rem !important;
+    padding: 0.75rem !important;
+    overflow: visible !important;
+}
+
+.action-execution-static .form-step-body {
+    border-top: 0 !important;
+    padding: 0 !important;
+}
+
+.action-execution-static form {
+    margin-top: 0 !important;
+}
+
+@media (max-width: 900px) {
+    .action-main-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .action-main-primary {
+        grid-column: 1;
+        position: static;
+    }
+
+    .action-main-layout [data-action-tab-panel] {
+        grid-column: 1 !important;
+    }
+}
+
+.action-kpi-card {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border: 1px solid #d7e2ec;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 0.9rem;
+    box-shadow: 0 8px 20px rgb(23 50 74 / 5%);
+}
+
+.action-kpi-card > div {
+    min-width: 0;
+}
+
+.action-kpi-icon {
+    display: inline-grid;
+    width: 2.35rem;
+    height: 2.35rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 999px;
+    background: #e7f2fb;
+    color: #1679bf;
+    font-size: 1.15rem;
+    font-weight: 900;
+}
+
+.action-kpi-icon.is-success { background: #e8f8ef; color: #0d9b63; }
+.action-kpi-icon.is-violet { background: #f3eaff; color: #8a45d1; }
+.action-kpi-icon.is-warning { background: #fff4d8; color: #cc8b00; }
+.action-kpi-icon.is-info { background: #e6f3fb; color: #176da6; }
+
+.action-kpi-label,
+.action-kpi-card small {
+    display: block;
+    color: #58708a;
+    font-size: 0.72rem;
+    line-height: 1.25;
+}
+
+.action-kpi-label {
+    font-weight: 800;
+}
+
+.action-kpi-card strong {
+    display: block;
+    margin-top: 0.25rem;
+    overflow-wrap: anywhere;
+    color: #123f73;
+    font-size: clamp(1rem, 1.4vw, 1.35rem);
+    line-height: 1.15;
+}
+
+.action-kpi-card small {
+    margin-top: 0.25rem;
+}
+
+.action-detail-tabs-external {
+    width: 100% !important;
+    margin: 0 0 1rem !important;
+    justify-content: flex-start !important;
+    border-radius: 0.75rem !important;
+    background: #ffffff !important;
+}
+
+/* Keep the action identity and its KPIs available while the operational
+   panels are being reviewed. The tab bar is part of this same surface so it
+   cannot overlap the summary when it becomes sticky. */
+.action-summary-sticky {
+    position: sticky;
+    top: 4rem;
+    z-index: 25;
+    margin-bottom: 1rem;
+    padding-bottom: 0.15rem;
+    background: rgb(239 246 252 / 96%);
+    isolation: isolate;
+}
+
+.action-summary-sticky .action-detail-tabs-external {
+    position: static !important;
+    margin-bottom: 0 !important;
+}
+
+@media (max-width: 900px) {
+    .action-summary-sticky {
+        position: static;
+        margin-bottom: 1rem;
+        padding-bottom: 0;
+        background: transparent;
+    }
+}
+
+.action-detail-tabs-external .action-detail-tab {
+    min-width: 13rem;
+    border-radius: 0.6rem;
+}
+
+.action-workspace-summary {
+    display: none !important;
+}
+
+/* Les trois blocs opérationnels partagent une même ligne et une même largeur. */
+.action-compact-row {
+    display: grid;
+    grid-column: 2;
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr);
+    align-self: start;
+    margin-top: 0 !important;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.action-compact-row > [data-action-tab-panel] {
+    grid-column: auto !important;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    margin-bottom: 0 !important;
+    overflow: hidden;
+}
+
+/* Keep the right column readable: one outer surface per block, with compact
+   inner controls instead of cards nested inside cards. */
+.action-main-layout #action-echeances > div.grid.gap-4 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.65rem !important;
+    margin-top: 0.75rem !important;
+}
+
+.action-main-layout #action-echeances .deadline-request-form-card {
+    padding: 0.65rem !important;
+    border: 1px solid #dbe7f1;
+    border-radius: 0.7rem;
+    background: #f8fbfe;
+    box-shadow: none;
+}
+
+.action-main-layout #action-echeances .form-section-title {
+    margin-bottom: 0.35rem !important;
+}
+
+.action-main-layout #action-echeances :where(input, select, textarea) {
+    min-height: 2.2rem;
+}
+
+.action-main-layout #action-echeances textarea {
+    min-height: 4rem;
+}
+
+.action-compact-row > [data-action-tab-panel] .showcase-panel-title {
+    margin-bottom: 0.55rem;
+    font-size: 0.96rem;
+}
+
+.action-compact-row > [data-action-tab-panel] > .justificatif-card {
+    min-width: 0;
+}
+
+.action-main-primary .justificatif-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.action-main-primary .justificatif-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem;
+}
+
+.justificatif-action-disabled {
+    cursor: not-allowed;
+    border: 1px solid #dbe7f1;
+    border-radius: 0.75rem;
+    background: #f3f6f9;
+    padding: 0.4rem 0.65rem;
+    color: #8a9aaa;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.justificatif-state-message,
+.justificatif-action-status {
+    color: #70839a;
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+
+.action-main-primary .justificatif-state-message {
+    grid-column: 2 / -1;
+    margin: -0.2rem 0 0;
+}
+
+@media (max-width: 700px) {
+    .action-main-primary .justificatif-card {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .action-main-primary .justificatif-card-actions,
+    .action-main-primary .justificatif-state-message {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+    }
+}
+
+.action-compact-row .showcase-inline-stat.action-detail-card {
+    padding: 0.7rem !important;
+    border: 1px solid rgb(57 150 211 / 16%);
+    box-shadow: none;
+}
+
+.action-compact-row .mt-4.grid {
+    margin-top: 0.65rem !important;
+    gap: 0.5rem !important;
+    grid-template-columns: 1fr !important;
+}
+
+.action-compact-row form.space-y-3 > :where(div, button) + :where(div, button) {
+    margin-top: 0.5rem;
+}
+
+.action-compact-row label {
+    margin-bottom: 0.2rem;
+}
+
+@media (max-width: 1100px) {
+    .action-main-primary {
+        position: static;
+        grid-row: auto;
+    }
+
+    .action-compact-row {
+        position: static;
+        grid-column: 1 / -1;
+        grid-row: auto;
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 700px) {
+    .action-compact-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 1100px) {
+    .action-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+    .action-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .action-detail-tabs-external .action-detail-tab { min-width: 0; flex: 1 1 100%; }
+}
+
+@media (max-width: 480px) {
+    .action-kpi-grid { grid-template-columns: 1fr; }
+}
+
+/* Keep the operational sidebar as one compact vertical rail.  The wrapper
+   must remain a grid item; `display: contents` made the three panels compete
+   with the main column and left an empty cell beside the journal. */
+.action-compact-row {
+    display: flex !important;
+    flex-direction: column;
+    grid-column: 2 !important;
+    grid-row: 2;
+    align-self: start;
+    min-width: 0;
+    gap: 0.75rem;
+}
+
+.action-compact-row > [data-action-tab-panel] {
+    width: 100%;
+    height: auto;
+    flex: 0 0 auto;
+    margin-bottom: 0 !important;
+}
+
+.action-main-layout #action-logs {
+    grid-column: 1 / -1;
+}
+
+/* The request card owns the whole sidebar width; generic form max-width rules
+   otherwise leave a narrow form inside a much wider panel. */
+.action-main-layout #action-echeances .deadline-request-form-card,
+.action-main-layout #action-echeances .deadline-request-form-card form {
+    width: 100%;
+    max-width: none !important;
+}
+
+.action-main-layout #action-echeances,
+.action-main-layout #action-echeances > .mt-4.grid,
+.action-main-layout #action-echeances .deadline-request-form-card {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.action-main-layout #action-echeances .deadline-request-form-card {
+    align-self: stretch;
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 1100px) {
+    .action-compact-row {
+        grid-column: 1 / -1 !important;
+        grid-row: auto;
+    }
+}
+
+@media (max-width: 900px) {
+    .action-compact-row {
+        grid-column: 1 !important;
+    }
+}
+
+/* Desktop sidebar contract: the rail is compact at rest and expands from the
+   pointer hover. Keep this contract here, after the legacy shell overrides,
+   so the final loaded stylesheet cannot leave the navigation permanently
+   expanded or hide its labels while the rail is open. */
+@media (min-width: 64rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-collapsed-width) !important;
+        transition: padding-left 180ms ease !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar,
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .app-sidebar {
+        width: var(--app-sidebar-collapsed-width) !important;
+        min-width: var(--app-sidebar-collapsed-width) !important;
+        max-width: var(--app-sidebar-collapsed-width) !important;
+        transition: width 180ms ease, min-width 180ms ease, max-width 180ms ease, box-shadow 180ms ease !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]),
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar,
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded .app-sidebar {
+        width: var(--app-sidebar-width) !important;
+        min-width: var(--app-sidebar-width) !important;
+        max-width: var(--app-sidebar-width) !important;
+        box-shadow: 16px 0 32px rgb(15 47 87 / 16%) !important;
+    }
+
+    /* A stale body class must never keep the rail open after the pointer has
+       left it. The direct :not(:hover) selector intentionally outranks the
+       compatibility class above; keyboard expansion remains available through
+       the explicit data attribute. */
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]),
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded .app-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) {
+        width: var(--app-sidebar-collapsed-width) !important;
+        min-width: var(--app-sidebar-collapsed-width) !important;
+        max-width: var(--app-sidebar-collapsed-width) !important;
+        box-shadow: none !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) ~ :where(.app-main, .admin-content-shell),
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) ~ :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-collapsed-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ) {
+        width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ),
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ) {
+        width: auto !important;
+        max-width: none !important;
+        margin: revert !important;
+        padding: revert !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ) {
+        width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar :where(.app-sidebar-link, .app-sidebar-logout) {
+        justify-content: center !important;
+        gap: 0 !important;
+        padding-inline: 0.35rem !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) :where(.app-sidebar-link, .app-sidebar-logout),
+    body.admin-theme-scope[data-ui-version="institutional-v2"].sidebar-desktop-expanded #admin-sidebar :where(.app-sidebar-link, .app-sidebar-logout) {
+        justify-content: flex-start !important;
+        gap: 0.7rem !important;
+        padding-inline: 0.8rem !important;
+    }
+}
+
+/* Absolute final compact state: the legacy desktop full-width selector must
+   lose whenever the pointer and keyboard focus are outside the rail. */
+@media (min-width: 64rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]),
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar {
+        width: var(--app-sidebar-collapsed-width) !important;
+        min-width: var(--app-sidebar-collapsed-width) !important;
+        max-width: var(--app-sidebar-collapsed-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) ~ :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-collapsed-width) !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge,
+        .app-sidebar-logo-full
+    ) {
+        width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+}
+
+/* Shared KPI contract ----------------------------------------------------
+   Workspace screens used several historical statistic-card variants. Keep
+   their visual language and interaction consistent through one contract:
+   equal height, predictable internal spacing, readable left alignment and a
+   responsive grid that does not create narrow cards or horizontal overflow.
+   The selector is scoped to the institutional shell so public/auth screens
+   keep their own presentation. */
+body.admin-theme-scope[data-ui-version="institutional-v2"] {
+    /* The dashboard command cards are the reference KPI scale across the
+       workspace: keep the same vertical rhythm everywhere. */
+    --app-kpi-height: 10.25rem;
+    --app-kpi-radius: 0.875rem;
+    --app-kpi-padding: 1rem;
+    --app-kpi-gap: 0.875rem;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .dashboard-primary-kpi-card,
+    .reporting-hub-kpi,
+    .reco-metric-card,
+    .action-kpi-card
+) {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: var(--app-kpi-height) !important;
+    height: 100%;
+    align-items: stretch !important;
+    justify-content: space-between !important;
+    gap: 0.7rem;
+    padding: var(--app-kpi-padding) !important;
+    border-radius: var(--app-kpi-radius) !important;
+    text-align: left !important;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+    .stat-card-grid,
+    .app-kpi-grid,
+    .showcase-summary-grid,
+    .app-screen-kpis,
+    .dashboard-command-kpi-grid,
+    .action-kpi-grid
+) {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    align-items: stretch;
+    gap: var(--app-kpi-gap) !important;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+    .stat-card-grid,
+    .app-kpi-grid,
+    .showcase-summary-grid,
+    .app-screen-kpis,
+    .dashboard-command-kpi-grid,
+    .action-kpi-grid
+) > :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .reporting-hub-kpi,
+    .reco-metric-card,
+    .action-kpi-card
+) {
+    width: 100% !important;
+    max-width: none !important;
+    flex: none !important;
+}
+
+/* Mes tâches can expose only « À traiter » when the other counters are zero.
+   Keep that single actionable card in the same compact column rhythm instead
+   of allowing auto-fit to stretch it across the entire panel. */
+body.admin-theme-scope[data-ui-version="institutional-v2"] .personal-task-kpi-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    justify-content: stretch;
+}
+
+@media (max-width: 95rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .personal-task-kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (max-width: 64rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .personal-task-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .dashboard-primary-kpi-card,
+    .reporting-hub-kpi,
+    .reco-metric-card
+) :where(
+    .stat-card-label,
+    .eas-stat-card-label,
+    .showcase-kpi-label,
+    .dashboard-summary-label,
+    .reco-metric-label
+) {
+    display: -webkit-box;
+    min-width: 0;
+    min-height: 2.35em;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    text-align: left !important;
+    text-overflow: ellipsis;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .reporting-hub-kpi,
+    .reco-metric-card
+) :where(
+    .stat-card-value,
+    .eas-stat-card-value,
+    .showcase-kpi-number,
+    .dashboard-summary-value,
+    .dashboard-primary-kpi-value,
+    .dashboard-summary-number,
+    .reco-metric-value
+) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1 !important;
+    text-align: left !important;
+}
+
+body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .reporting-hub-kpi,
+    .reco-metric-card,
+    .action-kpi-card
+) :where(.showcase-kpi-meta, .eas-stat-card-meta, .stat-card-meta, .dashboard-summary-meta, .reco-metric-description, small) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    text-align: left !important;
+}
+
+@media (max-width: 95rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+        .stat-card-grid,
+        .app-kpi-grid,
+        .showcase-summary-grid,
+        .app-screen-kpis,
+        .dashboard-command-kpi-grid,
+        .action-kpi-grid
+    ) {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (max-width: 64rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+        .stat-card-grid,
+        .app-kpi-grid,
+        .showcase-summary-grid,
+        .app-screen-kpis,
+        .dashboard-command-kpi-grid,
+        .action-kpi-grid
+    ) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .reporting-hub-kpi,
+    .reco-metric-card,
+    .action-kpi-card
+) {
+    border-color: #27445f !important;
+    background: #0c1626 !important;
+    color: #e5f1fb !important;
+}
+
+@media (max-width: 47.99rem) {
+    body.admin-theme-scope[data-ui-version="institutional-v2"] {
+        --app-kpi-height: 7.25rem;
+        --app-kpi-padding: 0.875rem;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] .personal-task-kpi-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    body.admin-theme-scope[data-ui-version="institutional-v2"] :where(
+        .stat-card,
+        .stat-card-link,
+        .app-stat-card,
+        .eas-stat-card,
+        .showcase-kpi-card,
+        .dealdeck-kpi-card,
+        .anbg-kpi-stat-card,
+        .dashboard-summary-card,
+        .reporting-hub-kpi,
+        .reco-metric-card,
+        .action-kpi-card
+    ) {
+        min-height: var(--app-kpi-height) !important;
     }
 }

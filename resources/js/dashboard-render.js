@@ -977,6 +977,30 @@ function bootDashboardRender(force = false) {
     return Array.isArray(chartData.labels) && chartData.labels.length > 0;
   }
 
+  // Chart.js accepte un jeu de donnees compose uniquement de zeros, mais il
+  // ne dessine alors aucune barre, aucun secteur et une ligne confondue avec
+  // l'axe. La carte semble vide alors que le rendu fonctionne correctement.
+  // Ces donnees doivent etre presentees comme un etat explicite afin de
+  // distinguer l'absence de valeur d'un probleme de chargement du graphique.
+  function chartConfigHasVisibleData(config) {
+    const datasets = Array.isArray(config?.data?.datasets) ? config.data.datasets : [];
+
+    return datasets.some((dataset) => {
+      if (!Array.isArray(dataset?.data)) {
+        return false;
+      }
+
+      return dataset.data.some((value) => {
+        const candidate = value && typeof value === 'object'
+          ? (value.y ?? value.v ?? value.value ?? value.x)
+          : value;
+        const numeric = Number(candidate);
+
+        return Number.isFinite(numeric) && Math.abs(numeric) > 0.0001;
+      });
+    });
+  }
+
   function chartHostIsRenderable(host) {
     if (!(host instanceof HTMLElement) || !host.isConnected) {
       return false;
@@ -1127,6 +1151,15 @@ function bootDashboardRender(force = false) {
 
     if (!chartConfigHasData(config)) {
       restoreHostFallback(host);
+      return;
+    }
+
+    if (!chartConfigHasVisibleData(config)) {
+      mountChartEmptyState(
+        host,
+        host.dataset.emptyZeroMessage
+          || 'Toutes les valeurs sont à 0 pour le périmètre et la période sélectionnés.'
+      );
       return;
     }
 

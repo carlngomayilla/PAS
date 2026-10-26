@@ -6926,6 +6926,12 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
 
     .chart-disclosure-collapsed .chart-disclosure-body {
         max-height: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        border-top-width: 0 !important;
+        border-bottom-width: 0 !important;
         opacity: 0;
         margin-top: 0 !important;
         pointer-events: none;
@@ -7094,6 +7100,12 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
 
     body.admin-theme-scope .chart-disclosure-collapsed .chart-disclosure-body {
         max-height: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        border-top-width: 0 !important;
+        border-bottom-width: 0 !important;
         opacity: 0 !important;
         margin-top: 0 !important;
         transform: translateY(-0.25rem);

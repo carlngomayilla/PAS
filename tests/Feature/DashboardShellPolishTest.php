@@ -59,12 +59,26 @@ class DashboardShellPolishTest extends TestCase
         $this->assertStringContainsString('.app-sidebar-logo-flame', $styles);
         $this->assertStringContainsString('transform: translate(42%, -42%)', $styles);
         $this->assertStringContainsString('syncDesktopSidebarLayout', $script);
+        $this->assertStringNotContainsString('admin-sidebar-collapse', $script);
+        $this->assertStringNotContainsString('pas.sidebar-collapsed', $script);
         $this->assertStringContainsString("sidebar.addEventListener('mouseenter'", $script);
         $this->assertStringContainsString("'Menu' => 10", $sidebar);
         $this->assertStringContainsString("'Plateforme' => 60", $sidebar);
         $this->assertStringContainsString('aria-label="{{ $item[\'label\'] }}"', $sidebar);
         $this->assertStringContainsString('class="min-w-0 flex-1 break-words"', $sidebar);
         $this->assertStringContainsString('overflow-wrap: anywhere !important;', $styles);
+    }
+
+    public function test_desktop_sidebar_keeps_its_labels_and_content_offset_aligned(): void
+    {
+        $styles = (string) file_get_contents(resource_path('css/ui-system.css'));
+
+        $this->assertStringContainsString('padding-left: var(--app-sidebar-width) !important;', $styles);
+        $this->assertStringContainsString('width: var(--app-sidebar-width) !important;', $styles);
+        $this->assertStringContainsString('.app-sidebar-logo-full', $styles);
+        $this->assertStringContainsString('opacity: 1 !important;', $styles);
+        $this->assertStringContainsString('visibility: visible !important;', $styles);
+        $this->assertStringContainsString('sidebar-desktop-expanded', $styles);
     }
 
     public function test_import_and_reporting_navigation_are_unified_with_internal_tabs(): void
