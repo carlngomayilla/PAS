@@ -24,18 +24,6 @@ class UserWorkspaceService
     {
         $specRole = $this->specSidebarRole($user);
         $modules = $this->modulesForSpecRole($specRole, $user);
-        if ($user->hasPermission('reporting.read')) {
-            $modules[] = [
-                'code' => 'institutional_reports',
-                'label' => 'Rapports institutionnels',
-                'description' => 'Rapports périodiques, pièces justificatives et circuit de vérification',
-                'endpoint' => '/workspace/rapports',
-                'can_write' => ! $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE),
-                'actions' => $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE)
-                    ? ['Consulter']
-                    : ['Consulter', 'Déposer un rapport'],
-            ];
-        }
         $modules = array_values(array_filter(
             $modules,
             fn (array $module): bool => $this->moduleAllowedByPermissions($module, $user)
@@ -535,7 +523,7 @@ class UserWorkspaceService
                 User::ROLE_CHEF_UNITE_SCIQ
             ),
             'ai_reports' => $user->hasPermission('ai_reports.view'),
-            'institutional_reports', 'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
+            'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
             'financements_critiques' => $user->hasPermission('alerts.read'),
             'audit' => $user->hasPermission('audit.read'),
             'referentiel', 'roles_permissions', 'organisation' => $user->hasAnyPermission(

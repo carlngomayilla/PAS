@@ -6,7 +6,6 @@ test('actions et rapports restent utilisables sur petit écran', async ({ page }
     await login(page, { email: 'super.admin.e2e@example.test', password });
     const screens = [
         ['actions', '/workspace/actions', '.action-list-workspace'],
-        ['rapports', '/workspace/rapports', '.reports-workspace'],
         ['reporting', '/workspace/reporting', '.reports-workspace'],
         ['conformite', '/workspace/reporting?report_type=conformite', '.reports-workspace'],
         ['pta-officiel', '/workspace/reporting?report_type=pta', '.reports-workspace'],

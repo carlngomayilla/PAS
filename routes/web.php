@@ -18,7 +18,6 @@ use App\Http\Controllers\Web\FinancialMonitoringWebController;
 use App\Http\Controllers\Web\GlobalSearchWebController;
 use App\Http\Controllers\Web\GovernanceWebController;
 use App\Http\Controllers\Web\HistoricalExecutionImportWebController;
-use App\Http\Controllers\Web\InstitutionalReportWebController;
 use App\Http\Controllers\Web\KpiMesureWebController;
 use App\Http\Controllers\Web\KpiWebController;
 use App\Http\Controllers\Web\MonitoringWebController;
@@ -142,26 +141,11 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::get('/workspace/mes-taches', [PersonalTaskWebController::class, 'index'])
             ->name('workspace.tasks.index');
 
-        foreach (['reunions', 'ai-imports'] as $retiredModule) {
+        foreach (['reunions', 'ai-imports', 'rapports'] as $retiredModule) {
             Route::any('/workspace/'.$retiredModule.'/{path?}', static function (): never {
                 abort(410, 'Ce module a été retiré de l’application.');
             })->where('path', '.*');
         }
-
-        Route::get('/workspace/rapports', [InstitutionalReportWebController::class, 'index'])
-            ->name('workspace.reports.index');
-        Route::post('/workspace/rapports', [InstitutionalReportWebController::class, 'store'])
-            ->name('workspace.reports.store');
-        Route::get('/workspace/rapports/{institutionalReport}', [InstitutionalReportWebController::class, 'show'])
-            ->name('workspace.reports.show');
-        Route::post('/workspace/rapports/{institutionalReport}/soumettre', [InstitutionalReportWebController::class, 'submit'])
-            ->name('workspace.reports.submit');
-        Route::post('/workspace/rapports/{institutionalReport}/corriger', [InstitutionalReportWebController::class, 'resubmit'])
-            ->name('workspace.reports.resubmit');
-        Route::post('/workspace/rapports/{institutionalReport}/verification', [InstitutionalReportWebController::class, 'review'])
-            ->name('workspace.reports.review');
-        Route::get('/workspace/rapports/{institutionalReport}/pieces/{justificatif}/telecharger', [InstitutionalReportWebController::class, 'download'])
-            ->name('workspace.reports.attachments.download');
 
         // ── RÉFÉRENTIEL (Directions, Services, Utilisateurs) ──────────────────────
         // Gestion des structures organisationnelles accessibles aux administrateurs.

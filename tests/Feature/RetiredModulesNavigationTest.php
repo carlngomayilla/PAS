@@ -24,15 +24,13 @@ class RetiredModulesNavigationTest extends TestCase
             $this->assertFalse($modules->contains('code', 'ai_imports'), $role);
             $this->assertFalse($modules->contains('endpoint', '/workspace/reunions'), $role);
             $this->assertFalse($modules->contains('endpoint', '/workspace/ai-imports/pta'), $role);
-            if ($user->hasPermission('reporting.read')) {
-                $this->assertSame('/workspace/rapports', $modules->firstWhere('code', 'institutional_reports')['endpoint']);
-            }
+            $this->assertFalse($modules->contains('code', 'institutional_reports'), $role);
         }
     }
 
     public function test_old_published_settings_cannot_restore_retired_modules(): void
     {
-        foreach (['reports', 'ai_imports'] as $code) {
+        foreach (['reports', 'ai_imports', 'institutional_reports'] as $code) {
             PlatformSetting::query()->create([
                 'group' => 'workspace_modules',
                 'key' => 'workspace_module_'.$code,
@@ -42,9 +40,11 @@ class RetiredModulesNavigationTest extends TestCase
         $settings = app(WorkspaceModuleSettings::class);
         $this->assertArrayNotHasKey('reports', $settings->all());
         $this->assertArrayNotHasKey('ai_imports', $settings->all());
+        $this->assertArrayNotHasKey('institutional_reports', $settings->all());
         $this->assertSame([], $settings->applyToModules([
             ['code' => 'reports', 'endpoint' => '/workspace/reunions'],
             ['code' => 'ai_imports', 'endpoint' => '/workspace/ai-imports/pta'],
+            ['code' => 'institutional_reports', 'endpoint' => '/workspace/rapports'],
         ]));
     }
 
@@ -52,7 +52,7 @@ class RetiredModulesNavigationTest extends TestCase
     {
         $user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN, 'is_active' => true]);
         $this->actingAs($user);
-        foreach (['/workspace/reunions', '/workspace/reunions/1/pv', '/workspace/ai-imports', '/workspace/ai-imports/pta/1/import'] as $path) {
+        foreach (['/workspace/reunions', '/workspace/reunions/1/pv', '/workspace/ai-imports', '/workspace/ai-imports/pta/1/import', '/workspace/rapports', '/workspace/rapports/1', '/workspace/rapports/1/pieces/1/telecharger'] as $path) {
             foreach (['GET', 'POST', 'PATCH', 'DELETE'] as $method) {
                 $this->call($method, $path)->assertStatus(410);
             }
@@ -60,11 +60,11 @@ class RetiredModulesNavigationTest extends TestCase
         $this->assertFalse(Route::has('workspace.meetings.index'));
         $this->assertFalse(Route::has('workspace.ai-imports.pta.import'));
         $this->assertTrue(Route::has('workspace.imports.index'));
-        $this->assertTrue(Route::has('workspace.reports.index'));
+        $this->assertFalse(Route::has('workspace.reports.index'));
         $this->assertTrue(Route::has('workspace.ai-reports.index'));
     }
 
-    public function test_sidebar_keeps_standard_imports_and_institutional_reports_without_retired_links(): void
+    public function test_sidebar_keeps_standard_imports_and_hides_removed_institutional_reports(): void
     {
         $user = User::factory()->create(['role' => User::ROLE_PLANIFICATION, 'is_active' => true]);
         $this->actingAs($user);
@@ -72,7 +72,8 @@ class RetiredModulesNavigationTest extends TestCase
             'modules' => app(UserWorkspaceService::class)->modulesFor($user),
         ]);
         $this->assertStringContainsString('/workspace/imports-excel', $html);
-        $this->assertStringContainsString('/workspace/rapports', $html);
+        $this->assertStringNotContainsString('/workspace/rapports', $html);
+        $this->assertStringNotContainsString('Rapports institutionnels', $html);
         $this->assertStringNotContainsString('/workspace/reunions', $html);
         $this->assertStringNotContainsString('/workspace/ai-imports', $html);
     }

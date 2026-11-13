@@ -33,14 +33,13 @@
         'workflows' => 'workflow',
         'imports_excel' => 'docs',
         'ai_reports' => 'reporting',
-        'institutional_reports' => 'reporting',
         default => $code,
     };
     $moduleSection = static fn (string $code): string => match ($code) {
         'mes_taches', 'notifications' => 'Menu',
         'pas', 'pao', 'pta', 'imports_excel' => 'Planification',
         'execution', 'mes_actions', 'corrections', 'validations', 'agents', 'services_agents', 'controle', 'financement' => 'Exécution',
-        'reporting', 'institutional_reports', 'ai_reports', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
+        'reporting', 'ai_reports', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
         'super_admin' => 'Plateforme',
         default => 'Administration',
     };
@@ -181,17 +180,6 @@
     }
 
     $pilotageItems = [];
-    if ($canSeeModule('institutional_reports')) {
-        $pilotageItems[] = [
-            'code' => 'institutional_reports',
-            'label' => $moduleLabel('institutional_reports', 'Rapports institutionnels'),
-            'route' => 'workspace.reports.index',
-            'icon' => 'reporting',
-            'patterns' => ['workspace.reports.*'],
-            'badge' => (int) ($moduleBadges['institutional_reports'] ?? 0),
-            'display_order' => $moduleOrder('institutional_reports', 71),
-        ];
-    }
     $visibleReportingModuleCodes = collect(['reporting', 'ai_reports'])
         ->filter(fn (string $code): bool => $canSeeModule($code))
         ->values()
