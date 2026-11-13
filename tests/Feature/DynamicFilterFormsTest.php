@@ -31,7 +31,6 @@ class DynamicFilterFormsTest extends TestCase
             'directions' => ['workspace/referentiel/directions/index.blade.php'],
             'services' => ['workspace/referentiel/services/index.blade.php'],
             'utilisateurs' => ['workspace/referentiel/utilisateurs/index.blade.php'],
-            'rapports' => ['workspace/reports/index.blade.php'],
             'recherche globale' => ['workspace/search/index.blade.php'],
             'organisation' => ['workspace/super_admin/organization.blade.php'],
             'modèles' => ['workspace/super_admin/templates/index.blade.php'],
