@@ -47,12 +47,19 @@ class ReportingReportCatalogTest extends TestCase
     {
         $admin = $this->createAdminUser();
 
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->get(route('workspace.reporting', ['report_type' => 'pta']))
             ->assertOk()
             ->assertSee('reporting-advanced-filters', false)
             ->assertSee('data-pta-modal', false)
             ->assertSee("Détail de l'action et des preuves", false);
+
+        $document = new \DOMDocument;
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+        $xpath = new \DOMXPath($document);
+        $this->assertSame('pta', $xpath->evaluate('string(//form[contains(@class,"reports-filter-form")]/input[@name="report_type"]/@value)'));
+        $this->assertSame(1, $xpath->query('//form[@method="GET" and contains(@class,"reports-filter-form")]//button[@type="submit"]')->length);
+        $this->assertSame(1, $xpath->query('//form[contains(@class,"reports-filter-form")]//details[@data-reporting-advanced-filters]')->length);
     }
 
     public function test_excel_export_can_target_financing_report_only(): void

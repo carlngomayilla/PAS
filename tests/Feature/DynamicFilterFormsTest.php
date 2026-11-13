@@ -40,7 +40,7 @@ class DynamicFilterFormsTest extends TestCase
     }
 
     #[DataProvider('filterViewProvider')]
-    public function test_filter_forms_are_dynamic_and_have_no_execution_button(string $relativePath): void
+    public function test_filter_forms_remain_dynamic_read_only_get_requests(string $relativePath): void
     {
         $view = (string) file_get_contents(resource_path('views/'.$relativePath));
         preg_match_all(
@@ -52,11 +52,12 @@ class DynamicFilterFormsTest extends TestCase
         $this->assertNotEmpty($matches[0], 'Aucun formulaire dynamique trouvé dans '.$relativePath);
 
         foreach ($matches[0] as $form) {
-            $this->assertDoesNotMatchRegularExpression(
-                '/<(?:button|input)\b[^>]*\btype=["\']submit["\']/i',
+            $this->assertMatchesRegularExpression(
+                '/<form\b[^>]*\bmethod=["\']get["\']/i',
                 $form,
-                'Un bouton d’exécution subsiste dans '.$relativePath,
+                'Les filtres doivent rester une requête GET dans '.$relativePath,
             );
+            $this->assertMatchesRegularExpression('/<(?:input|select)\b[^>]*\bname=/i', $form);
         }
     }
 

@@ -11,6 +11,37 @@ class NotificationWebTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_notification_filters_remain_submittable_and_preserve_read_state(): void
+    {
+        $user = User::factory()->create(['role' => User::ROLE_SERVICE]);
+        $this->actingAs($user)->get(route('workspace.notifications.index'))
+            ->assertOk()->assertSee('Aucune notification pour le moment');
+        $user->notify(new WorkspaceModuleNotification([
+            'title' => 'Suivi à examiner',
+            'message' => 'Une information du module actions.',
+            'module' => 'actions',
+            'url' => route('workspace.actions.index'),
+        ]));
+
+        $response = $this->actingAs($user)->get(route('workspace.notifications.index', [
+            'q' => 'Suivi', 'etat' => 'unread', 'module' => 'actions', 'per_page' => 25,
+        ]))->assertOk();
+
+        $document = new \DOMDocument;
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+        $xpath = new \DOMXPath($document);
+        $form = '//form[@aria-label="Filtres des notifications"]';
+        $this->assertSame(1, $xpath->query($form.'//button[@type="submit"]')->length);
+        $this->assertSame('GET', $xpath->query($form)->item(0)->getAttribute('method'));
+        $this->assertSame('Suivi', $xpath->query($form.'//input[@name="q"]')->item(0)->getAttribute('value'));
+        $this->assertSame('unread', $xpath->query($form.'//select[@name="etat"]/option[@selected]')->item(0)->getAttribute('value'));
+        $this->assertSame('actions', $xpath->query($form.'//select[@name="module"]/option[@selected]')->item(0)->getAttribute('value'));
+        $this->assertSame('25', $xpath->query($form.'//select[@name="per_page"]/option[@selected]')->item(0)->getAttribute('value'));
+        $this->assertNull($user->notifications()->firstOrFail()->read_at);
+        $this->get(route('workspace.notifications.index', ['q' => 'introuvable']))
+            ->assertOk()->assertSee('Aucune notification dans cette vue');
+    }
+
     public function test_user_can_open_notification_and_mark_it_as_read(): void
     {
         $user = User::factory()->create([

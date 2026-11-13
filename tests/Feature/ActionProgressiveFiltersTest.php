@@ -6,10 +6,12 @@ use App\Models\Direction;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CreatesAiPtaFixtures;
 use Tests\TestCase;
 
 class ActionProgressiveFiltersTest extends TestCase
 {
+    use CreatesAiPtaFixtures;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -35,6 +37,8 @@ class ActionProgressiveFiltersTest extends TestCase
         $this->assertSame('Dossiers', $document->query('//input[@name="q"]')->item(0)->getAttribute('value'));
         $this->assertSame(4, $document->query('//div[contains(@class,"action-primary-filter-grid")]/div')->length);
         $this->assertSame(1, $document->query('//form[@method="GET" and @data-auto-filter-form]')->length);
+        $this->assertSame(1, $document->query('//form[@method="GET" and @data-auto-filter-form]//button[@type="submit"]')->length);
+        $this->assertSame(route('workspace.actions.index'), $document->query('//form[@data-auto-filter-form]')->item(0)->getAttribute('action'));
         $this->assertSame(0, $document->query('//span[@class="action-advanced-filter-count"]')->length);
         $this->assertSame(1, $document->query('//table[contains(@class,"action-list-table")]')->length);
     }
@@ -78,6 +82,31 @@ class ActionProgressiveFiltersTest extends TestCase
         $this->assertSame('validations', $document->query('//form[@data-auto-filter-form]/input[@name="vue"]')->item(0)->getAttribute('value'));
         $this->assertTrue($document->query('//details[@data-action-advanced-filters]')->item(0)->hasAttribute('open'));
         $this->assertSame('1 actif', trim($document->query('//span[@class="action-advanced-filter-count"]')->item(0)->textContent));
+    }
+
+    public function test_tablet_cards_keep_validation_and_evidence_context_available_until_desktop(): void
+    {
+        $fixture = $this->createReportFixture();
+        $user = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'password_changed_at' => now(),
+        ]);
+        $this->actingAs($user);
+
+        $response = $this->get(route('workspace.actions.index', [
+            'q' => $fixture['action']->libelle,
+            'annee' => 2026,
+        ]))->assertOk();
+        $document = $this->document($response->getContent());
+        $context = $document->query('//details[@data-action-mobile-context]')->item(0);
+        $this->assertNotNull($context);
+        $this->assertStringContainsString('lg:hidden', $context->getAttribute('class'));
+        $this->assertStringNotContainsString('sm:hidden', $context->getAttribute('class'));
+        $this->assertStringContainsString('Justificatif :', $context->textContent);
+        $this->assertStringContainsString('Validation :', $context->textContent);
+        $this->assertSame(1, $document->query('//td[@data-label="Action"]/div[contains(@class,"hidden lg:block")]')->length);
     }
 
     private function document(string $html): \DOMXPath

@@ -115,6 +115,17 @@
     $pilotDashboardRoles = ['global', 'admin', 'super_admin', 'dg', 'cabinet', 'planification', 'suivi_evaluation'];
     $showDirectionSynthesisSelector = ($directionSelector['enabled'] ?? false)
         && in_array($dashboardRole, $pilotDashboardRoles, true);
+    $additionalSynthesisFilterValues = [
+        ...($showDirectionSynthesisSelector ? [$selectedSynthesisService, $selectedSynthesisRmo] : []),
+        $synthesisFilters['statut_action'] ?? 'all',
+        $synthesisFilters['statut_suivi'] ?? 'all',
+        $synthesisFilters['statut_delai'] ?? 'all',
+        $synthesisFilters['alerte_echeance'] ?? 'all',
+    ];
+    $activeAdditionalSynthesisFilters = count(array_filter(
+        $additionalSynthesisFilterValues,
+        fn (mixed $value): bool => $value !== null && $value !== '' && $value !== 'all',
+    ));
     $availableDashboardTabs = [
         'overview' => 'Pilotage',
         'advanced' => 'Tableaux',
@@ -720,34 +731,14 @@
         data-auto-filter-form
         data-form-layout="wide"
         data-dashboard-synthesis-filter-form
-        data-mobile-collapsed="true"
         data-services-url-template="{{ route('synthese.services-by-direction', ['direction' => '__DIRECTION__']) }}"
         data-responsibles-url="{{ route('synthese.responsibles') }}"
     >
         <input type="hidden" name="dashboardTab" value="{{ $currentDashboardTab }}">
-        <button
-            type="button"
-            class="dashboard-filter-toggle"
-            data-dashboard-filter-toggle
-            aria-expanded="false"
-            aria-controls="dashboard-filter-fields"
-        >
-            <span class="dashboard-filter-toggle-icon" aria-hidden="true">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M7 12h10M10 18h4" />
-                </svg>
-            </span>
-            <span>
-                <strong>Filtres de pilotage</strong>
-                <small>{{ $directionSelector['selected_label'] ?? 'Pilotage global' }} · {{ $exerciseFilter['label'] ?? 'Exercice courant' }}</small>
-            </span>
-            <span class="dashboard-filter-toggle-chevron" aria-hidden="true"></span>
-        </button>
-
         <div id="dashboard-filter-fields" data-dashboard-filter-fields>
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-9">
+        <div class="dashboard-primary-filters grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3" data-dashboard-primary-filters>
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
-                Annee
+                Année
                 <select name="exercice" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
                     @foreach ($synthesisExerciseOptions as $option)
                         <option value="{{ $option['value'] }}" @selected((string) $selectedSynthesisYear === (string) $option['value'])>{{ $option['label'] }}</option>
@@ -772,6 +763,17 @@
                         @endforeach
                     </select>
                 </label>
+            @endif
+        </div>
+        <details class="dashboard-secondary-filters mt-3 rounded-xl border border-slate-200 p-3" data-dashboard-additional-filters @if ($activeAdditionalSynthesisFilters > 0) open @endif>
+            <summary class="cursor-pointer text-sm font-semibold text-[#17324a] focus-visible:outline-2 focus-visible:outline-offset-4">
+                Plus de filtres
+                @if ($activeAdditionalSynthesisFilters > 0)
+                    <span class="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-900" data-dashboard-active-filter-count>{{ $activeAdditionalSynthesisFilters }} actif(s)</span>
+                @endif
+            </summary>
+            <div class="dashboard-additional-filter-grid mt-3 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3" data-dashboard-additional-filter-fields>
+            @if ($showDirectionSynthesisSelector)
                 <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
                     Service
                     <select name="service_id" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]" data-synthesis-service-select @disabled($selectedSynthesisDirection === '' || $selectedSynthesisDirection === 'all')>
@@ -823,7 +825,8 @@
                     @endforeach
                 </select>
             </label>
-        </div>
+            </div>
+        </details>
         <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
             <div class="text-xs font-semibold text-[#667085]">
                 {{ $directionSelector['selected_label'] ?? 'Pilotage global' }} | {{ $directionSelector['service_selected_label'] ?? 'Tous les services' }} | {{ $exerciseFilter['label'] ?? 'Exercice courant' }}

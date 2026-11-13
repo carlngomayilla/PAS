@@ -73,7 +73,7 @@ class QueueOperationsConfigurationTest extends TestCase
         $this->assertStringContainsString('APP_KEY est absent ou vide', $deployment);
         $this->assertStringContainsString('verify_vite_assets()', $deployment);
         $this->assertStringContainsString('public/build/manifest.json', $deployment);
-        $this->assertStringContainsString('resources/css/ui-system.css', $deployment);
+        $this->assertStringContainsString('resources/css/app.css', $deployment);
         $this->assertStringContainsString('resources/js/app.js', $deployment);
         $this->assertStringContainsString('npm run build', $deployment);
         $this->assertStringContainsString('verification des assets front existants', $deployment);

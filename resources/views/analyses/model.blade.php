@@ -11,10 +11,9 @@
 
 @section('title', 'Analyse — état du modèle')
 
-@push('styles')
+@push('head')
     <link rel="stylesheet" href="{{ asset('css/analyse-model.css') }}">
 @endpush
-
 @section('content')
 
 <div class="app">

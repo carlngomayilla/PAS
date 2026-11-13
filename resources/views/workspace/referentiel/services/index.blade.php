@@ -8,15 +8,15 @@
         $filters = is_array($filters ?? null) ? $filters : [];
         $exportFilters = collect($filters)->except('page')->filter(static fn ($value): bool => $value !== null && $value !== '')->all();
         $metrics = [
-            ['label' => 'Services', 'value' => (int) ($summary['total'] ?? 0), 'tone' => 'border-[#17324a] text-[#17324a] dark:border-sky-200 dark:text-sky-100'],
-            ['label' => 'Actifs', 'value' => (int) ($summary['actifs'] ?? 0), 'tone' => 'border-[#5D8E25] text-[#4B741E] dark:border-lime-400 dark:text-lime-200'],
-            ['label' => 'Inactifs', 'value' => (int) ($summary['inactifs'] ?? 0), 'tone' => 'border-[#B42318] text-[#9B1C13] dark:border-red-400 dark:text-red-200'],
-            ['label' => 'Directions couvertes', 'value' => (int) ($summary['directions_total'] ?? 0), 'tone' => 'border-[#3996D3] text-[#176A9D] dark:border-cyan-300 dark:text-cyan-200'],
-            ['label' => 'Utilisateurs', 'value' => (int) ($summary['users_total'] ?? 0), 'tone' => 'border-violet-400 text-violet-700 dark:border-violet-400 dark:text-violet-200'],
+            ['label' => 'Services', 'value' => (int) ($summary['total'] ?? 0), 'tone' => 'navy'],
+            ['label' => 'Actifs', 'value' => (int) ($summary['actifs'] ?? 0), 'tone' => 'green'],
+            ['label' => 'Inactifs', 'value' => (int) ($summary['inactifs'] ?? 0), 'tone' => 'danger'],
+            ['label' => 'Directions couvertes', 'value' => (int) ($summary['directions_total'] ?? 0), 'tone' => 'blue'],
+            ['label' => 'Utilisateurs', 'value' => (int) ($summary['users_total'] ?? 0), 'tone' => 'blue'],
         ];
     @endphp
 
-    <div class="app-screen-flow">
+    <div class="app-screen-flow reference-workspace">
         <x-ui.page-title class="mb-4 app-screen-block" eyebrow="Administration organisationnelle" title="Référentiel - Services" subtitle="Unités opérationnelles, rattachements et capacité de suivi.">
             <x-slot:actions>
                 <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.services.export.csv', $exportFilters) }}">Exporter CSV</a>
@@ -29,19 +29,16 @@
         @include('workspace.referentiel.partials.navigation', ['active' => 'services'])
 
         <section class="showcase-panel app-screen-block p-4" aria-label="Synthèse des services">
-            <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(145px,1fr))]">
+            <x-ui.kpi-grid class="reference-kpi-grid">
                 @foreach ($metrics as $metric)
-                    <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
-                        <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $metric['label'] }}</span>
-                        <strong class="mt-1 block text-2xl">{{ number_format($metric['value'], 0, ',', ' ') }}</strong>
-                    </div>
+                    <x-ui.stat-card :label="$metric['label']" :value="number_format($metric['value'], 0, ',', ' ')" :tone="$metric['tone']" />
                 @endforeach
-            </div>
+            </x-ui.kpi-grid>
         </section>
 
         <section class="app-screen-block" aria-labelledby="services-list-title">
-            <form method="GET" action="{{ route('workspace.referentiel.services.index') }}" class="showcase-toolbar grid min-w-0 gap-3 p-4 md:grid-cols-2 xl:grid-cols-6" aria-label="Filtres des services" data-auto-filter-form>
-                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 md:col-span-2 dark:text-slate-400">
+            <form method="GET" action="{{ route('workspace.referentiel.services.index') }}" class="reference-filters showcase-toolbar grid min-w-0 gap-3 p-4 md:grid-cols-2 xl:grid-cols-6" aria-label="Filtres des services" data-auto-filter-form>
+                <label class="reference-filter-search grid gap-1 text-xs font-bold uppercase text-slate-500 md:col-span-2 dark:text-slate-400">
                     Recherche
                     <input name="q" type="search" maxlength="100" value="{{ $filters['q'] ?? '' }}" placeholder="Code ou libellé..." class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                 </label>
@@ -78,7 +75,8 @@
                         @endforeach
                     </select>
                 </label>
-                <div class="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-6">
+                <div class="reference-filter-actions flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-6">
+                    <button class="btn btn-primary min-h-10 px-4" type="submit">Filtrer</button>
                     <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.services.index') }}">Réinitialiser</a>
                 </div>
             </form>
@@ -89,18 +87,18 @@
             </div>
 
             <div class="app-table-wrapper mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                <table class="app-table data-table min-w-[900px]">
+                <table class="app-table data-table reference-table w-full" data-mobile-cards>
                     <thead><tr><th>Service</th><th>Direction</th><th>État</th><th>Utilisateurs</th><th>PTA</th>@if ($canWrite)<th>Actions</th>@endif</tr></thead>
                     <tbody>
                         @forelse ($rows as $row)
                             <tr>
-                                <td><div class="min-w-[240px]"><div class="flex items-center gap-2"><span class="anbg-badge anbg-badge-neutral">{{ $row->code }}</span><strong class="text-slate-900 dark:text-slate-100">{{ $row->libelle }}</strong></div><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Identifiant #{{ $row->id }}</span></div></td>
-                                <td><div class="min-w-[210px]"><strong class="text-slate-800 dark:text-slate-200">{{ $row->direction?->code ?? '-' }}</strong><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ $row->direction?->libelle ?? 'Direction non définie' }}</span></div></td>
-                                <td><span class="anbg-badge {{ $row->actif ? 'anbg-badge-success' : 'anbg-badge-danger' }}">{{ $row->actif ? 'Actif' : 'Inactif' }}</span></td>
-                                <td>{{ number_format($row->users_count, 0, ',', ' ') }}</td>
-                                <td>{{ number_format($row->ptas_count, 0, ',', ' ') }}</td>
+                                <td data-label="Service"><div class="min-w-0"><div class="flex items-center gap-2"><span class="anbg-badge anbg-badge-neutral">{{ $row->code }}</span><strong class="text-slate-900 dark:text-slate-100">{{ $row->libelle }}</strong></div><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Identifiant #{{ $row->id }}</span></div></td>
+                                <td data-label="Direction"><div class="min-w-0"><strong class="text-slate-800 dark:text-slate-200">{{ $row->direction?->code ?? '-' }}</strong><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ $row->direction?->libelle ?? 'Direction non définie' }}</span></div></td>
+                                <td data-label="État"><span class="anbg-badge {{ $row->actif ? 'anbg-badge-success' : 'anbg-badge-danger' }}">{{ $row->actif ? 'Actif' : 'Inactif' }}</span></td>
+                                <td data-label="Utilisateurs">{{ number_format($row->users_count, 0, ',', ' ') }}</td>
+                                <td data-label="PTA">{{ number_format($row->ptas_count, 0, ',', ' ') }}</td>
                                 @if ($canWrite)
-                                    <td><div class="flex flex-wrap gap-2"><a class="btn btn-secondary btn-sm" href="{{ route('workspace.referentiel.services.edit', $row) }}">Modifier</a><form method="POST" action="{{ route('workspace.referentiel.services.destroy', $row) }}" data-confirm-message="Supprimer ce service ?" data-confirm-tone="danger" data-confirm-label="Supprimer">@csrf @method('DELETE')<button class="btn btn-danger btn-sm" type="submit">Supprimer</button></form></div></td>
+                                    <td data-label="Actions"><div class="flex flex-wrap gap-2"><a class="btn btn-secondary btn-sm" href="{{ route('workspace.referentiel.services.edit', $row) }}">Modifier</a><form method="POST" action="{{ route('workspace.referentiel.services.destroy', $row) }}" data-confirm-message="Supprimer ce service ?" data-confirm-tone="danger" data-confirm-label="Supprimer">@csrf @method('DELETE')<button class="btn btn-danger btn-sm" type="submit">Supprimer</button></form></div></td>
                                 @endif
                             </tr>
                         @empty

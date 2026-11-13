@@ -29,6 +29,25 @@ class ActionTrackingWorkspaceTest extends TestCase
 
     private int $fixtureSequence = 0;
 
+    public function test_tracking_keeps_only_identity_and_tabs_sticky_with_evidence_below_journal(): void
+    {
+        $fixture = $this->createFixture();
+        $response = $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.suivi', $fixture['action']))
+            ->assertOk();
+
+        $document = new \DOMDocument;
+        @$document->loadHTML(mb_convert_encoding($response->getContent(), 'HTML-ENTITIES', 'UTF-8'));
+        $xpath = new \DOMXPath($document);
+
+        $this->assertCount(1, $xpath->query('//*[@data-action-summary-sticky]//*[@id="action-header"]'));
+        $this->assertCount(1, $xpath->query('//*[@data-action-summary-sticky]//*[@data-action-detail-tabs]'));
+        $this->assertCount(0, $xpath->query('//*[@data-action-summary-sticky]//*[contains(concat(" ", normalize-space(@class), " "), " action-kpi-grid ")]'));
+        $this->assertCount(1, $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " action-main-primary ")]/*[@id="action-logs"]/following-sibling::*[1][@id="action-justificatifs"]'));
+        $this->assertCount(1, $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " action-compact-row ")]/*[@id="action-echeances"]'));
+        $this->assertCount(1, $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " action-compact-row ")]/*[@id="action-discussion"]'));
+    }
+
     public function test_actions_table_exposes_only_tracking_and_deadline_report_commands(): void
     {
         $fixture = $this->createFixture();

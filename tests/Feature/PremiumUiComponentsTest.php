@@ -39,15 +39,15 @@ class PremiumUiComponentsTest extends TestCase
 
     public function test_workspace_stat_cards_share_a_responsive_visual_contract(): void
     {
-        $styles = file_get_contents(resource_path('css/ui-system.css'));
+        $styles = file_get_contents(resource_path('css/app.css'));
 
         $this->assertIsString($styles);
-        $this->assertStringContainsString('--app-kpi-height: 10.25rem;', $styles);
+        $this->assertStringContainsString('--app-kpi-height: 8rem;', $styles);
         $this->assertStringContainsString('.app-kpi-grid', $styles);
         $this->assertStringContainsString('.showcase-kpi-card', $styles);
         $this->assertStringContainsString('.reco-metric-card', $styles);
         $this->assertStringContainsString('.personal-task-kpi-grid', $styles);
-        $this->assertStringContainsString('grid-template-columns: repeat(6, minmax(0, 1fr)) !important;', $styles);
+        $this->assertStringContainsString('grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)) !important;', $styles);
         $this->assertStringContainsString('font-variant-numeric: tabular-nums;', $styles);
         $this->assertStringContainsString('html.dark body.admin-theme-scope[data-ui-version="institutional-v2"]', $styles);
     }
@@ -93,7 +93,7 @@ class PremiumUiComponentsTest extends TestCase
     public function test_global_loader_assets_and_operation_counter_are_loaded(): void
     {
         $javascript = file_get_contents(resource_path('js/app.js'));
-        $styles = file_get_contents(resource_path('css/ui-system.css'));
+        $styles = file_get_contents(resource_path('css/app.css'));
 
         $this->assertIsString($javascript);
         $this->assertIsString($styles);
@@ -238,7 +238,7 @@ class PremiumUiComponentsTest extends TestCase
 
     public function test_recommendation_style_metrics_and_pta_secondary_actions_remain_readable_on_mobile_dark_theme(): void
     {
-        $styles = file_get_contents(resource_path('css/ui-system.css'));
+        $styles = file_get_contents(resource_path('css/app.css'));
 
         $this->assertIsString($styles);
         $this->assertStringContainsString('html.dark body.admin-theme-scope[data-ui-version="institutional-v2"] .reco-metric-label', $styles);
@@ -265,7 +265,7 @@ class PremiumUiComponentsTest extends TestCase
     public function test_collapsed_sidebar_uses_the_same_official_favicon_as_the_application_icon(): void
     {
         $sidebar = file_get_contents(resource_path('views/components/admin/sidebar.blade.php'));
-        $glassStyles = file_get_contents(resource_path('css/anbg-glass.css'));
+        $glassStyles = file_get_contents(resource_path('css/app.css'));
 
         $this->assertIsString($sidebar);
         $this->assertIsString($glassStyles);

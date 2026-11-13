@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const appCss = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
-const glassCss = readFileSync(new URL('../../resources/css/anbg-glass.css', import.meta.url), 'utf8');
 
 function declarationBlock(css, selector) {
   const selectorOffset = css.indexOf(selector);
@@ -17,8 +16,7 @@ function declarationBlock(css, selector) {
 }
 
 describe.each([
-  ['default admin theme', appCss, 'body.admin-theme-scope'],
-  ['ANBG glass theme', glassCss, 'body.admin-theme-scope.anbg-glass-theme'],
+  ['consolidated admin theme', appCss, 'body.admin-theme-scope.anbg-glass-theme'],
 ])('%s dashboard hierarchy', (_theme, css, bodySelector) => {
   it('uses dark surfaces for strategic and operational summaries', () => {
     const strategicSelector = `html.dark ${bodySelector} .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-strategic-objective > .dashboard-synthesis-node-summary`;

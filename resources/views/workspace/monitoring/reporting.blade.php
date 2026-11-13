@@ -2,53 +2,6 @@
 
 @section('title', 'Reporting')
 
-@push('head')
-    <style>
-        .reporting-pta-official .pta-suivi-table-wrap { width:100%; overflow-x:auto; }
-        .reporting-pta-official .pta-suivi-table { width:100%; min-width:2200px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
-        .reporting-pta-official .pta-suivi-table th,
-        .reporting-pta-official .pta-suivi-table td { border:1px solid #111; padding:6px; vertical-align:middle; overflow-wrap:break-word; word-break:normal; hyphens:none; }
-        .reporting-pta-official .pta-suivi-table th { background:#d9d9d9; color:#000; text-align:center; font-weight:900; }
-        .reporting-pta-official .pta-pas-row td { background:#2f75b5; color:#fff; font-weight:900; text-align:center; }
-        .reporting-pta-official .pta-level-axis td { background:#0f2f57; color:#fff; font-weight:900; text-align:center; }
-        .reporting-pta-official .pta-level-strategic-objective td { background:#1e5fa8; color:#fff; font-weight:900; text-align:center; }
-        .reporting-pta-official .pta-level-operational-objective td { background:#d8ecff; color:#0f2f57; font-weight:900; text-align:center; }
-        .reporting-pta-official .pta-level-action td { background:#f8fafc; color:#111827; }
-        .reporting-pta-official .pta-level-sub-action td { background:#f1f5f9; color:#334155; }
-        .reporting-pta-official .pta-sub-action-row td { background:#f1f5f9; color:#334155; }
-        .reporting-pta-official .pta-sub-action-row .pta-action-index-cell,
-        .reporting-pta-official .pta-sub-action-row .pta-action-parent-cell { background:#f8fafc; color:#111827; }
-        .reporting-pta-official .pta-hierarchy-action-cell { background:#f8fafc; color:#111827; }
-        .reporting-pta-official .pta-hierarchy-sub-action-cell { background:#f1f5f9; color:#334155; }
-        .reporting-pta-official .pta-strategy-row td { background:#5b9bd5; color:#000; font-weight:900; text-align:center; }
-        .reporting-pta-official .pta-strategy-rate { background:#ddebf7 !important; }
-        .reporting-pta-official .pta-objective-row td { background:#ddebf7; font-weight:900; text-align:center; }
-        .reporting-pta-official .pta-objective-number { width:42px; }
-        .reporting-pta-official .pta-center,
-        .reporting-pta-official .pta-status-cell { text-align:center; }
-        .reporting-pta-official .pta-status-cell { font-weight:900; line-height:1.15; }
-        .reporting-pta-official .pta-status-badge { display:inline-flex; min-height:24px; align-items:center; justify-content:center; border-radius:6px; padding:4px 7px; font-size:10px; font-weight:900; line-height:1.1; }
-        .reporting-pta-official .pta-proof-button { display:inline-flex; min-height:28px; min-width:76px; align-items:center; justify-content:center; gap:4px; border:1px solid #1e5fa8; border-radius:6px; background:#eef6fc; color:#0f2f57; padding:5px 7px; font-size:10px; font-weight:900; line-height:1.1; text-decoration:none; white-space:nowrap; }
-        .reporting-pta-official .pta-proof-button svg { width:13px; height:13px; flex:0 0 13px; }
-        .reporting-pta-official .pta-proof-button-label { line-height:1; }
-        .reporting-pta-official .pta-proof-count { display:inline-grid; min-width:16px; height:16px; place-items:center; border-radius:999px; background:#1e5fa8; color:#fff; font-size:10px; line-height:1; }
-        .reporting-pta-official .pta-proof-button-empty,
-        .reporting-pta-official .pta-proof-button:disabled { border-color:#cbd5e1; background:#f1f5f9; color:#64748b; }
-        .reporting-pta-official .pta-action-link { display:block; width:100%; border:0; padding:2px 3px; margin:-2px -3px; background:transparent; color:#17324a; font:inherit; font-weight:800; text-decoration:none; cursor:pointer; text-align:left; border-radius:4px; }
-        .reporting-pta-official .pta-preview-link { display:block; width:100%; min-height:100%; margin:-2px -3px; border:0; border-radius:4px; padding:2px 3px; background:transparent; color:inherit; font:inherit; text-align:inherit; text-decoration:none; cursor:pointer; transition:background-color .15s ease, color .15s ease; }
-        .reporting-pta-official .pta-action-link.pta-preview-link { color:#17324a; font-weight:800; }
-        .reporting-pta-official .pta-preview-link:hover { background:rgba(15,47,87,.045); color:inherit; box-shadow:none; }
-        .reporting-pta-official .pta-preview-link:active { background:rgba(57,150,211,.12); }
-        .reporting-pta-official .pta-preview-link:focus-visible { outline:2px solid rgba(57,150,211,.55); outline-offset:2px; }
-        .reporting-pta-official .pta-parameter-pill { display:inline-flex; align-items:center; justify-content:center; margin-top:5px; border:1px solid #1e5fa8; border-radius:6px; background:#1e5fa8; color:#fff; padding:4px 7px; font-size:10px; font-weight:900; line-height:1.1; text-decoration:none; }
-        .reporting-pta-official .pta-parameter-pill:hover { background:#17324a; color:#fff; }
-        .reporting-pta-official .pta-sub-action-cell { font-weight:800; color:#334155; }
-        .reporting-pta-official .pta-sub-action-number { font-weight:900; color:#0f2f57; }
-        .reporting-pta-official .pta-observation { font-size:11px; line-height:1.35; }
-        .reporting-pta-official .pta-empty { padding:18px; text-align:center; font-weight:800; color:#64748b; }
-    </style>
-@endpush
-
 @section('content')
     @php
         $roleProfile = $roleProfile ?? ['eyebrow' => 'Reporting institutionnel', 'title' => "Centre d'export et de diffusion", 'subtitle' => 'Exports et diffusion du reporting.', 'role_label' => strtoupper((string) ($scope['role'] ?? 'lecture'))];
@@ -120,6 +73,7 @@
         $metricPercent = static fn ($value): float => min(100, max(0, (float) $value));
     @endphp
 
+    <div class="app-screen-flow reports-workspace">
     <x-ui.page-title
         class="mb-4"
         :eyebrow="$roleProfile['eyebrow']"
@@ -186,9 +140,9 @@
             </div>
         </div>
 
-        <form method="GET" action="{{ route('workspace.reporting') }}" class="reporting-filter-surface" data-auto-filter-form>
+        <form method="GET" action="{{ route('workspace.reporting') }}" class="reporting-filter-surface reports-filter-form reports-filters" data-auto-filter-form>
             <input type="hidden" name="report_type" value="{{ $activeReportType }}">
-            <div class="reporting-primary-filter-grid">
+            <div class="reporting-primary-filter-grid reports-filter-grid">
             <div>
                 <label for="exercice">Exercice</label>
                 <select id="exercice" name="exercice">
@@ -230,7 +184,7 @@
                     <span>Filtres avancés</span>
                     <span class="reporting-advanced-filter-count">{{ $advancedReportFilterCount }} actif{{ $advancedReportFilterCount > 1 ? 's' : '' }}</span>
                 </summary>
-                <div class="reporting-advanced-filter-grid">
+                <div class="reporting-advanced-filter-grid reports-filter-grid">
             <div>
                 <label for="statut">Statut</label>
                 <select id="statut" name="statut">
@@ -277,7 +231,8 @@
             </div>
                 </div>
             </details>
-            <div class="reporting-filter-actions">
+            <div class="reporting-filter-actions reports-filter-actions">
+                <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">Filtrer</button>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting', ['report_type' => $activeReportType]) }}">Réinitialiser</a>
             </div>
         </form>
@@ -302,7 +257,7 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-[980px] w-full border-collapse text-sm">
+                    <table class="app-table reports-table w-full border-collapse text-sm" data-mobile-cards>
                         <thead>
                             <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                                 <th class="px-3 py-2">Direction</th>
@@ -321,16 +276,16 @@
                                     $isCompliant = (string) ($row['statut'] ?? '') === 'Conforme';
                                 @endphp
                                 <tr>
-                                    <td class="px-3 py-2 text-slate-600">{{ $row['direction'] ?? '-' }}</td>
-                                    <td class="px-3 py-2 text-slate-600">{{ $row['service'] ?? '-' }}</td>
-                                    <td class="px-3 py-2 font-semibold text-slate-900">{{ $row['action'] ?? '-' }}</td>
-                                    <td class="px-3 py-2 text-slate-600">{{ $row['rmo'] ?? '-' }}</td>
-                                    <td class="px-3 py-2 text-slate-700">{{ $row['controle'] ?? '-' }}</td>
-                                    <td class="px-3 py-2">
+                                    <td data-label="Direction" class="px-3 py-2 text-slate-600">{{ $row['direction'] ?? '-' }}</td>
+                                    <td data-label="Service" class="px-3 py-2 text-slate-600">{{ $row['service'] ?? '-' }}</td>
+                                    <td data-label="Action" class="px-3 py-2 font-semibold text-slate-900">{{ $row['action'] ?? '-' }}</td>
+                                    <td data-label="RMO" class="px-3 py-2 text-slate-600">{{ $row['rmo'] ?? '-' }}</td>
+                                    <td data-label="Contrôle" class="px-3 py-2 text-slate-700">{{ $row['controle'] ?? '-' }}</td>
+                                    <td data-label="Statut" class="px-3 py-2">
                                         <span class="anbg-badge {{ $isCompliant ? 'anbg-badge-success' : 'anbg-badge-warning' }} px-3">{{ $row['statut'] ?? '-' }}</span>
                                     </td>
-                                    <td class="px-3 py-2 text-slate-600">{{ $row['correction'] ?? '-' }}</td>
-                                    <td class="px-3 py-2 text-right font-semibold text-slate-700">{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
+                                    <td data-label="Correction attendue" class="px-3 py-2 text-slate-600">{{ $row['correction'] ?? '-' }}</td>
+                                    <td data-label="Avancement" class="px-3 py-2 text-right font-semibold text-slate-700">{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -480,5 +435,6 @@
             </div>
         </article>
         @endif
+    </div>
     </div>
 @endsection

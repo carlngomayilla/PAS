@@ -21,6 +21,39 @@ class OrganizationDirectoryTest extends TestCase
         $this->seed();
     }
 
+    public function test_reference_lists_keep_filters_submittable_and_mobile_cells_identifiable(): void
+    {
+        $admin = $this->createAdminUser();
+        [$direction, $service] = $this->createScope('UX');
+        User::factory()->create([
+            'name' => 'Utilisateur UX lisible',
+            'email' => 'ux.directory@anbg.test',
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'password_changed_at' => now(),
+        ]);
+
+        foreach (['directions', 'services', 'utilisateurs'] as $resource) {
+            $response = $this->actingAs($admin)->get(route('workspace.referentiel.'.$resource.'.index', [
+                'q' => 'UX',
+                'per_page' => 15,
+            ]))->assertOk();
+            $document = new \DOMDocument;
+            @$document->loadHTML('<?xml encoding="utf-8" ?>'.$response->getContent());
+            $xpath = new \DOMXPath($document);
+            $filter = '//form[contains(concat(" ", normalize-space(@class), " "), " reference-filters ")]';
+            $this->assertSame('GET', $xpath->query($filter)->item(0)?->getAttribute('method'));
+            $this->assertSame('UX', $xpath->query($filter.'//input[@name="q"]')->item(0)?->getAttribute('value'));
+            $this->assertSame(1, $xpath->query($filter.'//button[@type="submit"]')->length);
+            $this->assertSame('15', $xpath->query($filter.'//select[@name="per_page"]/option[@selected]')->item(0)?->getAttribute('value'));
+            $this->assertSame(1, $xpath->query('//table[@data-mobile-cards]')->length);
+            $this->assertGreaterThan(0, $xpath->query('//table[@data-mobile-cards]/tbody/tr/td[@data-label]')->length);
+            $this->assertSame(0, $xpath->query('//table[@data-mobile-cards]/tbody/tr/td[not(@colspan) and not(@data-label)]')->length);
+            $this->assertGreaterThan(0, $xpath->query('//a[contains(@href, "/create")]')->length);
+        }
+    }
+
     public function test_user_directory_filters_account_health_and_neutralizes_array_filters(): void
     {
         $admin = $this->createAdminUser();

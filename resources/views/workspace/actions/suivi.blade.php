@@ -443,6 +443,23 @@
             : null;
         $validationKpiLabel = $validationLabel;
     @endphp
+    <nav class="action-detail-tabs action-detail-tabs-external no-print" aria-label="Onglets de l'action" role="tablist" data-action-detail-tabs>
+        @foreach ($detailSections as $anchor => $label)
+            <a
+                id="{{ $anchor }}-tab"
+                class="action-detail-tab {{ $loop->first ? 'active' : '' }}"
+                href="#{{ $anchor }}"
+                role="tab"
+                aria-controls="{{ $anchor }}"
+                aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                tabindex="{{ $loop->first ? '0' : '-1' }}"
+            >
+                {{ $label }}
+            </a>
+        @endforeach
+    </nav>
+    </div>
+
     <section class="action-kpi-grid mb-4" aria-label="Indicateurs essentiels">
         <article class="action-kpi-card">
             <span class="action-kpi-icon" aria-hidden="true">↗</span>
@@ -472,22 +489,6 @@
             <div><span class="action-kpi-label">État de validation</span><strong>{{ $validationKpiLabel }}</strong><small>{{ $actionStatusLabel($status) }}</small></div>
         </article>
     </section>
-    <nav class="action-detail-tabs action-detail-tabs-external no-print" aria-label="Onglets de l'action" role="tablist" data-action-detail-tabs>
-        @foreach ($detailSections as $anchor => $label)
-            <a
-                id="{{ $anchor }}-tab"
-                class="action-detail-tab {{ $loop->first ? 'active' : '' }}"
-                href="#{{ $anchor }}"
-                role="tab"
-                aria-controls="{{ $anchor }}"
-                aria-selected="{{ $loop->first ? 'true' : 'false' }}"
-                tabindex="{{ $loop->first ? '0' : '-1' }}"
-            >
-                {{ $label }}
-            </a>
-        @endforeach
-    </nav>
-    </div>
 
     <span id="action-tracking" class="sr-only" aria-hidden="true"></span>
     <span id="action-details" class="sr-only" aria-hidden="true"></span>

@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const styles = readFileSync(new URL('../../resources/css/ui-system.css', import.meta.url), 'utf8');
+const styles = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
 const layout = readFileSync(new URL('../../resources/views/layouts/admin.blade.php', import.meta.url), 'utf8');
 const commandCenter = readFileSync(
   new URL('../../resources/views/dashboard/partials/command-center.blade.php', import.meta.url),
@@ -15,6 +15,10 @@ const hierarchy = readFileSync(
 );
 
 describe('institutional design system', () => {
+  it('keeps table clipping on the scrolling wrapper rather than positioned table cells', () => {
+    expect(styles).toMatch(/@layer reference\s*\{[\s\S]*?table:is\(\.app-table, \.data-table, \.dashboard-table\)\s*\{\s*overflow: visible !important;/);
+  });
+
   it('uses one semantic contract for light and dark surfaces', () => {
     expect(styles).toContain('--ui-canvas: #f2f7fb;');
     expect(styles).toContain('--ui-surface: #ffffff;');

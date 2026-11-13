@@ -1,5 +1,7 @@
 @extends('layouts.workspace')
 
+@section('title', 'Rapports institutionnels')
+
 @section('content')
     @php
         $typeLabels = [
@@ -13,7 +15,7 @@
         ];
     @endphp
 
-    <div class="app-screen-flow">
+    <div class="app-screen-flow reports-workspace">
         <x-ui.page-title eyebrow="Communication et gouvernance" title="Rapports institutionnels" class="app-screen-block">
             <x-slot:actions>
                 <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.audit.index', ['module' => 'institutional_reports']) }}">Voir la traçabilité</a>
@@ -35,10 +37,10 @@
         {{-- Meme motif de barre de filtres que les pages PAS / PAO / PTA. --}}
         <section class="showcase-toolbar app-screen-block mt-5">
             <div><h2 class="showcase-panel-title">Filtres</h2></div>
-            <form method="GET" action="{{ route('workspace.reports.index') }}" data-auto-filter-form>
+            <form method="GET" action="{{ route('workspace.reports.index') }}" class="reports-filter-form reports-filters" data-auto-filter-form>
                 <input type="hidden" name="tab" value="{{ $activeTab }}">
-                <div class="showcase-filter-grid">
-                    <div><label for="report_q">Recherche</label><input id="report_q" name="q" type="search" value="{{ $filters['q'] }}" placeholder="Objet, résumé ou décision"></div>
+                <div class="showcase-filter-grid reports-filter-grid">
+                    <div class="reports-filter-search"><label for="report_q">Recherche</label><input id="report_q" name="q" type="search" value="{{ $filters['q'] }}" placeholder="Objet, résumé ou décision"></div>
                     <div><label for="report_direction">Direction</label><select id="report_direction" name="direction_id"><option value="">Toutes</option>@foreach ($directionOptions as $direction)<option value="{{ $direction->id }}" @selected((string) $filters['direction_id'] === (string) $direction->id)>{{ $direction->code }} · {{ $direction->libelle }}</option>@endforeach</select></div>
                     <div><label for="report_service">Service</label><select id="report_service" name="service_id"><option value="">Tous</option>@foreach ($serviceOptions as $service)<option value="{{ $service->id }}" @selected((string) $filters['service_id'] === (string) $service->id)>{{ $service->code }} · {{ $service->libelle }}</option>@endforeach</select></div>
                     <div><label for="report_status">Statut</label><select id="report_status" name="status"><option value="">Tous</option><option value="draft" @selected($filters['status'] === 'draft')>Brouillon</option><option value="submitted_sciq" @selected($filters['status'] === 'submitted_sciq')>En vérification</option><option value="verified" @selected($filters['status'] === 'verified')>Vérifié</option><option value="returned" @selected($filters['status'] === 'returned')>À corriger</option></select></div>
@@ -54,13 +56,14 @@
                         </select>
                     </div>
                 </div>
-                <div class="showcase-filter-actions mt-4">
+                <div class="showcase-filter-actions reports-filter-actions mt-4">
+                    <button class="btn btn-primary" type="submit">Filtrer</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.reports.index', ['tab' => $activeTab]) }}">Réinitialiser</a>
                 </div>
             </form>
         </section>
 
-        <nav class="app-screen-block mt-5 flex gap-1 overflow-x-auto border-b border-slate-200 pb-px dark:border-slate-700" aria-label="Vues des rapports">
+        <nav class="app-screen-block mt-5 flex flex-wrap gap-1 border-b border-slate-200 pb-px dark:border-slate-700" aria-label="Vues des rapports">
             @foreach ($tabs as $code => $label)
                 <a href="{{ route('workspace.reports.index', ['tab' => $code]) }}" @if ($activeTab === $code) aria-current="page" @endif class="inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 px-4 py-2 text-sm font-bold transition {{ $activeTab === $code ? 'border-[#3996d3] text-[#176a9d] dark:text-sky-200' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100' }}">
                     {{ $label }}
@@ -135,22 +138,22 @@
                 <span class="text-sm text-slate-500 dark:text-slate-400">{{ $reports->total() }} dossier(s)</span>
             </div>
             <div class="app-table-wrapper overflow-x-auto">
-                <table class="app-table data-table min-w-[980px]">
+                <table class="app-table data-table reports-table w-full" data-mobile-cards>
                     <thead><tr><th>Dossier</th><th>Périmètre</th><th>Déposant</th><th>Date de dépôt</th><th>Statut</th><th>Prochaine action</th><th class="text-right">Action</th></tr></thead>
                     <tbody>
                         @forelse ($reports as $report)
                             @php($nextAction = $reportService->nextAction($report))
                             <tr>
-                                <td><p class="font-semibold text-[#17324a] dark:text-slate-100">{{ $report->title }}</p><p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $typeLabels[$report->report_type] ?? $report->report_type }}</p></td>
-                                <td>{{ $report->direction?->code ?? 'Agence' }}@if ($report->service) · {{ $report->service->code }}@endif</td>
-                                <td>{{ $report->submittedBy?->name ?? 'N/A' }}</td>
-                                <td>{{ $report->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
-                                <td><x-ui.badge :tone="match($report->status) { \App\Models\InstitutionalReport::STATUS_VERIFIED => 'success', \App\Models\InstitutionalReport::STATUS_RETURNED => 'danger', \App\Models\InstitutionalReport::STATUS_DRAFT => 'neutral', default => 'warning' }">{{ $reportService->statusLabel($report->status) }}</x-ui.badge></td>
-                                <td>
+                                <td data-label="Dossier"><p class="font-semibold text-[#17324a] dark:text-slate-100">{{ $report->title }}</p><p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $typeLabels[$report->report_type] ?? $report->report_type }}</p></td>
+                                <td data-label="Périmètre">{{ $report->direction?->code ?? 'Agence' }}@if ($report->service) · {{ $report->service->code }}@endif</td>
+                                <td data-label="Déposant">{{ $report->submittedBy?->name ?? 'N/A' }}</td>
+                                <td data-label="Date de dépôt">{{ $report->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td data-label="Statut"><x-ui.badge :tone="match($report->status) { \App\Models\InstitutionalReport::STATUS_VERIFIED => 'success', \App\Models\InstitutionalReport::STATUS_RETURNED => 'danger', \App\Models\InstitutionalReport::STATUS_DRAFT => 'neutral', default => 'warning' }">{{ $reportService->statusLabel($report->status) }}</x-ui.badge></td>
+                                <td data-label="Prochaine action">
                                     <p class="text-sm font-bold text-slate-700 dark:text-slate-200">{{ $nextAction['label'] }}</p>
                                     <p class="mt-1 max-w-xs text-xs text-slate-500 dark:text-slate-400">{{ $nextAction['description'] }}</p>
                                 </td>
-                                <td class="text-right"><a class="btn btn-secondary btn-sm" href="{{ route('workspace.reports.show', $report) }}">Ouvrir</a></td>
+                                <td data-label="Action" class="text-right"><a class="btn btn-secondary btn-sm" href="{{ route('workspace.reports.show', $report) }}">Ouvrir</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="7"><x-ui.empty-state title="Aucun dossier" message="Aucun rapport ne correspond à cette vue." icon="docs" /></td></tr>

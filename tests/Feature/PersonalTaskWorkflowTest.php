@@ -25,6 +25,43 @@ class PersonalTaskWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_personal_task_filters_remain_submittable_and_keep_selected_values(): void
+    {
+        $fixture = $this->planningFixture();
+        $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action ergonomie personnelle');
+        $action->forceFill([
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'soumise_le' => now()->subHour(),
+        ])->save();
+
+        $html = $this->actingAs($fixture['chef'])
+            ->get(route('workspace.tasks.index', [
+                'q' => 'ergonomie',
+                'famille' => 'validations',
+                'tri' => 'echeance',
+                'per_page' => 25,
+                'vue' => 'toutes',
+            ]))
+            ->assertOk()
+            ->assertSee('Action ergonomie personnelle')
+            ->assertSee('Valider')
+            ->getContent();
+
+        $document = new \DOMDocument;
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new \DOMXPath($document);
+        $form = '//form[@data-personal-task-filters]';
+
+        $this->assertSame(1, $xpath->query($form.'[@method="GET"][@aria-label="Filtrer mes tâches"]')->length);
+        $this->assertSame(1, $xpath->query($form.'//button[@type="submit"]')->length);
+        $this->assertSame(1, $xpath->query($form.'//input[@name="q"][@value="ergonomie"]')->length);
+        $this->assertSame(1, $xpath->query($form.'//input[@name="vue"][@value="toutes"]')->length);
+        foreach (['famille' => 'validations', 'tri' => 'echeance', 'per_page' => '25'] as $name => $value) {
+            $this->assertSame(1, $xpath->query($form.'//select[@name="'.$name.'"]/option[@selected][@value="'.$value.'"]')->length);
+        }
+    }
+
     public function test_chef_receives_validation_task_with_48h_deadline(): void
     {
         $fixture = $this->planningFixture();

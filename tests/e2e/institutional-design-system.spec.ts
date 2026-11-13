@@ -29,18 +29,26 @@ test.describe('système de design institutionnel', () => {
         }
 
         const filterForm = page.locator('[data-dashboard-synthesis-filter-form]');
-        if (testInfo.project.name === 'mobile-chrome') {
-            await expect(filterForm.locator('[data-dashboard-filter-fields]')).not.toBeVisible();
-            await filterForm.locator('[data-dashboard-filter-toggle]').click();
-            await expect(filterForm.locator('[data-dashboard-filter-fields]')).toBeVisible();
-            await filterForm.locator('[data-dashboard-filter-toggle]').click();
-        }
+        const primaryFilters = filterForm.locator('[data-dashboard-primary-filters]');
+        const additionalFilters = filterForm.locator('[data-dashboard-additional-filters]');
+        await expect(primaryFilters.locator('select[name="exercice"]')).toBeVisible();
+        await expect(primaryFilters.locator('select[name="periode"]')).toBeVisible();
+        await expect(additionalFilters).not.toHaveAttribute('open', '');
+        await additionalFilters.locator('summary').click();
+        await expect(additionalFilters.locator('select[name="statut_action"]')).toBeVisible();
+        await additionalFilters.locator('summary').click();
+        await expect(additionalFilters.locator('select[name="statut_action"]')).not.toBeVisible();
 
         const viewportFits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
         expect(viewportFits).toBe(true);
 
         const lightSurface = await commandCenter.evaluate(element => getComputedStyle(element).backgroundColor);
         expect(lightSurface).not.toBe('rgba(0, 0, 0, 0)');
+
+        await page.screenshot({
+            path: testInfo.outputPath(`institutional-${testInfo.project.name}-light.png`),
+            fullPage: true,
+        });
 
         const themeToggle = page.locator('#admin-theme-toggle');
         await themeToggle.click();
@@ -54,6 +62,18 @@ test.describe('système de design institutionnel', () => {
         await page.screenshot({
             path: testInfo.outputPath(`institutional-${testInfo.project.name}-dark.png`),
             fullPage: true,
+        });
+
+        await page.goto('/dashboard?dashboardTab=advanced');
+        const tables = page.locator('table.app-table');
+        if (await tables.count()) {
+            await expect(tables.first()).toBeVisible();
+            await tables.first().scrollIntoViewIfNeeded();
+        } else {
+            await expect(page.getByText('Aucune donnée pour les tableaux', { exact: true })).toBeVisible();
+        }
+        await page.screenshot({
+            path: testInfo.outputPath(`institutional-${testInfo.project.name}-tables.png`),
         });
 
         diagnostics.assertClean();

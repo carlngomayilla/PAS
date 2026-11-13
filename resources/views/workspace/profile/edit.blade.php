@@ -11,8 +11,8 @@
         </p>
     @endif
 
-    <section class="app-screen-stack mb-4">
-        <article class="showcase-panel app-screen-block profile-summary-card">
+    <section class="app-screen-stack mb-4" aria-label="Compte et sécurité">
+        <article class="showcase-panel app-screen-block profile-summary-card" aria-labelledby="profile-identity-title">
             <div class="profile-summary-identity flex flex-wrap items-center gap-4">
                 @if ($user->profile_photo_url)
                     <img src="{{ $user->profile_photo_url }}" alt="Photo de {{ $user->name }}" class="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow-sm">
@@ -21,33 +21,33 @@
                         {{ $user->profile_initials }}
                     </span>
                 @endif
-                <div>
-                    <p class="break-words text-xl font-semibold text-[var(--app-text)]">{{ $user->name }}</p>
+                <div class="min-w-0 flex-1">
+                    <h2 id="profile-identity-title" class="break-words text-xl font-semibold text-[var(--app-text)]">{{ $user->name }}</h2>
                     <p class="mt-1 break-all text-sm text-[var(--app-muted)]">{{ $user->email }}</p>
                 </div>
             </div>
-            <div class="showcase-data-list profile-summary-data">
+            <dl class="showcase-data-list profile-summary-data" aria-label="Affectation et périmètre">
                 <div class="showcase-data-point">
-                    <p class="showcase-data-key">Rôle</p>
-                    <p class="showcase-data-value">{{ $profil['role_label'] }}</p>
+                    <dt class="showcase-data-key">Rôle</dt>
+                    <dd class="showcase-data-value">{{ $profil['role_label'] }}</dd>
                 </div>
                 <div class="showcase-data-point">
-                    <p class="showcase-data-key">Portée</p>
-                    <p class="showcase-data-value">{{ $profil['scope'] }}</p>
+                    <dt class="showcase-data-key">Portée</dt>
+                    <dd class="showcase-data-value">{{ $profil['scope'] }}</dd>
                 </div>
                 <div class="showcase-data-point">
-                    <p class="showcase-data-key">Direction</p>
-                    <p class="showcase-data-value">{{ $user->direction?->libelle ?? 'Aucune' }}</p>
+                    <dt class="showcase-data-key">Direction</dt>
+                    <dd class="showcase-data-value">{{ $user->direction?->libelle ?? 'Aucune' }}</dd>
                 </div>
                 <div class="showcase-data-point">
-                    <p class="showcase-data-key">Service</p>
-                    <p class="showcase-data-value">{{ $user->service?->libelle ?? 'Aucun' }}</p>
+                    <dt class="showcase-data-key">Service</dt>
+                    <dd class="showcase-data-value">{{ $user->service?->libelle ?? 'Aucun' }}</dd>
                 </div>
-            </div>
+            </dl>
         </article>
 
-        <article class="showcase-panel app-screen-block profile-security-card">
-            <h2 class="showcase-panel-title">Synthèse sécurité</h2>
+        <article class="showcase-panel app-screen-block profile-security-card" aria-labelledby="profile-security-title">
+            <h2 id="profile-security-title" class="showcase-panel-title">Synthèse sécurité</h2>
             <div class="mt-4 showcase-summary-grid">
                 <article class="showcase-kpi-card">
                     <p class="showcase-kpi-label">Sessions actives</p>
@@ -70,8 +70,16 @@
 
             <div class="form-section reco-form-section">
                 <h2 class="form-section-title">Informations personnelles</h2>
-                <div class="form-grid reco-form-grid">
-                    <details class="action-advanced-filters" data-profile-photo-options @if ($errors->has('profile_photo') || old('remove_profile_photo')) open @endif>
+                <div class="form-grid reco-form-grid profile-personal-fields">
+                    <div>
+                        <label for="name">Nom complet</label>
+                        <input id="name" name="name" type="text" autocomplete="name" value="{{ old('name', $user->name) }}" required>
+                    </div>
+                    <div>
+                        <label for="email">Adresse email</label>
+                        <input id="email" name="email" type="email" autocomplete="email" value="{{ old('email', $user->email) }}" required>
+                    </div>
+                    <details class="action-advanced-filters col-span-full" data-profile-photo-options @if ($errors->has('profile_photo') || old('remove_profile_photo')) open @endif>
                         <summary class="cursor-pointer font-semibold text-[var(--app-text)]">Photo de profil (facultatif)</summary>
                         <label for="profile_photo">Photo de profil</label>
                         <div class="showcase-upload-zone">
@@ -86,14 +94,6 @@
                             </label>
                         @endif
                     </details>
-                    <div>
-                        <label for="name">Nom complet</label>
-                        <input id="name" name="name" type="text" value="{{ old('name', $user->name) }}" required>
-                    </div>
-                    <div>
-                        <label for="email">Adresse email</label>
-                        <input id="email" name="email" type="email" value="{{ old('email', $user->email) }}" required>
-                    </div>
                 </div>
             </div>
 
@@ -104,21 +104,21 @@
                     <div>
                         <label for="current_password">Mot de passe actuel</label>
                         <div class="relative">
-                            <input id="current_password" name="current_password" type="password" class="pr-14" @required($passwordChangeRequired)>
+                            <input id="current_password" name="current_password" type="password" autocomplete="current-password" class="pr-14" @required($passwordChangeRequired)>
                             <x-auth.password-toggle target="current_password" />
                         </div>
                     </div>
                     <div>
                         <label for="password">Nouveau mot de passe</label>
                         <div class="relative">
-                            <input id="password" name="password" type="password" class="pr-14" @required($passwordChangeRequired)>
+                            <input id="password" name="password" type="password" autocomplete="new-password" class="pr-14" @required($passwordChangeRequired)>
                             <x-auth.password-toggle target="password" />
                         </div>
                     </div>
                     <div>
                         <label for="password_confirmation">Confirmation</label>
                         <div class="relative">
-                            <input id="password_confirmation" name="password_confirmation" type="password" class="pr-14" @required($passwordChangeRequired)>
+                            <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" class="pr-14" @required($passwordChangeRequired)>
                             <x-auth.password-toggle target="password_confirmation" />
                         </div>
                     </div>
@@ -146,7 +146,7 @@
         </div>
 
         <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table">
+            <table class="app-table data-table" data-mobile-cards aria-label="Sessions actives du compte">
                 <thead>
                     <tr>
                         <th>Statut</th>
@@ -159,19 +159,19 @@
                 <tbody>
                     @forelse ($activeSessions as $session)
                         <tr>
-                            <td>
+                            <td data-label="Statut">
                                 @if ($session['is_current'])
-                                    <span class="rounded-full bg-[#eef6e1] px-2 py-1 text-xs font-semibold text-[#1c203d]">Session courante</span>
+                                    <span class="profile-session-status rounded-full px-2 py-1 text-xs font-semibold">Session courante</span>
                                 @else
-                                    <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Active</span>
+                                    <span class="profile-session-status rounded-full px-2 py-1 text-xs font-semibold">Active</span>
                                 @endif
                             </td>
-                            <td class="font-medium text-slate-800">{{ $session['ip_address'] }}</td>
-                            <td>
+                            <td data-label="Adresse IP" class="break-all font-medium text-slate-800">{{ $session['ip_address'] }}</td>
+                            <td data-label="Dernière activité">
                                 {{ $session['last_activity']?->format('d/m/Y H:i:s') ?? 'N/A' }}
                             </td>
-                            <td>{{ $session['user_agent'] }}</td>
-                            <td class="text-right">
+                            <td data-label="Client" class="break-all">{{ $session['user_agent'] }}</td>
+                            <td data-label="Action" class="text-right">
                                 <form method="POST" action="{{ $session['is_current'] ? route('workspace.profile.sessions.revoke_current') : route('workspace.profile.sessions.revoke', $session['id']) }}">
                                     @csrf
                                     <button class="btn btn-primary btn-sm" type="submit">

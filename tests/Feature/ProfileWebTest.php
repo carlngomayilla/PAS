@@ -50,6 +50,32 @@ class ProfileWebTest extends TestCase
             ->assertSee($user->email);
     }
 
+    public function test_profile_exposes_readable_assignment_metadata_and_accessible_account_fields(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+            'password_changed_at' => now(),
+        ]);
+
+        $html = $this->actingAs($user)->get(route('workspace.profile.edit'))->assertOk()->getContent();
+        $document = new \DOMDocument;
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new \DOMXPath($document);
+
+        $terms = $xpath->query('//dl[@aria-label="Affectation et périmètre"]/div/dt');
+        $this->assertSame(['Rôle', 'Portée', 'Direction', 'Service'], array_map(
+            static fn (\DOMNode $node): string => trim($node->textContent),
+            iterator_to_array($terms),
+        ));
+        $this->assertSame(4, $xpath->query('//dl[@aria-label="Affectation et périmètre"]/div/dd')->length);
+        foreach (['name' => 'name', 'email' => 'email', 'current_password' => 'current-password', 'password' => 'new-password', 'password_confirmation' => 'new-password'] as $id => $autocomplete) {
+            $this->assertSame(1, $xpath->query('//label[@for="'.$id.'"]')->length);
+            $this->assertSame($autocomplete, $document->getElementById($id)->getAttribute('autocomplete'));
+        }
+        $this->assertSame(1, $xpath->query('//table[@data-mobile-cards and @aria-label="Sessions actives du compte"]')->length);
+        $this->assertSame(0, $xpath->query('//input[@type="password" and @value!=""]')->length);
+    }
+
     public function test_user_can_update_his_profile_with_photo_and_password(): void
     {
         Storage::fake('public');

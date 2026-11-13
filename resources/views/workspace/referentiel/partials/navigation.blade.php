@@ -6,7 +6,7 @@
     ];
 @endphp
 
-<nav class="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px dark:border-slate-700" aria-label="Sections du référentiel organisationnel">
+<nav class="reference-navigation flex flex-wrap gap-1 border-b border-slate-200 pb-px dark:border-slate-700" aria-label="Sections du référentiel organisationnel">
     @foreach ($tabs as $tab)
         <a
             href="{{ route($tab['route']) }}"

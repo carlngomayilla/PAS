@@ -245,6 +245,9 @@
             return;
         }
 
+        sidebarKeyboardNavigation = false;
+        sidebar.removeAttribute('data-sidebar-keyboard-expanded');
+
         if (window.matchMedia('(min-width: 1024px)').matches) {
             sidebar.classList.remove('-translate-x-full');
             sidebar.removeAttribute('inert');

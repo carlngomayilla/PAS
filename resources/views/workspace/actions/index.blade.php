@@ -244,7 +244,7 @@
         $ganttSpanDays = max(1, $ganttMin->diffInDays($ganttMax) + 1);
     @endphp
 
-    <div class="app-screen-flow">
+    <div class="app-screen-flow action-list-workspace">
     <x-ui.page-title
         :eyebrow="$isValidationTab && $isFinalControlQueue ? 'Conformité SCIQ' : 'Pilotage opérationnel'"
         :title="$isValidationTab && $isFinalControlQueue ? 'Contrôle des exécutions' : 'Suivi des actions'"
@@ -266,7 +266,7 @@
                         @endif
                     </a>
                     @if ($isValidationTab && $validationQueues !== [])
-                        <nav class="flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900" aria-label="Files de validation">
+                        <nav class="flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900" aria-label="Files de validation">
                             @foreach ($validationQueues as $queueKey => $queue)
                                 @php
                                     $queue = is_array($queue) ? $queue : [];
@@ -295,7 +295,7 @@
                     @endif
                 @endif
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <div class="view-toggle action-view-toggle" role="group" aria-label="Mode d'affichage">
                 <a href="{{ $baseListUrl }}" class="view-toggle-btn {{ $layoutMode === 'list' ? 'active' : '' }}" title="Vue liste">
                     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
@@ -338,11 +338,8 @@
             <div>
                 <h2 class="showcase-panel-title">Filtres de navigation</h2>
             </div>
-            <a class="btn btn-secondary rounded-2xl px-4 py-2" href="{{ route('workspace.actions.index') }}">
-                Réinitialiser
-            </a>
         </div>
-        <form method="GET" action="{{ route('workspace.actions.index') }}" data-auto-filter-form>
+        <form method="GET" action="{{ route('workspace.actions.index') }}" class="action-list-filters" data-auto-filter-form>
             @php
                 $advancedFilterCount = count(array_filter([
                     (bool) ($filters['pas_axe_id'] ?? null),
@@ -373,7 +370,7 @@
                 <input type="hidden" name="statut_validation_min" value="{{ $filters['statut_validation_min'] }}">
             @endif
             <div class="showcase-filter-grid action-primary-filter-grid">
-                <div>
+                <div class="action-list-filter-search">
                     <label for="q">Recherche</label>
                     <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Titre, description, résultat">
                 </div>
@@ -538,6 +535,10 @@
                     </a>
                 </div>
             @endif
+            <div class="action-list-filter-actions mt-4 flex flex-wrap justify-end gap-2">
+                <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Réinitialiser</a>
+                <button class="btn btn-primary" type="submit">Filtrer</button>
+            </div>
         </form>
     </section>
 
@@ -851,7 +852,7 @@
         </div>
 
         <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table action-list-table min-w-[1200px] w-full text-sm" data-mobile-cards>
+            <table class="app-table data-table action-list-table w-full text-sm" data-mobile-cards>
                 <thead>
                     <tr>
                         <th>Action</th>
@@ -938,9 +939,9 @@
                             };
                         @endphp
                         <tr>
-                            <td class="min-w-[260px]">
+                            <td data-label="Action">
                                 <div class="font-semibold text-slate-900">{{ $row->libelle }}</div>
-                                <div class="hidden sm:block">
+                                <div class="hidden lg:block">
                                     <p class="mt-1 text-xs font-medium text-slate-500">
                                         ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }} · PTA : {{ $row->pta?->titre ?? '-' }}
                                     </p>
@@ -954,7 +955,7 @@
                                     @endif
                                 </div>
 
-                                <details class="mt-2 sm:hidden" data-action-mobile-context>
+                                <details class="mt-2 lg:hidden" data-action-mobile-context>
                                     <summary class="cursor-pointer text-xs font-semibold text-[var(--app-primary)]">Contexte et contrôles</summary>
                                     <div class="mt-2 space-y-2 text-xs text-slate-600">
                                         <p><span class="font-semibold text-slate-700">Référence :</span> ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</p>
@@ -978,11 +979,11 @@
                                     </div>
                                 </details>
                             </td>
-                            <td class="min-w-[180px]">
+                            <td data-label="Responsable">
                                 <div class="font-medium text-slate-900">{{ $row->responsable?->name ?? '-' }}</div>
                                 <p class="mt-1 text-xs text-slate-500">{{ $row->responsable?->agent_matricule ?? $row->responsable?->email ?? '-' }}</p>
                             </td>
-                            <td class="min-w-[140px] text-sm text-slate-700">
+                            <td class="text-sm text-slate-700" data-label="Échéance">
                                 @php $rowEcheance = $echeanceOf($row); @endphp
                                 @if ($rowEcheance)
                                     <span class="font-semibold text-slate-900">{{ \Illuminate\Support\Carbon::parse($rowEcheance)->format('d/m/Y') }}</span>
@@ -994,12 +995,12 @@
                                     {{ $modeEvaluationLabel }}
                                 </p>
                             </td>
-                            <td>
+                            <td data-label="Statut">
                                 <span class="{{ $statusClass }} px-3">
                                     {{ $actionStatusLabel($row->statut_dynamique ?: 'non_demarre') }}
                                 </span>
                             </td>
-                            <td class="min-w-[170px]" data-mobile-hidden>
+                            <td data-label="Justificatif" data-mobile-hidden>
                                 <span class="{{ $rowToneStyles[$rowCard['proof_tone'] ?? 'neutral'] ?? $rowToneStyles['neutral'] }} px-3">
                                     {{ $rowCard['proof_label'] ?? 'Selon exécution' }}
                                 </span>
@@ -1007,7 +1008,7 @@
                                     {{ $row->justificatif_obligatoire ? 'Preuve obligatoire' : 'Preuve selon dossier' }}
                                 </p>
                             </td>
-                            <td class="min-w-[180px]">
+                            <td data-label="{{ $isExecutorAgentInterface ? 'Exécution' : 'Progression' }}">
                                 @if ($hideRowMetrics)
                                     <span class="anbg-badge anbg-badge-success px-3">Réalisé</span>
                                     <p class="mt-1 text-xs text-slate-500">En attente de validation.</p>
@@ -1029,7 +1030,7 @@
                                 @endif
                                 @endif
                             </td>
-                            <td data-mobile-hidden>
+                            <td data-label="Validation" data-mobile-hidden>
                                 <span class="{{ $validationStyles[$rowValidationStatus] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
                                     {{ $validationStatusLabel($rowValidationStatus) }}
                                 </span>
@@ -1039,7 +1040,7 @@
                                     </p>
                                 @endunless
                             </td>
-                            <td class="min-w-[210px]">
+                            <td data-label="Prochaine étape">
                                 <a
                                     class="{{ $rowToneStyles[$rowNextStep['tone'] ?? 'neutral'] ?? $rowToneStyles['neutral'] }} px-3 no-underline"
                                     href="{{ route('workspace.actions.suivi', $row) }}{{ $rowCard['next_anchor'] ?? '#action-validation' }}"
@@ -1050,7 +1051,7 @@
                                     {{ $rowNextStep['hint'] ?? 'Ouvrir la fiche action.' }}
                                 </p>
                             </td>
-                            <td>
+                            <td data-label="Actions">
                                 <div class="row-actions">
                                     <a class="btn btn-follow btn-sm" href="{{ route('workspace.actions.suivi', $row) }}{{ $isValidationTab ? '#action-validation' : '' }}">
                                         Faire le suivi

@@ -20,7 +20,7 @@ class InstitutionalDesignSystemTest extends TestCase
 
     public function test_semantic_tokens_cover_light_dark_responsive_and_reduced_motion_states(): void
     {
-        $styles = (string) file_get_contents(resource_path('css/ui-system.css'));
+        $styles = (string) file_get_contents(resource_path('css/app.css'));
 
         foreach ([
             '--ui-canvas:',
@@ -49,7 +49,7 @@ class InstitutionalDesignSystemTest extends TestCase
 
     public function test_table_style_contract_keeps_linked_labels_wrappable_and_keyboard_rows_visible(): void
     {
-        $styles = (string) file_get_contents(resource_path('css/ui-system.css'));
+        $styles = (string) file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringNotContainsString('td :where(.btn, .btn-sm, a, button, summary)', $styles);
         $this->assertStringContainsString('td :where(.app-btn, .btn, .btn-sm, a[role="button"], button, summary)', $styles);
@@ -73,8 +73,9 @@ class InstitutionalDesignSystemTest extends TestCase
         $this->assertStringContainsString('Dépliez uniquement le niveau à analyser', $hierarchy);
         $this->assertStringContainsString('dashboard-action-facts', $hierarchy);
         $this->assertStringContainsString('Ouvrir l’action', $hierarchy);
-        $this->assertStringContainsString('data-dashboard-filter-toggle', $dashboard);
-        $this->assertStringContainsString('data-mobile-collapsed="true"', $dashboard);
+        $this->assertStringContainsString('data-dashboard-primary-filters', $dashboard);
+        $this->assertStringContainsString('data-dashboard-additional-filters', $dashboard);
+        $this->assertStringNotContainsString('data-mobile-collapsed="true"', $dashboard);
 
         $strategicNode = '/<details class="dashboard-synthesis-node dashboard-synthesis-node-strategic-objective"[^>]*>/';
         $operationalNode = '/<details class="dashboard-synthesis-node dashboard-synthesis-node-operational-objective"[^>]*>/';

@@ -216,11 +216,12 @@ class InstitutionalReportingService
         $query = $this->visibleQuery($user);
         $search = trim((string) ($filters['q'] ?? ''));
         if ($search !== '') {
+            $pattern = '%'.$search.'%';
             $query->where(fn (Builder $reportsQuery) => $reportsQuery
-                ->whereLike('title', $search)
-                ->orWhereLike('summary', $search)
-                ->orWhereLike('actual_agenda', $search)
-                ->orWhereLike('decisions', $search));
+                ->whereLike('title', $pattern)
+                ->orWhereLike('summary', $pattern)
+                ->orWhereLike('actual_agenda', $pattern)
+                ->orWhereLike('decisions', $pattern));
         }
 
         foreach (['direction_id', 'service_id'] as $field) {

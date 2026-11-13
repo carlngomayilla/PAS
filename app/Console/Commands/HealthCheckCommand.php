@@ -174,8 +174,6 @@ class HealthCheckCommand extends Command
 
         $entries = [
             'resources/css/app.css',
-            'resources/css/anbg-glass.css',
-            'resources/css/ui-system.css',
             'resources/js/app.js',
         ];
 

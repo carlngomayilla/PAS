@@ -175,7 +175,7 @@ verify_vite_assets() {
 
     php -r '
         $manifest = json_decode((string) file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
-        foreach (["resources/css/app.css", "resources/css/anbg-glass.css", "resources/css/ui-system.css", "resources/js/app.js"] as $entry) {
+        foreach (["resources/css/app.css", "resources/js/app.js"] as $entry) {
             $file = $manifest[$entry]["file"] ?? null;
             if (! is_string($file) || $file === "" || str_starts_with($file, "/") || str_contains($file, "..")) {
                 fwrite(STDERR, "!! Entree Vite absente ou invalide: {$entry}\n");

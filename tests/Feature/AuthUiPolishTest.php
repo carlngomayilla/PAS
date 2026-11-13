@@ -66,16 +66,16 @@ class AuthUiPolishTest extends TestCase
 
     public function test_stat_cards_share_a_responsive_visual_contract(): void
     {
-        $systemCss = (string) file_get_contents(resource_path('css/ui-system.css'));
+        $systemCss = (string) file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringContainsString('.app-kpi-grid', $systemCss);
         $this->assertStringContainsString('.showcase-summary-grid', $systemCss);
         $this->assertStringContainsString('.reco-metric-card', $systemCss);
         $this->assertStringContainsString('.showcase-kpi-card', $systemCss);
         $this->assertStringContainsString('.dashboard-primary-kpi-card', $systemCss);
-        $this->assertStringContainsString('--app-kpi-height: 10.25rem;', $systemCss);
+        $this->assertStringContainsString('--app-kpi-height: 8rem;', $systemCss);
         $this->assertStringContainsString('.personal-task-kpi-grid', $systemCss);
-        $this->assertStringContainsString('grid-template-columns: repeat(6, minmax(0, 1fr)) !important;', $systemCss);
+        $this->assertStringContainsString('grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)) !important;', $systemCss);
         $this->assertStringContainsString('grid-template-columns: repeat(3, minmax(0, 1fr)) !important;', $systemCss);
         $this->assertStringContainsString('grid-template-columns: repeat(2, minmax(0, 1fr)) !important;', $systemCss);
         $this->assertStringContainsString('grid-template-columns: 1fr !important;', $systemCss);
@@ -103,8 +103,8 @@ class AuthUiPolishTest extends TestCase
         $sidebar = (string) file_get_contents(resource_path('views/components/admin/sidebar.blade.php'));
         $script = (string) file_get_contents(resource_path('js/ui-enhancements.js'));
         $adminShell = (string) file_get_contents(resource_path('js/admin-shell.js'));
-        $css = (string) file_get_contents(resource_path('css/anbg-glass.css'));
-        $systemCss = (string) file_get_contents(resource_path('css/ui-system.css'));
+        $css = (string) file_get_contents(resource_path('css/app.css'));
+        $systemCss = (string) file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringContainsString('admin-navbar-back-button', $layout);
         $this->assertStringNotContainsString('anbg:sidebar:collapsed', $layout);

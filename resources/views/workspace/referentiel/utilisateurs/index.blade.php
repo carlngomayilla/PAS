@@ -21,7 +21,7 @@
         $exportFilters = collect($filters)->except('page')->filter(static fn ($value): bool => $value !== null && $value !== '')->all();
     @endphp
 
-    <div class="app-screen-flow">
+    <div class="app-screen-flow reference-workspace">
         <x-ui.page-title class="mb-4 app-screen-block" eyebrow="Administration organisationnelle" title="Référentiel - Utilisateurs" subtitle="Annuaire, rattachements métier et santé des comptes.">
             <x-slot:actions>
                 <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.utilisateurs.export.csv', $exportFilters) }}">Exporter CSV</a>
@@ -45,24 +45,21 @@
         @include('workspace.referentiel.partials.navigation', ['active' => 'utilisateurs'])
 
         <section class="showcase-panel app-screen-block p-4" aria-label="Synthèse des comptes">
-            <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(145px,1fr))]">
+            <x-ui.kpi-grid class="reference-kpi-grid">
                 @foreach ([
-                    ['label' => 'Comptes visibles', 'value' => (int) ($scopeCounts['all'] ?? 0), 'tone' => 'border-[#17324a] text-[#17324a] dark:border-sky-200 dark:text-sky-100'],
-                    ['label' => 'Actifs', 'value' => (int) ($scopeCounts['active'] ?? 0), 'tone' => 'border-[#5D8E25] text-[#4B741E] dark:border-lime-400 dark:text-lime-200'],
-                    ['label' => 'À régulariser', 'value' => (int) (($scopeCounts['renewal'] ?? 0) + ($scopeCounts['unscoped'] ?? 0)), 'tone' => 'border-[#F9B13C] text-[#9A5B00] dark:border-amber-300 dark:text-amber-200'],
-                    ['label' => 'Directions', 'value' => (int) ($summary['directions_total'] ?? 0), 'tone' => 'border-[#3996D3] text-[#176A9D] dark:border-cyan-300 dark:text-cyan-200'],
-                    ['label' => 'Services', 'value' => (int) ($summary['services_total'] ?? 0), 'tone' => 'border-violet-400 text-violet-700 dark:border-violet-400 dark:text-violet-200'],
+                    ['label' => 'Comptes visibles', 'value' => (int) ($scopeCounts['all'] ?? 0), 'tone' => 'navy'],
+                    ['label' => 'Actifs', 'value' => (int) ($scopeCounts['active'] ?? 0), 'tone' => 'green'],
+                    ['label' => 'À régulariser', 'value' => (int) (($scopeCounts['renewal'] ?? 0) + ($scopeCounts['unscoped'] ?? 0)), 'tone' => 'gold'],
+                    ['label' => 'Directions', 'value' => (int) ($summary['directions_total'] ?? 0), 'tone' => 'blue'],
+                    ['label' => 'Services', 'value' => (int) ($summary['services_total'] ?? 0), 'tone' => 'blue'],
                 ] as $metric)
-                    <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
-                        <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $metric['label'] }}</span>
-                        <strong class="mt-1 block text-2xl">{{ number_format($metric['value'], 0, ',', ' ') }}</strong>
-                    </div>
+                    <x-ui.stat-card :label="$metric['label']" :value="number_format($metric['value'], 0, ',', ' ')" :tone="$metric['tone']" />
                 @endforeach
-            </div>
+            </x-ui.kpi-grid>
         </section>
 
         <section class="app-screen-block" aria-labelledby="users-list-title">
-            <nav class="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px dark:border-slate-700" aria-label="États des comptes">
+            <nav class="reference-state-tabs flex flex-wrap gap-1 border-b border-slate-200 pb-px dark:border-slate-700" aria-label="États des comptes">
                 @foreach ($stateTabs as $stateTab)
                     @php
                         $stateUrl = route('workspace.referentiel.utilisateurs.index', array_merge(
@@ -77,9 +74,9 @@
                 @endforeach
             </nav>
 
-            <form method="GET" action="{{ route('workspace.referentiel.utilisateurs.index') }}" class="showcase-toolbar mt-4 grid min-w-0 gap-3 p-4 md:grid-cols-2 xl:grid-cols-6" aria-label="Filtres des utilisateurs" data-auto-filter-form>
+            <form method="GET" action="{{ route('workspace.referentiel.utilisateurs.index') }}" class="reference-filters showcase-toolbar mt-4 grid min-w-0 gap-3 p-4 md:grid-cols-2 xl:grid-cols-6" aria-label="Filtres des utilisateurs" data-auto-filter-form>
                 @if ($activeState !== '')<input type="hidden" name="account_state" value="{{ $activeState }}">@endif
-                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 md:col-span-2 dark:text-slate-400">
+                <label class="reference-filter-search grid gap-1 text-xs font-bold uppercase text-slate-500 md:col-span-2 dark:text-slate-400">
                     Recherche
                     <input name="q" type="search" maxlength="100" value="{{ $filters['q'] ?? '' }}" placeholder="Nom, email, matricule ou fonction..." class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                 </label>
@@ -124,7 +121,8 @@
                         @foreach ([15, 30, 50, 100] as $perPage)<option value="{{ $perPage }}" @selected((int) ($filters['per_page'] ?? 30) === $perPage)>{{ $perPage }}</option>@endforeach
                     </select>
                 </label>
-                <div class="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-6">
+                <div class="reference-filter-actions flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-6">
+                    <button class="btn btn-primary min-h-10 px-4" type="submit">Filtrer</button>
                     <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.utilisateurs.index', $activeState !== '' ? ['account_state' => $activeState] : []) }}">Réinitialiser</a>
                 </div>
             </form>
@@ -135,26 +133,26 @@
             </div>
 
             <div class="app-table-wrapper mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                <table class="app-table data-table min-w-[1280px]">
+                <table class="app-table data-table reference-table w-full" data-mobile-cards>
                     <thead><tr><th>Utilisateur</th><th>Rôle</th><th>Rattachement</th><th>Fonction</th><th>Coordonnées</th><th>Santé du compte</th>@if ($canWrite || ($canRequestUserDeletion ?? false))<th>Actions</th>@endif</tr></thead>
                     <tbody>
                         @forelse ($rows as $row)
                             @php $health = $healthByUserId[(int) $row->id] ?? ['label' => $row->is_active ? 'Actif' : 'Inactif', 'tone' => $row->is_active ? 'success' : 'danger']; @endphp
                             <tr>
-                                <td>
-                                    <div class="flex min-w-[250px] items-center gap-3">
+                                <td data-label="Utilisateur">
+                                    <div class="flex min-w-0 items-center gap-3">
                                         @if ($row->profile_photo_url)<img src="{{ $row->profile_photo_url }}" alt="Photo de {{ $row->name }}" class="h-10 w-10 rounded-full object-cover ring-2 ring-white shadow-sm dark:ring-slate-700">@else<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0f5f99] text-xs font-bold text-white">{{ $row->profile_initials }}</span>@endif
-                                        <div class="min-w-0"><strong class="block truncate text-slate-900 dark:text-slate-100">{{ $row->name }}</strong><span class="block truncate text-xs text-slate-500 dark:text-slate-400">{{ $row->email }}</span></div>
+                                        <div class="min-w-0"><strong class="block break-words text-slate-900 dark:text-slate-100">{{ $row->name }}</strong><span class="block break-words text-xs text-slate-500 dark:text-slate-400">{{ $row->email }}</span></div>
                                     </div>
                                 </td>
-                                <td><div class="min-w-[180px]"><span class="anbg-badge anbg-badge-neutral">{{ $row->roleLabel() }}</span></div></td>
-                                <td><div class="min-w-[230px]"><strong class="text-slate-800 dark:text-slate-200">{{ $row->direction?->code ?? 'Périmètre global' }}</strong><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ $row->service?->code ? $row->service->code.' - '.$row->service->libelle : ($row->uniteDg?->code ? $row->uniteDg->code.' - '.$row->uniteDg->libelle : $row->profileScopeLabel()) }}</span></div></td>
-                                <td><div class="min-w-[180px]"><span>{{ $row->agent_fonction ?: '-' }}</span>@if ($row->agent_matricule)<span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Matricule {{ $row->agent_matricule }}</span>@endif</div></td>
-                                <td><div class="min-w-[180px]"><span>{{ $row->agent_telephone ?: '-' }}</span><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">#{{ $row->id }}</span></div></td>
-                                <td><span class="anbg-badge anbg-badge-{{ $health['tone'] }}">{{ $health['label'] }}</span>@if ($row->isSuspended() && $row->suspended_until)<span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">jusqu’au {{ $row->suspended_until->format('d/m/Y') }}</span>@endif</td>
+                                <td data-label="Rôle"><div class="min-w-0"><span class="anbg-badge anbg-badge-neutral">{{ $row->roleLabel() }}</span></div></td>
+                                <td data-label="Rattachement"><div class="min-w-0"><strong class="text-slate-800 dark:text-slate-200">{{ $row->direction?->code ?? 'Périmètre global' }}</strong><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ $row->service?->code ? $row->service->code.' - '.$row->service->libelle : ($row->uniteDg?->code ? $row->uniteDg->code.' - '.$row->uniteDg->libelle : $row->profileScopeLabel()) }}</span></div></td>
+                                <td data-label="Fonction"><div class="min-w-0"><span>{{ $row->agent_fonction ?: '-' }}</span>@if ($row->agent_matricule)<span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Matricule {{ $row->agent_matricule }}</span>@endif</div></td>
+                                <td data-label="Coordonnées"><div class="min-w-0"><span>{{ $row->agent_telephone ?: '-' }}</span><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">#{{ $row->id }}</span></div></td>
+                                <td data-label="Santé du compte"><span class="anbg-badge anbg-badge-{{ $health['tone'] }}">{{ $health['label'] }}</span>@if ($row->isSuspended() && $row->suspended_until)<span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">jusqu’au {{ $row->suspended_until->format('d/m/Y') }}</span>@endif</td>
                                 @if ($canWrite || ($canRequestUserDeletion ?? false))
-                                    <td>
-                                        <div class="flex min-w-[190px] flex-wrap items-start gap-2">
+                                    <td data-label="Actions">
+                                        <div class="flex min-w-0 flex-wrap items-start gap-2">
                                             @if ($canWrite)<a class="btn btn-secondary btn-sm" href="{{ route('workspace.referentiel.utilisateurs.edit', $row) }}">Modifier</a>@endif
                                             @if ($canWrite && (int) auth()->id() !== (int) $row->id)
                                                 <details class="relative" data-preview-ignore="1"><summary class="btn btn-secondary btn-sm cursor-pointer list-none" data-preview-ignore="1">Réinit. MDP</summary><form method="POST" action="{{ route('workspace.referentiel.utilisateurs.reset-password', $row) }}" class="absolute right-0 z-20 mt-2 grid w-72 gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900" data-preview-ignore="1">@csrf<p class="text-xs text-slate-600 dark:text-slate-300" data-preview-ignore="1">Génère un mot de passe temporaire pour {{ $row->email }} (changement requis à la prochaine connexion).</p><button class="btn btn-danger btn-sm" type="submit" data-preview-ignore="1">Confirmer</button></form></details>

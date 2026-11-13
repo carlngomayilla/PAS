@@ -56,7 +56,7 @@
         };
     @endphp
 
-    <div class="app-screen-flow">
+    <div class="app-screen-flow personal-task-workspace">
         <x-ui.page-title
             class="mb-4 app-screen-block"
             eyebrow="File personnelle de traitement"
@@ -77,8 +77,8 @@
         </x-ui.page-title>
 
         <x-ui.section-card class="app-screen-block" title="Charge en attente" aria-label="Synthèse personnelle">
-            <p class="mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Charge en attente — ces compteurs mesurent ce qu’il vous reste à traiter, indépendamment du score de vos traitements déjà terminés.
+            <p class="mb-3 text-sm text-slate-500 dark:text-slate-400">
+                Vos tâches ouvertes, classées par urgence. Le score personnel porte sur les traitements déjà terminés.
             </p>
             <x-ui.kpi-grid class="personal-task-kpi-grid" min="180px">
                 @php
@@ -94,7 +94,7 @@
                     <x-ui.stat-card
                         :title="$metric['label']"
                         :value="number_format((int) $metric['value'], 0, ',', ' ')"
-                        :tone="match ($metric['label']) { 'En retard' => 'danger', 'Sous 24 h' => 'gold', default => 'blue' }"
+                        :tone="match ($metric['label']) { 'En retard', 'Critiques' => 'danger', 'Sous 24 h' => 'gold', default => 'blue' }"
                         :href="route('workspace.tasks.index', array_merge(request()->except(['page', 'vue']), ['vue' => match ($metric['label']) { 'En retard' => 'retard', 'Sous 24 h' => 'a_24h', 'Critiques' => 'critiques', 'Sans échéance' => 'sans_echeance', default => 'toutes' }]))"
                         :aria-label="$metricHints[$metric['label']] ?? ''"
                     />
@@ -127,7 +127,7 @@
         </x-ui.section-card>
 
         <x-ui.section-card class="app-screen-block mt-4" aria-labelledby="task-queue-title">
-            <nav class="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px dark:border-slate-700" aria-label="Vues de la file de tâches">
+            <nav class="flex flex-wrap gap-1 border-b border-slate-200 pb-px dark:border-slate-700" aria-label="Vues de la file de tâches" data-personal-task-views>
                 @foreach ($taskViews as $view)
                     @php
                         $isActiveView = (string) ($filters['vue'] ?? 'toutes') === $view['code'];
@@ -147,15 +147,15 @@
                 @endforeach
             </nav>
 
-            <form method="GET" action="{{ route('workspace.tasks.index') }}" class="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,.75fr)_minmax(155px,.65fr)_7rem_auto_auto] dark:border-slate-700 dark:bg-slate-900/70" data-auto-filter-form>
+            <form method="GET" action="{{ route('workspace.tasks.index') }}" class="personal-task-filters mt-4 grid min-w-0 gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto] dark:border-slate-700 dark:bg-slate-900/70" aria-label="Filtrer mes tâches" data-auto-filter-form data-personal-task-filters>
                 <input type="hidden" name="vue" value="{{ $filters['vue'] ?? 'toutes' }}">
 
-                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                <label class="personal-task-search grid min-w-0 gap-1 text-xs font-semibold text-slate-500 sm:col-span-2 xl:col-span-1 dark:text-slate-400">
                     Recherche
                     <input name="q" type="search" maxlength="100" value="{{ $filters['q'] ?? '' }}" placeholder="Tâche, action, responsable..." class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 placeholder:text-slate-400 focus:border-[#3996D3] focus:outline-none focus:ring-2 focus:ring-[#3996D3]/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                 </label>
 
-                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                     Famille
                     <select name="famille" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 focus:border-[#3996D3] focus:outline-none focus:ring-2 focus:ring-[#3996D3]/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                         <option value="">Toutes</option>
@@ -167,7 +167,7 @@
                     </select>
                 </label>
 
-                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                     Tri
                     <select name="tri" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 focus:border-[#3996D3] focus:outline-none focus:ring-2 focus:ring-[#3996D3]/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                         <option value="priorite" @selected(($filters['tri'] ?? 'priorite') === 'priorite')>Priorité</option>
@@ -176,7 +176,7 @@
                     </select>
                 </label>
 
-                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                     Par page
                     <select name="per_page" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 focus:border-[#3996D3] focus:outline-none focus:ring-2 focus:ring-[#3996D3]/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                         @foreach ([15, 25, 50] as $perPage)
@@ -185,7 +185,10 @@
                     </select>
                 </label>
 
-                <a href="{{ route('workspace.tasks.index') }}" class="btn btn-secondary min-h-10 self-end px-4">Réinitialiser</a>
+                <div class="personal-task-filter-actions flex min-w-0 flex-wrap items-end gap-2 self-end sm:col-span-2 xl:col-span-1">
+                    <button type="submit" class="btn btn-primary min-h-10 px-4">Filtrer</button>
+                    <a href="{{ route('workspace.tasks.index') }}" class="btn btn-secondary min-h-10 px-4">Réinitialiser</a>
+                </div>
             </form>
 
             <div class="mt-5 flex flex-wrap items-end justify-between gap-3">
@@ -210,8 +213,8 @@
                     <article class="app-card relative overflow-hidden p-4 pl-5" aria-labelledby="task-{{ $loop->index }}-subject">
                         <span class="absolute inset-y-0 left-0 w-1 {{ $priorityBar($task) }}" aria-hidden="true"></span>
 
-                        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_11rem_10rem_12rem] lg:items-start">
-                            <div class="min-w-0">
+                        <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_10rem_10rem_11rem] xl:items-start" data-personal-task-row>
+                            <div class="min-w-0 sm:col-span-2 xl:col-span-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="{{ $familyBadge($task) }} px-2 py-0.5 text-xs">
                                         {{ $familyLabels[$task['family'] ?? 'autres'] ?? 'Autres' }}
@@ -228,19 +231,19 @@
                                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{{ $task['score_impact'] ?? '-' }}</p>
                             </div>
 
-                            <div class="border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0 dark:border-slate-700">
+                            <div class="min-w-0 border-t border-slate-100 pt-3 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0 dark:border-slate-700">
                                 <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Échéance</span>
                                 <strong class="mt-1 block text-sm {{ (bool) ($task['is_overdue'] ?? false) ? 'text-[#B42318] dark:text-red-300' : 'text-[#17324a] dark:text-slate-100' }}">{{ $task['remaining_label'] ?? 'Délai non défini' }}</strong>
                                 <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ optional($task['deadline_at'] ?? null)->format('d/m/Y H:i') ?: 'Non définie' }}</span>
                             </div>
 
-                            <div class="border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0 dark:border-slate-700">
+                            <div class="min-w-0 border-t border-slate-100 pt-3 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0 dark:border-slate-700">
                                 <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Responsable</span>
                                 <strong class="mt-1 block break-words text-sm text-[#17324a] dark:text-slate-100">{{ $task['responsible'] ?? '-' }}</strong>
                                 <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Reçue {{ optional($task['received_at'] ?? null)->format('d/m/Y H:i') ?: '-' }}</span>
                             </div>
 
-                            <div class="grid content-start gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0 dark:border-slate-700">
+                            <div class="grid min-w-0 content-start gap-2 border-t border-slate-100 pt-3 sm:col-span-2 sm:grid-cols-2 xl:col-span-1 xl:grid-cols-1 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0 dark:border-slate-700">
                                 @if (! empty($task['can_validate']) && ! empty($task['action_id']))
                                     <form
                                         method="POST"

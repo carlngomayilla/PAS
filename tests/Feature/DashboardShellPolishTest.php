@@ -48,7 +48,7 @@ class DashboardShellPolishTest extends TestCase
 
     public function test_shell_assets_keep_navbar_sidebar_and_header_controls_aligned(): void
     {
-        $styles = file_get_contents(base_path('resources/css/anbg-glass.css'));
+        $styles = file_get_contents(base_path('resources/css/app.css'));
         $script = file_get_contents(base_path('resources/js/admin-shell.js'));
         $sidebar = file_get_contents(base_path('resources/views/components/admin/sidebar.blade.php'));
 
@@ -71,7 +71,7 @@ class DashboardShellPolishTest extends TestCase
 
     public function test_desktop_sidebar_keeps_its_labels_and_content_offset_aligned(): void
     {
-        $styles = (string) file_get_contents(resource_path('css/ui-system.css'));
+        $styles = (string) file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringContainsString('padding-left: var(--app-sidebar-width) !important;', $styles);
         $this->assertStringContainsString('width: var(--app-sidebar-width) !important;', $styles);
@@ -86,7 +86,7 @@ class DashboardShellPolishTest extends TestCase
         $sidebar = (string) file_get_contents(resource_path('views/components/admin/sidebar.blade.php'));
         $layout = (string) file_get_contents(resource_path('views/layouts/admin.blade.php'));
         $tabs = (string) file_get_contents(resource_path('views/components/ui/module-tabs.blade.php'));
-        $styles = (string) file_get_contents(resource_path('css/anbg-glass.css'));
+        $styles = (string) file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringContainsString("'module_codes' => ['imports_excel']", $sidebar);
         $this->assertStringContainsString("\$visibleReportingModuleCodes = collect(['reporting', 'ai_reports'])", $sidebar);
