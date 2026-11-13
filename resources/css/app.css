@@ -211,6 +211,30 @@
         body.admin-theme-scope .dealdeck-dashboard :is(div, section, details):has(table) {
             overflow: visible !important;
         }
+
+        /* Keep real table wrappers scrollable; the rule above is for panel
+           paint flow and must not turn a wide table into page-level overflow. */
+        body.admin-theme-scope .dealdeck-dashboard .app-table-wrapper:has(> table) {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+        }
+    }
+
+    /* Chart.js adds a visually-hidden data table for assistive technology.
+       The broad table paint rule above must not expose it over the canvas. */
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-chart-host > table.chart-a11y-table {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        clip-path: inset(50%) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
     }
     /* The scrolling wrapper clips the table; clipping the table itself breaks
        painting of its positioned cells and sticky headers in Chromium. */
