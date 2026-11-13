@@ -133,7 +133,7 @@ class EssentialDashboardWorkflowTest extends TestCase
             ->assertDontSee('Voir les actions du périmètre')
             ->assertDontSee('Reporting filtré')
             ->assertDontSee('Suivi PTA filtré')
-            ->assertSee('Filtres de pilotage')
+            ->assertSee('Plus de filtres')
             ->assertSee('Validation planification')
             ->assertSee('Vue synthétique des axes')
             ->assertSee('Suivi PTA')

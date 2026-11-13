@@ -362,8 +362,7 @@ class ActionTrackingWorkspaceTest extends TestCase
     {
         $script = (string) file_get_contents(resource_path('js/action-detail-tabs.js'));
         $appScript = (string) file_get_contents(resource_path('js/app.js'));
-        $styles = (string) file_get_contents(resource_path('css/anbg-glass.css'));
-        $uiStyles = (string) file_get_contents(resource_path('css/ui-system.css'));
+        $styles = (string) file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringContainsString('id="action-echeances"', (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php')));
         $this->assertStringContainsString("'action-status': 'action-validation'", $script);
@@ -379,10 +378,10 @@ class ActionTrackingWorkspaceTest extends TestCase
         $this->assertStringContainsString('.action-stepper-panel', $styles);
         $this->assertStringContainsString('.action-detail-hero,', $styles);
         $this->assertStringContainsString('action-workspace-panel', (string) file_get_contents(resource_path('views/workspace/actions/suivi.blade.php')));
-        $this->assertStringContainsString('.action-workspace-panel,', $uiStyles);
+        $this->assertStringContainsString('.action-workspace-panel,', $styles);
         $this->assertStringContainsString('#admin-sidebar:hover', $styles);
-        $this->assertStringContainsString('.sidebar-desktop-expanded #admin-sidebar', $uiStyles);
-        $this->assertStringNotContainsString('data-sidebar-compact', $uiStyles);
+        $this->assertStringContainsString('.sidebar-desktop-expanded #admin-sidebar', $styles);
+        $this->assertStringNotContainsString('data-sidebar-compact', $styles);
     }
 
     public function test_action_tracking_keeps_the_execution_form_static(): void

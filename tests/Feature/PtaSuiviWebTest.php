@@ -1223,7 +1223,6 @@ class PtaSuiviWebTest extends TestCase
         $ptaSuiviUi = (string) file_get_contents(resource_path('js/pta-suivi-ui.js'));
         $appJavaScript = (string) file_get_contents(resource_path('js/app.js'));
         $css = (string) file_get_contents(resource_path('css/app.css'));
-        $uiSystemCss = (string) file_get_contents(resource_path('css/ui-system.css'));
 
         $this->assertStringContainsString('<x-pta.preview-link', $table);
         $this->assertStringContainsString('$cellPreviewMode = $exportMode;', $table);
@@ -1268,9 +1267,9 @@ class PtaSuiviWebTest extends TestCase
         $this->assertStringNotContainsString("http_build_query(['focus' => 'action'])", (string) file_get_contents(app_path('Services/PtaSuiviService.php')));
         $this->assertStringContainsString('.pta-suivi-table tbody tr.pta-level-axis > td', $css);
         $this->assertStringContainsString('.pta-suivi-table th,', $css);
-        $this->assertStringContainsString('#pta-suivi-modal-description', $uiSystemCss);
-        $this->assertStringContainsString('.pta-status-badge', $uiSystemCss);
-        $this->assertStringContainsString('.pta-status-badge--delai.pta-status-badge--dans-les-delais', $uiSystemCss);
+        $this->assertStringContainsString('#pta-suivi-modal-description', $css);
+        $this->assertStringContainsString('.pta-status-badge', $css);
+        $this->assertStringContainsString('.pta-status-badge--delai.pta-status-badge--dans-les-delais', $css);
     }
 
     public function test_pta_suivi_eager_loads_action_logs_for_status_calculation(): void

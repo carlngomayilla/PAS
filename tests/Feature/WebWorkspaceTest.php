@@ -868,7 +868,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_glass_theme_keeps_admin_table_headers_blue(): void
     {
-        $css = file_get_contents(resource_path('css/anbg-glass.css'));
+        $css = file_get_contents(resource_path('css/app.css'));
         $this->assertIsString($css);
         $normalizedCss = str_replace("\r\n", "\n", $css);
 

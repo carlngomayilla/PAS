@@ -55,7 +55,13 @@ test.describe('stabilisation du dashboard', () => {
         await expect(filterForm).toBeVisible();
         await expect(filterForm.locator('button[type="submit"], input[type="submit"]')).toHaveCount(0);
 
+        const additionalFilters = filterForm.locator('[data-dashboard-additional-filters]');
+        await expect(additionalFilters).not.toHaveAttribute('open', '');
+        await additionalFilters.locator('summary').click();
+        await expect(additionalFilters).toHaveAttribute('open', '');
+
         const statusSelect = filterForm.locator('select[name="statut_suivi"]');
+        await expect(statusSelect).toBeVisible();
         const statusValue = await statusSelect.locator('option').evaluateAll(options => {
             const candidate = options.find(option => ! ['', 'all'].includes((option as HTMLOptionElement).value));
 
