@@ -261,6 +261,7 @@ class ActionTrackingWorkspaceTest extends TestCase
     {
         Storage::fake('local');
         $fixture = $this->createFixture(['justificatif_obligatoire' => true]);
+        $this->registerSignature($fixture['agent']);
 
         $this->actingAs($fixture['controller'])
             ->post(route('workspace.actions.historical-execution.store', $fixture['action']), [
@@ -290,6 +291,7 @@ class ActionTrackingWorkspaceTest extends TestCase
                 'commentaire' => 'Justificatif du premier trimestre joint.',
                 'justificatif' => UploadedFile::fake()->create('pv-premier-trimestre.pdf', 10, 'application/pdf'),
                 'tracking_action' => 'submit',
+                ...$this->signaturePayload(),
             ])
             ->assertRedirect(route('workspace.actions.suivi', $fixture['action']));
 
@@ -321,7 +323,9 @@ class ActionTrackingWorkspaceTest extends TestCase
 
     public function test_historical_action_cannot_be_submitted_without_its_required_justificatif(): void
     {
+        Storage::fake('local');
         $fixture = $this->createFixture(['justificatif_obligatoire' => true]);
+        $this->registerSignature($fixture['agent']);
         $this->actingAs($fixture['controller'])
             ->post(route('workspace.actions.historical-execution.store', $fixture['action']), [
                 'statut_execution' => 'achevee',
@@ -335,6 +339,7 @@ class ActionTrackingWorkspaceTest extends TestCase
                 'quantite_realisee' => 100,
                 'commentaire' => 'Soumission sans pièce jointe.',
                 'tracking_action' => 'submit',
+                ...$this->signaturePayload(),
             ])
             ->assertSessionHasErrors('general');
 
@@ -988,5 +993,23 @@ class ActionTrackingWorkspaceTest extends TestCase
             'statut' => 'non_demarre',
             'validation_status' => SousAction::VALIDATION_NON_SOUMISE,
         ]);
+    }
+
+    /** @return array{signature_consent: string, current_password: string} */
+    private function signaturePayload(): array
+    {
+        return ['signature_consent' => '1', 'current_password' => 'password'];
+    }
+
+    private function registerSignature(User $user): void
+    {
+        $contents = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $path = 'signatures/'.$user->id.'/workflow.png';
+        Storage::disk('local')->put($path, $contents);
+        $user->forceFill([
+            'signature_path' => $path,
+            'signature_sha256' => hash('sha256', $contents),
+            'signature_updated_at' => now(),
+        ])->save();
     }
 }

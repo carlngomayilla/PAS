@@ -25,6 +25,12 @@ class WorkflowV2CycleTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('local');
+    }
+
     public function test_quantitative_action_save_then_submit_then_validate(): void
     {
         Storage::fake('local');
@@ -220,6 +226,7 @@ class WorkflowV2CycleTest extends TestCase
             ->post(route('workspace.actions.planification.review', $action), [
                 'decision' => 'valider',
                 'motif' => 'Controle de coherence.',
+                ...$this->signaturePayload(),
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
@@ -234,6 +241,7 @@ class WorkflowV2CycleTest extends TestCase
             ->post(route('workspace.actions.control.review', $action), [
                 'decision' => 'valider',
                 'motif' => 'Controle final conforme.',
+                ...$this->signaturePayload(),
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
@@ -477,10 +485,12 @@ class WorkflowV2CycleTest extends TestCase
             'direction_id' => $pta->direction_id,
             'service_id' => $pta->service_id,
         ]);
+        $this->registerSignature($unitChief);
 
         $this->actingAs($unitChief)
             ->post(route('workspace.actions.review', $action), [
                 'decision' => 'valider',
+                ...$this->signaturePayload(),
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
@@ -649,6 +659,10 @@ class WorkflowV2CycleTest extends TestCase
         $controller = User::factory()->create(['role' => User::ROLE_SCIQ]);
         $planification = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
 
+        foreach ([$agent, $chef, $controller, $planification] as $signer) {
+            $this->registerSignature($signer);
+        }
+
         $pas = Pas::query()->create(['titre' => 'PAS WF', 'periode_debut' => 2026, 'periode_fin' => 2030]);
         $pao = Pao::query()->create(['pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO WF', 'annee' => 2026]);
         $pta = Pta::query()->create(['pao_id' => $pao->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PTA WF']);
@@ -671,5 +685,23 @@ class WorkflowV2CycleTest extends TestCase
             'controller' => $controller,
             'planification' => $planification,
         ];
+    }
+
+    /** @return array{signature_consent: string, current_password: string} */
+    private function signaturePayload(): array
+    {
+        return ['signature_consent' => '1', 'current_password' => 'password'];
+    }
+
+    private function registerSignature(User $user): void
+    {
+        $contents = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $path = 'signatures/'.$user->id.'/workflow.png';
+        Storage::disk('local')->put($path, $contents);
+        $user->forceFill([
+            'signature_path' => $path,
+            'signature_sha256' => hash('sha256', $contents),
+            'signature_updated_at' => now(),
+        ])->save();
     }
 }

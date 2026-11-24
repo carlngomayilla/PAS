@@ -19,6 +19,7 @@ use App\Services\Actions\ActionTrackingService;
 use App\Services\PersonalTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PersonalTaskWorkflowTest extends TestCase
@@ -92,6 +93,7 @@ class PersonalTaskWorkflowTest extends TestCase
     public function test_inline_validation_from_personal_tasks_is_journalized(): void
     {
         $fixture = $this->planningFixture();
+        $this->registerSignature($fixture['chef']);
 
         $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action journalisee depuis taches');
         $action->forceFill([
@@ -105,6 +107,7 @@ class PersonalTaskWorkflowTest extends TestCase
             ->post(route('workspace.actions.review', $action), [
                 'source' => 'personal_tasks',
                 'decision' => 'valider',
+                ...$this->signaturePayload(),
             ])
             ->assertRedirect(route('workspace.tasks.index'));
 
@@ -745,6 +748,24 @@ class PersonalTaskWorkflowTest extends TestCase
         ]);
 
         return compact('direction', 'service', 'agent', 'chef', 'pta');
+    }
+
+    /** @return array{signature_consent: string, current_password: string} */
+    private function signaturePayload(): array
+    {
+        return ['signature_consent' => '1', 'current_password' => 'password'];
+    }
+
+    private function registerSignature(User $user): void
+    {
+        $contents = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $path = 'signatures/'.$user->id.'/workflow.png';
+        Storage::disk('local')->put($path, $contents);
+        $user->forceFill([
+            'signature_path' => $path,
+            'signature_sha256' => hash('sha256', $contents),
+            'signature_updated_at' => now(),
+        ])->save();
     }
 
     private function makeAction(Pta $pta, User $agent, string $label): Action
