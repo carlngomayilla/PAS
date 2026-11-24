@@ -13,12 +13,19 @@ use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ApiActionValidationWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('local');
+    }
 
     public function test_service_chief_can_validate_a_submitted_action_through_the_api(): void
     {
@@ -29,6 +36,7 @@ class ApiActionValidationWorkflowTest extends TestCase
             'decision' => 'valider',
             'progress_percent' => 75,
             'motif' => 'Ajustement vérifié avec les pièces.',
+            ...$this->signaturePayload(),
         ])
             ->assertOk()
             // Le visa du chef transmet maintenant l'action à la Planification;
@@ -51,6 +59,7 @@ class ApiActionValidationWorkflowTest extends TestCase
 
         $this->postJson(route('v1.actions.review', $fixture['action']), [
             'decision' => 'valider',
+            ...$this->signaturePayload(),
         ])->assertOk()
             ->assertJsonPath('data.statut_validation', ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION);
 
@@ -77,6 +86,63 @@ class ApiActionValidationWorkflowTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('motif');
+    }
+
+    public function test_rejection_does_not_require_an_approval_signature(): void
+    {
+        $fixture = $this->createFixture();
+        $fixture['chef']->forceFill([
+            'signature_path' => null,
+            'signature_sha256' => null,
+            'signature_updated_at' => null,
+        ])->save();
+        Sanctum::actingAs($fixture['chef']);
+
+        $this->postJson(route('v1.actions.review', $fixture['action']), [
+            'decision' => 'rejeter',
+            'motif' => 'La pièce doit être corrigée.',
+        ])->assertOk();
+
+        $this->assertSame(ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE, $fixture['action']->fresh()->statut_validation);
+    }
+
+    public function test_approval_requires_explicit_signature_consent_and_current_password(): void
+    {
+        $fixture = $this->createFixture();
+        Sanctum::actingAs($fixture['chef']);
+
+        $this->postJson(route('v1.actions.review', $fixture['action']), [
+            'decision' => 'valider',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['signature_consent', 'current_password']);
+
+        $this->postJson(route('v1.actions.review', $fixture['action']), [
+            'decision' => 'valider',
+            'signature_consent' => '1',
+            'current_password' => 'incorrect',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('current_password');
+
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $fixture['action']->fresh()->statut_validation);
+    }
+
+    public function test_approval_requires_a_signature_registered_in_the_profile(): void
+    {
+        $fixture = $this->createFixture();
+        $fixture['chef']->forceFill([
+            'signature_path' => null,
+            'signature_sha256' => null,
+            'signature_updated_at' => null,
+        ])->save();
+        Sanctum::actingAs($fixture['chef']);
+
+        $this->postJson(route('v1.actions.review', $fixture['action']), [
+            'decision' => 'valider',
+            ...$this->signaturePayload(),
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('signature_consent');
+
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $fixture['action']->fresh()->statut_validation);
     }
 
     public function test_chief_cannot_review_an_action_from_another_service(): void
@@ -106,10 +172,12 @@ class ApiActionValidationWorkflowTest extends TestCase
 
         $this->postJson(route('v1.actions.review', $fixture['action']), [
             'decision' => 'valider',
+            ...$this->signaturePayload(),
         ])->assertOk();
 
         $this->postJson(route('v1.actions.review', $fixture['action']->fresh()), [
             'decision' => 'valider',
+            ...$this->signaturePayload(),
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('action');
@@ -139,6 +207,7 @@ class ApiActionValidationWorkflowTest extends TestCase
             'direction_id' => $direction->id,
             'service_id' => $service->id,
         ]);
+        $this->registerSignature($chef);
         $pas = Pas::query()->create([
             'titre' => 'PAS API',
             'periode_debut' => 2026,
@@ -171,5 +240,26 @@ class ApiActionValidationWorkflowTest extends TestCase
         ]);
 
         return compact('action', 'chef', 'direction');
+    }
+
+    /** @return array{signature_consent: string, current_password: string} */
+    private function signaturePayload(): array
+    {
+        return [
+            'signature_consent' => '1',
+            'current_password' => 'password',
+        ];
+    }
+
+    private function registerSignature(User $user): void
+    {
+        $contents = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $path = 'signatures/'.$user->id.'/workflow.png';
+        Storage::disk('local')->put($path, $contents);
+        $user->forceFill([
+            'signature_path' => $path,
+            'signature_sha256' => hash('sha256', $contents),
+            'signature_updated_at' => now(),
+        ])->save();
     }
 }

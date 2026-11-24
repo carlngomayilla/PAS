@@ -11,6 +11,8 @@ class Justificatif extends Model
 {
     use HasFactory;
 
+    public const CATEGORY_GENERATED_FOLLOWUP = 'fiche_suivi_generee';
+
     private const EXECUTION_CATEGORIES = [
         'hebdomadaire',
         'final',

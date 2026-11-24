@@ -13583,11 +13583,15 @@ body.admin-theme-scope.anbg-glass-theme .action-stepper {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--action-stepper-columns, 4), minmax(0, 1fr));
     gap: 0;
     margin: 0;
     padding: 0.25rem 0 0;
     list-style: none;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-has-legacy-sciq {
+    --action-stepper-columns: 5;
 }
 
 body.admin-theme-scope.anbg-glass-theme .action-stepper-item {

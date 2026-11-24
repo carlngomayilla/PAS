@@ -132,6 +132,78 @@
         </form>
     </section>
 
+    <section class="showcase-panel app-screen-block profile-signature-card" aria-labelledby="profile-signature-title">
+        <div class="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <div>
+                <p class="showcase-kpi-label">Visa électronique</p>
+                <h2 id="profile-signature-title" class="showcase-panel-title mt-1">Signature personnelle</h2>
+                <p class="mt-2 text-sm text-[var(--app-muted)]">
+                    Cette image pourra être apposée sur les fiches de suivi que vous validez. Elle reste privée et ne peut être consultée que depuis votre compte.
+                </p>
+
+                <div class="mt-4 flex min-h-32 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-900/40">
+                    @if ($user->signature_path)
+                        <img src="{{ route('workspace.profile.signature.show', ['v' => $user->signature_updated_at?->timestamp]) }}"
+                             alt="Signature personnelle enregistrée"
+                             class="max-h-24 max-w-full object-contain">
+                    @else
+                        <p class="text-center text-sm text-[var(--app-muted)]">Aucune signature enregistrée.</p>
+                    @endif
+                </div>
+
+                @if ($user->signature_updated_at)
+                    <p class="mt-2 text-xs text-[var(--app-muted)]">
+                        Dernière mise à jour le {{ $user->signature_updated_at->format('d/m/Y à H:i') }}.
+                    </p>
+                @endif
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" action="{{ route('workspace.profile.signature.update') }}" class="form-shell reco-form-shell !m-0 !p-0">
+                @csrf
+                @method('PUT')
+
+                <div class="form-section reco-form-section !mb-0">
+                    <div>
+                        <label for="signature">{{ $user->signature_path ? 'Remplacer la signature' : 'Importer la signature' }}</label>
+                        <div class="showcase-upload-zone">
+                            <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">Fichier PNG sur fond blanc ou transparent</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Dimensions de 40 × 20 à 2 400 × 1 200 px, taille maximale 1 Mo.</p>
+                            <input id="signature" class="mt-4" name="signature" type="file" accept="image/png,.png" required>
+                        </div>
+                        @error('signature')
+                            <p class="mt-2 text-sm text-red-700" role="alert">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="signature_current_password">Mot de passe actuel</label>
+                        <div class="relative">
+                            <input id="signature_current_password" name="current_password" type="password" autocomplete="current-password" class="pr-14" required>
+                            <x-auth.password-toggle target="signature_current_password" />
+                        </div>
+                        @error('current_password')
+                            <p class="mt-2 text-sm text-red-700" role="alert">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <label class="mt-4 !mb-0 flex items-start gap-3 text-sm text-[var(--app-text)]" for="signature_ownership_confirmed">
+                        <input id="signature_ownership_confirmed" name="signature_ownership_confirmed" type="checkbox" value="1" class="mt-1" required @checked(old('signature_ownership_confirmed'))>
+                        <span>Je confirme que cette signature est la mienne et j’autorise son utilisation uniquement pour mes visas explicites dans l’application.</span>
+                    </label>
+                    @error('signature_ownership_confirmed')
+                        <p class="mt-2 text-sm text-red-700" role="alert">{{ $message }}</p>
+                    @enderror
+
+                    <div class="form-actions reco-form-footer mt-5">
+                        <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
+                            {{ $user->signature_path ? 'Remplacer ma signature' : 'Enregistrer ma signature' }}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+
     <section class="showcase-panel app-screen-block profile-sessions-card">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>

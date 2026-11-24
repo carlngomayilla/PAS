@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateProfileSignatureRequest;
 use App\Models\User;
 use App\Services\Security\AntivirusScanner;
 use App\Services\Security\MalwareScanException;
@@ -14,8 +15,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProfileWebController extends Controller
 {
@@ -107,6 +110,60 @@ class ProfileWebController extends Controller
         return redirect()
             ->route('workspace.profile.edit')
             ->with('success', 'Profil mis a jour avec succès.');
+    }
+
+    public function updateSignature(UpdateProfileSignatureRequest $request): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $file = $request->file('signature');
+        try {
+            $this->scanner->scanUploadedFile($file);
+        } catch (MalwareScanException $exception) {
+            return back()->withErrors(['signature' => $exception->getMessage()]);
+        }
+
+        $path = $file->storeAs('signatures/'.$user->id, Str::uuid().'.png', 'local');
+        if (! is_string($path) || $path === '') {
+            throw new \RuntimeException('La signature ne peut pas être enregistrée.');
+        }
+
+        try {
+            $digest = (string) hash_file('sha256', $file->getRealPath());
+            DB::transaction(function () use ($user, $path, $digest): void {
+                $lockedUser = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+                $lockedUser->forceFill([
+                    'signature_path' => $path,
+                    'signature_sha256' => $digest,
+                    'signature_updated_at' => now(),
+                ])->save();
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($path);
+            throw $exception;
+        }
+
+        $this->recordAudit($request, 'profil_utilisateur', 'signature_updated', $user, null, [
+            'signature_sha256' => $digest,
+            'ownership_confirmed' => true,
+        ]);
+
+        return redirect()->route('workspace.profile.edit')->with('success', 'Signature personnelle enregistrée.');
+    }
+
+    public function showSignature(Request $request): StreamedResponse
+    {
+        $user = $this->authUser($request);
+        $path = $user->signature_path;
+        abort_unless(is_string($path)
+            && str_starts_with($path, 'signatures/'.$user->id.'/')
+            && ! str_contains($path, '..')
+            && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, 'signature.png', [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ], 'inline');
     }
 
     public function revokeCurrentSession(Request $request): RedirectResponse

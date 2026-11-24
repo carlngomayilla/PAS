@@ -3,7 +3,9 @@
 @section('content')
     @php
         $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
-        $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
+        $actionStatusLabel = static fn (string $status): string => $status === 'cloturee'
+            ? 'Achevée'
+            : \App\Support\UiLabel::actionStatus($status);
         $validationStatusLabel = static function (string $status): string {
             return [
                 'realisee_a_soumettre' => 'Réalisée à soumettre',
@@ -14,6 +16,7 @@
                 'attente_validation_sciq' => 'En attente du SCIQ',
                 'retour_sciq' => 'Retour du SCIQ',
                 'reexamen_sciq' => 'Réexamen SCIQ',
+                'validee_planification' => 'Validée par la Planification',
                 'achevee_validee' => 'Achevée et validée',
             ][$status] ?? \App\Support\UiLabel::validationStatus($status);
         };
@@ -62,12 +65,12 @@
             'service_enabled' => true,
             'direction_enabled' => false,
             'submission_target' => 'service',
-            'chain_label' => 'Agent -> Chef -> Planification -> SCIQ -> Action achevée',
-            'submission_help_text' => "L'action est d'abord visée par le Chef, contrôlée par la Planification, puis soumise au SCIQ pour clôture officielle.",
+            'chain_label' => 'Agent → Chef → Planification → Action achevée',
+            'submission_help_text' => "L’action est visée par le Chef, puis clôturée dès sa validation par la Planification.",
             'submission_button_label' => 'Soumettre',
             'service_review_button_label' => 'Viser et transmettre',
             'service_review_success_text' => 'Visa chef enregistre.',
-             'final_statistics_hint' => 'Oui après validation finale par le SCIQ.',
+            'final_statistics_hint' => 'Oui après validation par la Planification.',
             'rejection_comment_required' => true,
         ];
         $agentLocked = auth()->check()
@@ -77,6 +80,7 @@
         $isAwaitingChefSciqReturn = $workflow['service_enabled'] && $validationStatus === 'retour_planification';
         $isAwaitingPlanification = in_array($validationStatus, ['soumise_planification', 'attente_validation_planification'], true);
         $isAwaitingControl = in_array($validationStatus, ['soumise_controle', 'attente_validation_sciq', 'reexamen_sciq'], true);
+        $hasLegacySciqStage = $isAwaitingControl || in_array($validationStatus, ['validee_controle', 'correction_controle', 'retour_sciq'], true);
         // L'etape « validation direction » a ete supprimee du circuit metier.
         // Les statuts `validee_direction` / `rejetee_direction` ne sont
         // conserves qu'en lecture historique (actions cloturees avant la
@@ -114,6 +118,10 @@
                 'action_transmise_planification',
                 'action_validee_planification',
                 'action_rejetee_planification',
+                'action_controle_sciq_ouvert',
+                'action_controle_sciq_conforme',
+                'action_controle_sciq_ecart',
+                'action_controle_sciq_arbitre',
                 'action_validee_direction',
                 'action_rejetee_direction',
                 'financement_demande',
@@ -305,7 +313,6 @@
             'soumise_controle', 'attente_validation_sciq',
             'validee_controle', 'validee_planification', 'validee_direction',
         ];
-        $stepperControlApprovedStatuses = ['validee_controle', 'validee_planification', 'validee_direction'];
         $stepperValidatedStatuses = ['validee_controle', 'validee_planification', 'validee_direction', 'achevee_validee'];
         $stepperCorrectionStatuses = [
             'correction_demandee', 'retour_chef', 'correction_planification', 'retour_planification',
@@ -320,8 +327,6 @@
         $stepperChefApproved = in_array($validationStatus, $stepperChefApprovedStatuses, true);
         $stepperPlanificationApproved = in_array($validationStatus, $stepperPlanificationApprovedStatuses, true);
         $stepperPlanificationPending = in_array($validationStatus, ['soumise_planification', 'attente_validation_planification', 'correction_planification', 'retour_planification'], true);
-        $stepperControlPending = in_array($validationStatus, ['soumise_controle', 'attente_validation_sciq', 'reexamen_sciq'], true);
-        $stepperControlApproved = in_array($validationStatus, $stepperControlApprovedStatuses, true);
         $stepperIsValidated = in_array($validationStatus, $stepperValidatedStatuses, true);
         $stepperNeedsCorrection = in_array($validationStatus, $stepperCorrectionStatuses, true) || $status === 'a_corriger';
         $stepperIsClosed = $stepperIsValidated;
@@ -350,20 +355,20 @@
                     ? 'warning'
                     : ($stepperPlanificationApproved || $stepperIsValidated ? 'done' : ($stepperPlanificationPending ? 'current' : 'pending')),
             ],
-            [
+        ];
+        if ($hasLegacySciqStage) {
+            $actionStepperSteps[] = [
                 'label' => 'SCIQ',
-                'caption' => $stepperIsValidated ? 'Visa final enregistré' : ($stepperControlPending ? 'Décision attendue' : 'À venir'),
+                'caption' => $stepperIsValidated ? 'Visa final enregistré' : ($isAwaitingControl ? 'Décision attendue' : 'Retour pour correction'),
                 'state' => $stepperNeedsCorrection && in_array($validationStatus, ['correction_controle', 'retour_sciq'], true)
                     ? 'warning'
-                    : ($stepperControlApproved || $stepperIsValidated ? 'done' : ($stepperControlPending ? 'current' : 'pending')),
-            ],
-            [
-                'label' => 'Action achevée',
-                'caption' => $stepperIsClosed ? 'Clôture officielle' : 'Après le visa SCIQ',
-                'state' => $stepperIsStopped
-                    ? 'blocked'
-                    : ($stepperIsClosed ? 'done' : 'pending'),
-            ],
+                    : ($stepperIsValidated ? 'done' : ($isAwaitingControl ? 'current' : 'pending')),
+            ];
+        }
+        $actionStepperSteps[] = [
+            'label' => 'Action achevée',
+            'caption' => $stepperIsClosed ? 'Clôture officielle' : ($hasLegacySciqStage ? 'Après le visa SCIQ' : 'Après validation Planification'),
+            'state' => $stepperIsStopped ? 'blocked' : ($stepperIsClosed ? 'done' : 'pending'),
         ];
         $actionStepperActiveIndex = 0;
         foreach ($actionStepperSteps as $stepIndex => $step) {
@@ -379,20 +384,26 @@
                 'retour_sciq_accepte_planification',
                 'retour_planification_accepte_chef',
                 'retour_sciq_accepte_chef',
-            ], true))
+            ], true) || ($log->type_evenement === 'action_controle_sciq_arbitre'
+                && data_get($log->details, 'decision') === 'reouvrir'))
             ->sortByDesc('created_at')
             ->first();
         $lastCorrectionDetails = is_array($lastCorrectionLog?->details) ? $lastCorrectionLog->details : [];
         $lastCorrectionMessage = trim((string) ($lastCorrectionDetails['motif'] ?? $lastCorrectionLog?->message ?? ''));
         $planificationReviewedAt = $action->planification_validated_at
             ?? $action->planification_reviewed_at
-            ?? ($stepperIsValidated ? $action->cloture_le : null);
+            ?? ($validationStatus === 'validee_planification' ? $action->cloture_le : null);
         $workflowCircuitSteps = [
             ['label' => 'Agent', 'caption' => $action->soumise_le ? 'Soumission le '.$action->soumise_le->format('d/m/Y H:i') : 'Saisie ou correction'],
             ['label' => 'Chef', 'caption' => $action->evalue_le ? 'Visa le '.$action->evalue_le->format('d/m/Y H:i') : 'Visa attendu'],
             ['label' => 'Planification', 'caption' => $planificationReviewedAt ? 'Visa le '.$planificationReviewedAt->format('d/m/Y H:i') : 'Visa attendu'],
-            ['label' => 'SCIQ', 'caption' => $action->controle_reviewed_at ? 'Visa le '.$action->controle_reviewed_at->format('d/m/Y H:i') : 'Contrôle final attendu'],
-            ['label' => 'Action achevée', 'caption' => $action->cloture_le ? 'Clôture le '.$action->cloture_le->format('d/m/Y H:i') : 'Après le visa SCIQ'],
+        ];
+        if ($hasLegacySciqStage) {
+            $workflowCircuitSteps[] = ['label' => 'SCIQ', 'caption' => $action->controle_reviewed_at ? 'Visa le '.$action->controle_reviewed_at->format('d/m/Y H:i') : 'Décision attendue'];
+        }
+        $workflowCircuitSteps[] = [
+            'label' => 'Action achevée',
+            'caption' => $action->cloture_le ? 'Clôture le '.$action->cloture_le->format('d/m/Y H:i') : ($hasLegacySciqStage ? 'Après le visa SCIQ' : 'Après validation Planification'),
         ];
         $executionProofCount = $action->justificatifs
             ->whereIn('categorie', ['execution_quantitative', 'execution_non_quantitative', 'final'])
@@ -598,7 +609,7 @@
         $v2ValidationStatus = (string) ($action->statut_validation ?? 'non_soumise');
         $v2IsSubmitted = in_array($v2ValidationStatus, ['soumise_chef', 'attente_validation_chef'], true);
         $v2IsAwaitingPlanification = in_array($v2ValidationStatus, ['soumise_planification', 'attente_validation_planification'], true);
-        $v2IsAwaitingControl = in_array($v2ValidationStatus, ['validee_chef', 'soumise_controle', 'attente_validation_sciq'], true);
+        $v2IsAwaitingControl = $isAwaitingControl;
         $v2IsValidated = in_array($v2ValidationStatus, ['validee_controle', 'validee_planification', 'validee_direction', 'achevee_validee'], true);
     @endphp
 
@@ -616,7 +627,7 @@
                 {{ $hideExecutorMetrics ? 'Realise' : number_format($progressionReelle, 0, ',', ' ').'% realise' }}
             </span>
         </div>
-        <ol class="action-stepper">
+        <ol @class(['action-stepper', 'action-stepper-has-legacy-sciq' => $hasLegacySciqStage])>
             @foreach ($actionStepperSteps as $index => $step)
                 <li class="action-stepper-item is-{{ $step['state'] }} {{ $index <= $actionStepperActiveIndex ? 'is-line-active' : '' }}" @if (in_array($step['state'], ['current', 'warning', 'blocked'], true)) aria-current="step" @endif>
                     <span class="action-stepper-marker">{{ $index + 1 }}</span>
@@ -971,6 +982,8 @@
         var lastLogId = {{ $discussionEntries->last()?->id ?? 0 }};
         var validTypes = ['commentaire','action_soumise_validation','action_validee_chef','action_rejetee_chef','action_correction_demandee',
                           'action_transmise_controle','action_validee_controle','action_rejetee_controle',
+                          'action_transmise_planification','action_validee_planification','action_rejetee_planification',
+                          'action_controle_sciq_ouvert','action_controle_sciq_conforme','action_controle_sciq_ecart','action_controle_sciq_arbitre',
                           'action_validee_direction','action_rejetee_direction','financement_demande','financement_prepare',
                           'financement_soumis_daf','financement_resoumis_daf','financement_valide_daf',
                           'financement_complement_demande','financement_rejete_daf','financement_accord_dg','financement_refus_dg'];
@@ -1047,7 +1060,7 @@
         data-action-workspace-tracking
         data-action-tab-panel
         data-action-tab-group="action-tracking"
-        data-has-errors="{{ $errors->hasAny(['general', 'quantite_realisee', 'difficulte', 'justificatif', 'commentaire', 'progress_percent']) ? 'true' : 'false' }}"
+        data-has-errors="{{ $errors->hasAny(['general', 'quantite_realisee', 'difficulte', 'justificatif', 'commentaire', 'progress_percent', 'signature_consent', 'current_password']) ? 'true' : 'false' }}"
     >
 
         {{-- VALIDATION CHEF — action soumise --}}
@@ -1072,6 +1085,11 @@
                         <label for="chef-reason">Observation / justification d'ajustement</label>
                         <input id="chef-reason" name="motif" type="text" value="{{ old('motif') }}" placeholder="Obligatoire si le taux est modifié">
                     </div>
+                    <x-workflow-signature-confirmation
+                        id-prefix="chef-approval"
+                        class="md:col-span-3"
+                        label="Je confirme le visa du Chef de service et la transmission à la Planification."
+                    />
                     <button class="btn btn-primary" type="submit">Viser et transmettre</button>
                 </form>
                 <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
@@ -1088,7 +1106,9 @@
         @elseif ($v2IsAwaitingPlanification)
             <p class="action-section-note mb-3">Visa du Chef enregistré — saisie gelée en attente du contrôle de cohérence de la Planification.</p>
         @elseif ($v2IsAwaitingControl)
-            <p class="action-section-note mb-3">Visa de la Planification enregistré — saisie gelée en attente du contrôle final SCIQ.</p>
+            <p class="action-section-note mb-3">Ce dossier suit l’ancien circuit et attend la décision du SCIQ.</p>
+        @elseif ($v2ValidationStatus === 'validee_planification')
+            <p class="action-section-note mb-3">Action achevée et validée par la Planification. Son résultat est officiel.</p>
         @elseif ($v2IsValidated)
             <p class="action-section-note mb-3">Action validée officiellement et clôturée.</p>
         @elseif ($v2ValidationStatus === 'correction_demandee')
@@ -1102,7 +1122,7 @@
         @if (($v2ActionResponsible ?? false) && $action->hasHistoricalExecutionToValidate())
             <div class="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
                 <strong>Réalisation antérieure à confirmer.</strong>
-                Les faits et dates historiques restent conservés. Vérifiez les informations, ajoutez le justificatif demandé, puis enregistrez ou soumettez l’action. Les visas du Chef, de la Planification et du SCIQ seront datés lorsqu’ils seront réellement donnés.
+                Les faits et dates historiques restent conservés. Vérifiez les informations, ajoutez le justificatif demandé, puis enregistrez ou soumettez l’action. Chaque décision sera datée au moment où elle sera prise.
                 @if ($action->historical_execution_recorded_at)
                     <span class="mt-1 block text-xs">Reprise saisie le {{ $action->historical_execution_recorded_at->format('d/m/Y à H:i') }}.</span>
                 @endif
@@ -1119,7 +1139,7 @@
                 $executionFormHasErrors = $errors->hasAny(['general', 'quantite_realisee', 'difficulte', 'justificatif', 'commentaire']);
             @endphp
             @if ($v2FormFrozen)
-                <p class="action-section-note mb-2">Formulaire figé pendant les visas Chef, Planification et SCIQ. Il se rouvre automatiquement en cas de demande de correction.</p>
+                <p class="action-section-note mb-2">La saisie reprend lorsque le dossier est renvoyé à l’agent pour correction.</p>
             @endif
             <div class="form-step-accordion action-execution-disclosure action-execution-static mt-2" data-action-execution-disclosure>
                 <div class="form-step-body">
@@ -1155,6 +1175,10 @@
                             </div>
                         </fieldset>
                         @unless ($v2FormFrozen)
+                            <x-workflow-signature-confirmation
+                                id-prefix="rmo-submission"
+                                label="Je certifie les informations et pièces de cette version et j’appose ma signature de RMO lors de la soumission."
+                            />
                             <div class="mt-3 flex flex-wrap gap-2">
                                 <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
                                 <button class="btn btn-primary" type="submit" name="tracking_action" value="submit">Soumettre au chef</button>
@@ -1256,8 +1280,8 @@
 
         @if (($canReviewByChefV2 ?? false) && $isAwaitingChefSciqReturn)
             <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
-                <h3 class="text-base font-black text-amber-950">Arbitrage du retour SCIQ</h3>
-                <p class="mt-1 text-sm text-amber-900">La Planification a accepté le retour SCIQ. Le Chef doit confirmer le renvoi avant que l’agent puisse corriger.</p>
+                <h3 class="text-base font-black text-amber-950">Retour de la Planification</h3>
+                <p class="mt-1 text-sm text-amber-900">Confirmez le renvoi avant que l’agent puisse corriger son dossier.</p>
                 <div class="mt-3 grid gap-3 lg:grid-cols-1">
                     <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
                         @csrf
@@ -1268,6 +1292,75 @@
                     </form>
                 </div>
             </div>
+        @endif
+
+        @if ($validationStatus === 'validee_planification' || $action->controle_decision === 'ecart_reouvert')
+            <section id="action-sciq-facultatif" class="mt-3 scroll-mt-24 rounded-lg border border-slate-200 p-4 dark:border-slate-700" aria-labelledby="optional-sciq-title">
+                <h3 id="optional-sciq-title" class="form-section-title">Contrôle SCIQ facultatif</h3>
+                <p class="action-section-note mt-1">
+                    {{ match ($action->controle_decision) {
+                        'en_cours' => 'Contrôle ouvert, avis attendu.',
+                        'valider' => 'Contrôle terminé : conforme.',
+                        'rejeter' => 'Écart signalé, en attente de l’arbitrage de la Planification.',
+                        'ecart_classe' => 'Écart classé par la Planification. La clôture est maintenue.',
+                        'ecart_reouvert' => 'Écart retenu par la Planification. Le dossier a été rouvert.',
+                        default => 'Aucun contrôle initié.',
+                    } }}
+                </p>
+                @if ($action->controle_reviewed_at && $action->controle_decision !== 'en_cours')
+                    <p class="action-section-note mt-1">
+                        Avis du {{ $action->controle_reviewed_at->format('d/m/Y à H:i') }}
+                        @if ($action->controleReviewedBy)
+                            · {{ $action->controleReviewedBy->name }}
+                        @endif
+                    </p>
+                @endif
+                @if (filled($action->controle_comment))
+                    <p class="action-section-note mt-1"><strong>Observation SCIQ</strong> · {{ $action->controle_comment }}</p>
+                @endif
+
+                @if (($canOpenOptionalSciqControl ?? false) && $action->hasOptionalSciqDecision(null))
+                    <form method="POST" action="{{ route('workspace.actions.control.open', $action) }}" class="mt-3">
+                        @csrf
+                        <button class="btn btn-secondary" type="submit">Ouvrir un contrôle SCIQ</button>
+                    </form>
+                @endif
+
+                @if (($canReviewOptionalSciqControl ?? false) && $action->hasOptionalSciqDecision('en_cours'))
+                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                        <form method="POST" action="{{ route('workspace.actions.control.review', $action) }}" class="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                            @csrf
+                            <input type="hidden" name="decision" value="valider">
+                            <label for="optional-sciq-comment">Observation (facultative)</label>
+                            <textarea id="optional-sciq-comment" name="motif" rows="2" maxlength="5000">{{ old('decision') === 'valider' ? old('motif') : '' }}</textarea>
+                            <x-workflow-signature-confirmation
+                                id-prefix="optional-sciq-approval"
+                                label="Je confirme la conformité SCIQ et j’appose mon visa sur la fiche."
+                            />
+                            <button class="btn btn-primary mt-2" type="submit">Confirmer la conformité</button>
+                        </form>
+                        <form method="POST" action="{{ route('workspace.actions.control.review', $action) }}" class="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                            @csrf
+                            <input type="hidden" name="decision" value="rejeter">
+                            <label for="optional-sciq-finding">Motif de l’écart</label>
+                            <textarea id="optional-sciq-finding" name="motif" rows="2" maxlength="5000" required>{{ old('decision') === 'rejeter' ? old('motif') : '' }}</textarea>
+                            <button class="btn btn-secondary mt-2" type="submit">Signaler un écart</button>
+                        </form>
+                    </div>
+                @endif
+
+                @if (($canArbitrateOptionalSciqFinding ?? false) && $action->hasOptionalSciqDecision('rejeter'))
+                    <form method="POST" action="{{ route('workspace.actions.control.arbitrate', $action) }}" class="mt-3">
+                        @csrf
+                        <label for="optional-sciq-arbitration">Motif de l’arbitrage</label>
+                        <textarea id="optional-sciq-arbitration" name="motif" rows="2" maxlength="5000" required>{{ in_array(old('decision'), ['classer', 'rouvrir'], true) ? old('motif') : '' }}</textarea>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <button class="btn btn-primary" type="submit" name="decision" value="classer">Classer et maintenir la clôture</button>
+                            <button class="btn btn-secondary" type="submit" name="decision" value="rouvrir">Rouvrir pour correction</button>
+                        </div>
+                    </form>
+                @endif
+            </section>
         @endif
 
         @if (($canReviewByControllerV2 ?? false) && $v2IsAwaitingControl)
@@ -1292,6 +1385,10 @@
                         <input type="hidden" name="decision" value="valider">
                         <label for="control-comment">Observation finale <span class="text-xs text-slate-400">(optionnel)</span></label>
                         <textarea id="control-comment" name="motif" rows="2">{{ old('motif') }}</textarea>
+                        <x-workflow-signature-confirmation
+                            id-prefix="sciq-approval"
+                            label="Je confirme le contrôle SCIQ et j’appose mon visa sur la fiche."
+                        />
                          <button class="btn btn-primary mt-2" type="submit">Valider définitivement et clôturer</button>
                     </form>
                     <form method="POST" action="{{ route('workspace.actions.control.review', $action) }}" class="rounded-md border border-amber-200 bg-amber-50/50 p-3">
@@ -1340,7 +1437,7 @@
             <div class="mt-4 rounded-lg border border-[#3996d3]/30 bg-[#eef6fc]/60 p-4">
                 <h3 class="text-base font-black text-[#17324a]">{{ $isAwaitingPlanificationSciqReturn ? 'Arbitrage du retour SCIQ' : 'Validation Planification' }}</h3>
                 <p class="mt-1 text-sm text-[#667085]">
-                    {{ $isAwaitingPlanificationSciqReturn ? 'Acceptez le retour vers le Chef ou contestez-le pour demander un réexamen SCIQ.' : "L'action a été visée par le Chef. Vérifiez la cohérence du résultat, de la cible et des justificatifs avant de la transmettre au SCIQ." }}
+                    {{ $isAwaitingPlanificationSciqReturn ? 'Acceptez le retour vers le Chef ou contestez-le pour demander un réexamen SCIQ.' : "Vérifiez le résultat, la cible et les justificatifs. Votre approbation clôture l’action et rend son résultat officiel." }}
                 </p>
                 <div class="mt-3 grid gap-3 lg:grid-cols-2">
                     <form method="POST" action="{{ route('workspace.actions.planification.review', $action) }}" class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
@@ -1348,7 +1445,13 @@
                         <input type="hidden" name="decision" value="{{ $isAwaitingPlanificationSciqReturn ? 'accepter_rejet' : 'valider' }}">
                         <label for="planif-comment">Observation finale <span class="text-xs text-slate-400">(optionnel)</span></label>
                         <textarea id="planif-comment" name="motif" rows="2">{{ old('motif') }}</textarea>
-                        <button class="btn btn-primary mt-2" type="submit">{{ $isAwaitingPlanificationSciqReturn ? 'Accepter le retour vers le Chef' : 'Valider et transmettre au SCIQ' }}</button>
+                        @unless ($isAwaitingPlanificationSciqReturn)
+                            <x-workflow-signature-confirmation
+                                id-prefix="planification-approval"
+                                label="Je confirme la validation Planification et j’appose mon visa de clôture."
+                            />
+                        @endunless
+                        <button class="btn btn-primary mt-2" type="submit">{{ $isAwaitingPlanificationSciqReturn ? 'Accepter le retour vers le Chef' : 'Valider et clôturer' }}</button>
                     </form>
                     <form method="POST" action="{{ route('workspace.actions.planification.review', $action) }}" class="rounded-md border border-amber-200 bg-amber-50/50 p-3">
                         @csrf
@@ -1568,8 +1671,12 @@
                                 'retour_planification_accepte_chef' => 'Arbitrage Chef',
                                 'retour_sciq_accepte_chef' => 'Retour SCIQ confirmé par le Chef',
                                 'action_validee_chef', 'action_transmise_planification' => 'Visa Chef',
-                                'action_transmise_controle' => 'Visa Planification',
+                                'action_transmise_controle', 'action_validee_planification' => 'Visa Planification',
                                 'action_validee_controle' => 'Visa final SCIQ',
+                                'action_controle_sciq_ouvert' => 'Contrôle SCIQ ouvert',
+                                'action_controle_sciq_conforme' => 'Contrôle SCIQ conforme',
+                                'action_controle_sciq_ecart' => 'Écart SCIQ signalé',
+                                'action_controle_sciq_arbitre' => 'Écart SCIQ arbitré par la Planification',
                                 default => '',
                             };
                         @endphp

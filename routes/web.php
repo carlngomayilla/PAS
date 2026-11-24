@@ -76,6 +76,11 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
     // Gestion du compte personnel : informations, mot de passe, sessions ouvertes.
     Route::get('/workspace/profil', [ProfileWebController::class, 'edit'])->name('workspace.profile.edit');
     Route::put('/workspace/profil', [ProfileWebController::class, 'update'])->name('workspace.profile.update');
+    Route::get('/workspace/profil/signature', [ProfileWebController::class, 'showSignature'])
+        ->name('workspace.profile.signature.show');
+    Route::put('/workspace/profil/signature', [ProfileWebController::class, 'updateSignature'])
+        ->middleware('throttle:6,1')
+        ->name('workspace.profile.signature.update');
     Route::post('/workspace/profil/sessions/revoke-current', [ProfileWebController::class, 'revokeCurrentSession'])
         ->name('workspace.profile.sessions.revoke_current');
     Route::post('/workspace/profil/sessions/revoke-others', [ProfileWebController::class, 'revokeOtherSessions'])
@@ -421,7 +426,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.review');
             Route::post('actions/{action}/controle', [ActionTrackingWebController::class, 'reviewControl'])
                 ->name('actions.control.review');
-            // 3e visa : validation finale (cloture) par la planification.
+            Route::post('actions/{action}/controle/ouvrir', [ActionTrackingWebController::class, 'openOptionalSciqControl'])
+                ->name('actions.control.open');
+            Route::post('actions/{action}/controle/arbitrer', [ActionTrackingWebController::class, 'arbitrateOptionalSciqFinding'])
+                ->name('actions.control.arbitrate');
             Route::post('actions/{action}/validation-planification', [ActionTrackingWebController::class, 'reviewByPlanification'])
                 ->name('actions.planification.review');
             Route::post('actions/{action}/financement/soumettre', [ActionTrackingWebController::class, 'submitFinancing'])

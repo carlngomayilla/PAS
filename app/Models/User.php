@@ -163,6 +163,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'signature_path',
+        'signature_sha256',
     ];
 
     /**
@@ -204,6 +206,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password_changed_at' => 'datetime',
+            'signature_updated_at' => 'datetime',
             'suspended_until' => 'datetime',
             'deactivated_at' => 'datetime',
             'password' => 'hashed',

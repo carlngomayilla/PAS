@@ -8,10 +8,13 @@ use App\Http\Requests\ReviewActionRequest;
 use App\Http\Resources\ActionResource;
 use App\Models\Action;
 use App\Models\User;
+use App\Services\Actions\ActionFollowupDocumentService;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Workflow\ActionWorkflowService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Throwable;
 
 class ActionValidationController extends Controller
 {
@@ -21,7 +24,8 @@ class ActionValidationController extends Controller
         ReviewActionRequest $request,
         Action $action,
         ActionWorkflowService $workflow,
-        WorkspaceNotificationService $notificationService
+        WorkspaceNotificationService $notificationService,
+        ActionFollowupDocumentService $followupDocuments
     ): JsonResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -33,17 +37,36 @@ class ActionValidationController extends Controller
         $before = $action->toArray();
 
         try {
-            $reviewed = $workflow->reviewAction(
-                $action,
-                $approve,
-                $validated['motif'] ?? null,
-                $user,
-                isset($validated['progress_percent']) ? (float) $validated['progress_percent'] : null
-            );
+            $reviewed = DB::transaction(function () use ($workflow, $followupDocuments, $action, $approve, $validated, $user): Action {
+                if ($approve) {
+                    $followupDocuments->recordSignature($action, $user, ActionFollowupDocumentService::STAGE_CHEF);
+                }
+
+                $reviewed = $workflow->reviewAction(
+                    $action,
+                    $approve,
+                    $validated['motif'] ?? null,
+                    $user,
+                    isset($validated['progress_percent']) ? (float) $validated['progress_percent'] : null
+                );
+
+                if ($approve) {
+                    $followupDocuments->generate($reviewed, ActionFollowupDocumentService::STAGE_CHEF, $user);
+                }
+
+                return $reviewed;
+            });
         } catch (InvalidArgumentException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
                 'errors' => ['action' => [$exception->getMessage()]],
+            ], 422);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'La fiche signée n’a pas pu être générée. La validation n’a pas été enregistrée.',
+                'errors' => ['action' => ['La fiche signée n’a pas pu être générée. La validation n’a pas été enregistrée.']],
             ], 422);
         }
 

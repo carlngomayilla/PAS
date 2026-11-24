@@ -296,6 +296,7 @@ class ActionPolicy
     private function canManageJustificatif(User $user, Action $action, Justificatif $justificatif): bool
     {
         if ((string) $justificatif->justifiable_type !== Action::class
+            || $justificatif->categorie === Justificatif::CATEGORY_GENERATED_FOLLOWUP
             || (int) $justificatif->justifiable_id !== (int) $action->id
             || $justificatif->sous_action_id !== null
             || (int) $justificatif->ajoute_par !== (int) $user->id

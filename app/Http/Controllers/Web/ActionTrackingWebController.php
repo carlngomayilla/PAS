@@ -15,6 +15,7 @@ use App\Models\Justificatif;
 use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionFinancingWorkflowService;
+use App\Services\Actions\ActionFollowupDocumentService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Actions\ActionWorkspacePresenter;
 use App\Services\DocumentPolicySettings;
@@ -32,6 +33,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -126,8 +128,14 @@ class ActionTrackingWebController extends Controller
             && $this->isExecutionEditable($action)
             && ($action->isResponsible($user) || $user->isAgent());
         $canReviewByChef = $this->canReviewByChef($user, $action);
-        $canReviewByController = $this->canReviewByController($user);
-        $canReviewByPlanification = $this->canReviewByPlanification($user);
+        $canReviewByController = $this->canReviewByController($user) && $user->can('view', $action);
+        $canReviewByPlanification = $this->canReviewByPlanification($user) && $user->can('view', $action);
+        $canOpenOptionalSciqControl = $canReviewByController
+            && ! $action->isResponsible($user)
+            && ! in_array((int) $user->id, [(int) $action->soumise_par, (int) $action->evalue_par, (int) $action->cloture_par], true);
+        $canArbitrateOptionalSciqFinding = $canReviewByPlanification
+            && ! $action->isResponsible($user)
+            && ! in_array((int) $user->id, [(int) $action->soumise_par, (int) $action->evalue_par, (int) $action->controle_reviewed_by], true);
         $canRecordHistoricalExecution = $this->canRecordHistoricalExecution($user);
         $canRequestDeadlineExtension = $user->can('requestDeadlineExtension', $action);
         $canReviewDeadlineExtensionByChef = $user->can('reviewDeadlineExtensionByChef', $action);
@@ -146,6 +154,8 @@ class ActionTrackingWebController extends Controller
             'review_chef' => $canReviewByChef,
             'review_controller' => $canReviewByController,
             'review_planification' => $canReviewByPlanification,
+            'open_optional_sciq_control' => $canOpenOptionalSciqControl,
+            'arbitrate_optional_sciq_finding' => $canArbitrateOptionalSciqFinding,
             'request_deadline' => $canRequestDeadlineExtension,
             'review_deadline_chef' => $canReviewDeadlineExtensionByChef,
             'review_deadline_director' => $canReviewDeadlineExtensionByDirector,
@@ -168,6 +178,9 @@ class ActionTrackingWebController extends Controller
             'canTrackSubActionsV2' => $canTrackSubActions,
             'canReviewByChefV2' => $canReviewByChef,
             'canReviewByControllerV2' => $canReviewByController,
+            'canOpenOptionalSciqControl' => $canOpenOptionalSciqControl,
+            'canReviewOptionalSciqControl' => $canOpenOptionalSciqControl,
+            'canArbitrateOptionalSciqFinding' => $canArbitrateOptionalSciqFinding,
             'canRecordHistoricalExecutionV2' => $canRecordHistoricalExecution,
             // Le responsable VOIT toujours le formulaire (figé si non éditable),
             // tant que l'action est paramétrée. L'édition dépend de canTrackActionV2.
@@ -258,7 +271,8 @@ class ActionTrackingWebController extends Controller
         Action $action,
         ActionWorkflowService $workflow,
         SecureJustificatifStorage $secureStorage,
-        WorkspaceNotificationService $notificationService
+        WorkspaceNotificationService $notificationService,
+        ActionFollowupDocumentService $followupDocuments
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -281,13 +295,19 @@ class ActionTrackingWebController extends Controller
             'commentaire' => ['nullable', 'string', 'max:5000'],
             'difficulte' => ['nullable', 'string', 'max:5000'],
             'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+            'signature_consent' => [Rule::excludeIf($intent !== 'submit'), Rule::requiredIf($intent === 'submit'), 'accepted'],
+            'current_password' => [Rule::excludeIf($intent !== 'submit'), Rule::requiredIf($intent === 'submit'), 'string', 'current_password'],
         ]);
+
+        if ($intent === 'submit') {
+            $this->ensureWorkflowSignatureIsAvailable($user);
+        }
 
         $hasNewProof = $request->hasFile('justificatif');
         $before = $action->toArray();
 
         try {
-            DB::transaction(function () use ($workflow, $action, $validated, $intent, $user, $request, $secureStorage, $hasNewProof): void {
+            DB::transaction(function () use ($workflow, $action, $validated, $intent, $user, $request, $secureStorage, $hasNewProof, $followupDocuments): void {
                 if ($hasNewProof) {
                     $stored = $secureStorage->store($request->file('justificatif'), 'justificatifs/'.date('Y/m'));
                     Justificatif::query()->create([
@@ -312,6 +332,7 @@ class ActionTrackingWebController extends Controller
                 ], $user);
 
                 if ($intent === 'submit') {
+                    $followupDocuments->recordSignature($action, $user, ActionFollowupDocumentService::STAGE_RMO);
                     $workflow->submitAction($action->fresh(['justificatifs']), [
                         'commentaire' => $validated['commentaire'] ?? null,
                         'difficulte' => $validated['difficulte'] ?? null,
@@ -586,7 +607,8 @@ class ActionTrackingWebController extends Controller
         Request $request,
         Action $action,
         ActionWorkflowService $workflow,
-        WorkspaceNotificationService $notificationService
+        WorkspaceNotificationService $notificationService,
+        ActionFollowupDocumentService $followupDocuments
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -603,9 +625,14 @@ class ActionTrackingWebController extends Controller
             'sous_action_id' => ['nullable', 'integer', 'exists:sous_actions,id'],
             'motif' => ['nullable', 'string', 'max:5000'],
             'progress_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'signature_consent' => [Rule::excludeIf($request->string('decision')->toString() !== 'valider' || $request->filled('sous_action_id')), Rule::requiredIf($request->string('decision')->toString() === 'valider' && ! $request->filled('sous_action_id')), 'accepted'],
+            'current_password' => [Rule::excludeIf($request->string('decision')->toString() !== 'valider' || $request->filled('sous_action_id')), Rule::requiredIf($request->string('decision')->toString() === 'valider' && ! $request->filled('sous_action_id')), 'string', 'current_password'],
         ]);
 
         $approve = $validated['decision'] === 'valider';
+        if ($approve && ! $request->filled('sous_action_id')) {
+            $this->ensureWorkflowSignatureIsAvailable($user);
+        }
         if (! $approve && trim((string) ($validated['motif'] ?? '')) === '') {
             return back()->withErrors(['motif' => 'Le motif est obligatoire en cas de renvoi pour correction.']);
         }
@@ -652,15 +679,29 @@ class ActionTrackingWebController extends Controller
         } else {
             $before = $action->toArray();
             try {
-                $workflow->reviewAction(
-                    $action,
-                    $approve,
-                    $validated['motif'] ?? null,
-                    $user,
-                    isset($validated['progress_percent']) ? (float) $validated['progress_percent'] : null
-                );
+                DB::transaction(function () use ($workflow, $followupDocuments, $action, $approve, $validated, $user): void {
+                    if ($approve) {
+                        $followupDocuments->recordSignature($action, $user, ActionFollowupDocumentService::STAGE_CHEF);
+                    }
+
+                    $workflow->reviewAction(
+                        $action,
+                        $approve,
+                        $validated['motif'] ?? null,
+                        $user,
+                        isset($validated['progress_percent']) ? (float) $validated['progress_percent'] : null
+                    );
+
+                    if ($approve) {
+                        $followupDocuments->generate($action->fresh(), ActionFollowupDocumentService::STAGE_CHEF, $user);
+                    }
+                });
             } catch (InvalidArgumentException $exception) {
                 return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return back()->withInput()->withErrors(['general' => 'La fiche signée n’a pas pu être générée. La validation n’a pas été enregistrée.']);
             }
             $reviewed = $action->fresh();
             $this->recordAudit($request, 'action', $approve ? 'review_action_validate' : 'review_action_reject', $reviewed, $before, [
@@ -689,11 +730,66 @@ class ActionTrackingWebController extends Controller
                 : 'Renvoi pour correction enregistre.');
     }
 
-    public function reviewControl(
+    public function openOptionalSciqControl(
         Request $request,
         Action $action,
         ActionWorkflowService $workflow,
         WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
+        $user = $request->user();
+        abort_unless($user instanceof User && $this->canReviewByController($user) && $user->can('view', $action), 403);
+        $before = $action->toArray();
+
+        try {
+            $reviewed = $workflow->openOptionalSciqControl($action, $user);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        $this->recordAudit($request, 'action', 'open_optional_sciq_control', $reviewed, $before, $reviewed->toArray());
+        $notificationService->notifyActionSubmittedToController($reviewed->loadMissing('pta:id,direction_id,service_id'), $user);
+
+        return redirect()->route('workspace.actions.suivi', $action)->with('success', 'Contrôle SCIQ ouvert.');
+    }
+
+    public function arbitrateOptionalSciqFinding(
+        Request $request,
+        Action $action,
+        ActionWorkflowService $workflow,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
+        $user = $request->user();
+        abort_unless($user instanceof User && $this->canReviewByPlanification($user) && $user->can('view', $action), 403);
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in(['rouvrir', 'classer'])],
+            'motif' => ['required', 'string', 'max:5000'],
+        ]);
+        $reopen = $validated['decision'] === 'rouvrir';
+        $before = $action->toArray();
+
+        try {
+            $reviewed = $workflow->arbitrateOptionalSciqFinding($action, $reopen, $validated['motif'], $user);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        $this->recordAudit($request, 'action', 'arbitrate_optional_sciq_finding', $reviewed, $before, [
+            ...$reviewed->toArray(),
+            'audit_context' => ['decision' => $validated['decision'], 'motif' => $validated['motif']],
+        ]);
+        $notificationService->notifyOptionalSciqArbitration($reviewed->loadMissing('pta:id,direction_id,service_id'), $user);
+
+        return redirect()->route('workspace.actions.suivi', $action)->with('success', $reopen
+            ? 'Action rouverte pour correction.'
+            : 'Écart classé. La clôture est maintenue.');
+    }
+
+    public function reviewControl(
+        Request $request,
+        Action $action,
+        ActionWorkflowService $workflow,
+        WorkspaceNotificationService $notificationService,
+        ActionFollowupDocumentService $followupDocuments
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -701,24 +797,45 @@ class ActionTrackingWebController extends Controller
         }
 
         $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
-        if (! $this->canReviewByController($user)) {
-            abort(403, 'Acces reserve aux controleurs SCIQ et Planification.');
+        if (! $this->canReviewByController($user) || $user->cannot('view', $action)) {
+            abort(403, 'Accès réservé aux contrôleurs SCIQ habilités.');
         }
 
         $validated = $request->validate([
             'decision' => ['required', Rule::in(['valider', 'rejeter'])],
             'motif' => ['nullable', 'string', 'max:5000'],
+            'signature_consent' => [Rule::excludeIf($request->string('decision')->toString() !== 'valider'), Rule::requiredIf($request->string('decision')->toString() === 'valider'), 'accepted'],
+            'current_password' => [Rule::excludeIf($request->string('decision')->toString() !== 'valider'), Rule::requiredIf($request->string('decision')->toString() === 'valider'), 'string', 'current_password'],
         ]);
         $approve = $validated['decision'] === 'valider';
+        if ($approve) {
+            $this->ensureWorkflowSignatureIsAvailable($user);
+        }
         $before = $action->toArray();
 
         try {
-            $workflow->reviewActionByController($action, $approve, $validated['motif'] ?? null, $user);
+            $reviewed = DB::transaction(function () use ($workflow, $followupDocuments, $action, $approve, $validated, $user): Action {
+                if ($approve) {
+                    $followupDocuments->recordSignature($action, $user, ActionFollowupDocumentService::STAGE_SCIQ);
+                }
+
+                $reviewed = $workflow->reviewActionByController($action, $approve, $validated['motif'] ?? null, $user);
+
+                if ($approve) {
+                    $followupDocuments->generate($reviewed, ActionFollowupDocumentService::STAGE_SCIQ, $user);
+                }
+
+                return $reviewed;
+            });
         } catch (InvalidArgumentException $exception) {
             return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withInput()->withErrors(['general' => 'La fiche signée n’a pas pu être générée. La décision SCIQ n’a pas été enregistrée.']);
         }
 
-        $reviewed = $action->fresh();
+        $optionalControl = $reviewed->statut_validation === ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION;
         $this->recordAudit($request, 'action', $approve ? 'review_control_validate' : 'review_control_reject', $reviewed, $before, [
             ...$reviewed->toArray(),
             'audit_context' => [
@@ -728,6 +845,14 @@ class ActionTrackingWebController extends Controller
                 'motif' => $validated['motif'] ?? null,
             ],
         ]);
+        if ($optionalControl) {
+            $notificationService->notifyOptionalSciqDecision($reviewed->loadMissing('pta:id,direction_id,service_id'), $user);
+
+            return redirect()->route('workspace.actions.suivi', $action)->with('success', $approve
+                ? 'Conformité confirmée par le SCIQ.'
+                : 'Écart transmis à la Planification pour arbitrage.');
+        }
+
         $notificationService->notifyActionReviewedByController(
             $reviewed->loadMissing('pta:id,direction_id,service_id'),
             $approve,
@@ -742,13 +867,14 @@ class ActionTrackingWebController extends Controller
     }
 
     /**
-     * Visa intermédiaire de la planification — 2e visa du circuit.
+     * Validation finale de l'exécution par la Planification.
      */
     public function reviewByPlanification(
         Request $request,
         Action $action,
         ActionWorkflowService $workflow,
-        WorkspaceNotificationService $notificationService
+        WorkspaceNotificationService $notificationService,
+        ActionFollowupDocumentService $followupDocuments
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -756,30 +882,55 @@ class ActionTrackingWebController extends Controller
         }
 
         $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
-        if (! $this->canReviewByPlanification($user)) {
+        if (! $this->canReviewByPlanification($user) || $user->cannot('view', $action)) {
             abort(403, 'Acces reserve aux profils de planification.');
         }
 
         $validated = $request->validate([
             'decision' => ['required', Rule::in(['valider', 'rejeter', 'accepter_rejet', 'contester'])],
             'motif' => ['nullable', 'string', 'max:5000'],
+            'signature_consent' => [Rule::excludeIf($request->string('decision')->toString() !== 'valider'), Rule::requiredIf($request->string('decision')->toString() === 'valider'), 'accepted'],
+            'current_password' => [Rule::excludeIf($request->string('decision')->toString() !== 'valider'), Rule::requiredIf($request->string('decision')->toString() === 'valider'), 'string', 'current_password'],
         ]);
         $approve = $validated['decision'] === 'valider';
+        if ($approve) {
+            $this->ensureWorkflowSignatureIsAvailable($user);
+        }
         $before = $action->toArray();
 
         try {
-            if ((string) $action->statut_validation === ActionTrackingService::VALIDATION_RETOUR_SCIQ) {
-                $workflow->reviewSciqReturnByPlanification(
-                    $action,
-                    $validated['decision'],
-                    $validated['motif'] ?? null,
-                    $user
-                );
-            } else {
+            DB::transaction(function () use ($workflow, $followupDocuments, $action, $validated, $approve, $user): void {
+                if ((string) $action->statut_validation === ActionTrackingService::VALIDATION_RETOUR_SCIQ) {
+                    $workflow->reviewSciqReturnByPlanification(
+                        $action,
+                        $validated['decision'],
+                        $validated['motif'] ?? null,
+                        $user
+                    );
+
+                    return;
+                }
+
+                if (! in_array($validated['decision'], ['valider', 'rejeter'], true)) {
+                    throw new InvalidArgumentException('Décision de validation Planification invalide.');
+                }
+
+                if ($approve) {
+                    $followupDocuments->recordSignature($action, $user, ActionFollowupDocumentService::STAGE_PLANIFICATION);
+                }
+
                 $workflow->reviewActionByPlanification($action, $approve, $validated['motif'] ?? null, $user);
-            }
+
+                if ($approve) {
+                    $followupDocuments->generate($action->fresh(), ActionFollowupDocumentService::STAGE_PLANIFICATION, $user);
+                }
+            });
         } catch (InvalidArgumentException $exception) {
             return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withInput()->withErrors(['general' => 'La fiche signée n’a pas pu être générée. La validation Planification n’a pas été enregistrée.']);
         }
 
         $reviewed = $action->fresh();
@@ -807,17 +958,11 @@ class ActionTrackingWebController extends Controller
             $approve,
             $user
         );
-        if ($approve) {
-            $notificationService->notifyActionSubmittedToController(
-                $reviewed->loadMissing('pta:id,direction_id,service_id'),
-                $user
-            );
-        }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', $approve
-                ? 'Visa de la planification enregistre. L action est transmise au SCIQ pour validation finale.'
+                ? 'Validation Planification enregistrée. L’action est officiellement achevée.'
                 : 'Action renvoyee en correction par la planification.');
     }
 
@@ -1329,6 +1474,21 @@ class ActionTrackingWebController extends Controller
             User::ROLE_CHEF_PLANIFICATION
         ) || $user->isSuperAdmin()
             || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
+    }
+
+    /**
+     * Une validation signée ne peut utiliser qu'une signature privée déjà
+     * enregistrée dans le profil de l'acteur authentifié.
+     */
+    private function ensureWorkflowSignatureIsAvailable(User $user): void
+    {
+        if (filled($user->signature_path) && filled($user->signature_sha256)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'signature_consent' => 'Enregistrez d’abord votre signature dans votre profil avant de signer cette étape.',
+        ]);
     }
 
     private function workflowSettings(): WorkflowSettings

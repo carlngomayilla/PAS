@@ -338,6 +338,16 @@ class Action extends Model
         return $this->morphMany(Justificatif::class, 'justifiable');
     }
 
+    public function signatureReceipts(): HasMany
+    {
+        return $this->hasMany(ActionSignatureReceipt::class);
+    }
+
+    public function followupDocuments(): HasMany
+    {
+        return $this->hasMany(ActionFollowupDocument::class);
+    }
+
     public function financialTransactions(): HasMany
     {
         return $this->hasMany(FinancialTransaction::class);
@@ -386,6 +396,11 @@ class Action extends Model
                 'action_transmise_controle',
                 'action_validee_controle',
                 'action_rejetee_controle',
+                'action_validee_planification',
+                'action_controle_sciq_ouvert',
+                'action_controle_sciq_conforme',
+                'action_controle_sciq_ecart',
+                'action_controle_sciq_arbitre',
                 'action_validee_direction',
                 'action_rejetee_direction',
             ]);
@@ -600,6 +615,20 @@ class Action extends Model
     public function isCloturee(): bool
     {
         return $this->statut_dynamique === 'cloturee';
+    }
+
+    public function hasOptionalSciqDecision(?string $decision): bool
+    {
+        return $this->statut_validation === ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION
+            && $this->statut === ActionTrackingService::STATUS_CLOTUREE
+            && $this->controle_decision === $decision;
+    }
+
+    public function scopeWithOptionalSciqDecision(Builder $query, ?string $decision): void
+    {
+        $query->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION)
+            ->where('statut', ActionTrackingService::STATUS_CLOTUREE)
+            ->where('controle_decision', $decision);
     }
 
     public function scopeForPilotage(Builder $query): void

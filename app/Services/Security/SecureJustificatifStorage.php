@@ -68,6 +68,33 @@ class SecureJustificatifStorage
         }
     }
 
+    /**
+     * @return array{path:string,mime_type:string,taille_octets:int,nom_original:string,est_chiffre:bool}
+     */
+    public function storeGeneratedContent(string $content, string $originalName, string $directory, string $mimeType): array
+    {
+        $directory = trim($directory, '/');
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        $safeExtension = preg_match('/^[a-z0-9]{1,10}$/i', $extension) === 1 ? '.'.strtolower($extension) : '';
+        $encrypt = (bool) config('security.uploads.encrypt_justificatifs', true);
+        $path = $directory.'/'.Str::uuid()->toString().$safeExtension;
+
+        if ($encrypt) {
+            $path .= '.enc';
+            Storage::disk('local')->put($path, Crypt::encryptString(base64_encode($content)));
+        } else {
+            Storage::disk('local')->put($path, $content);
+        }
+
+        return [
+            'path' => $path,
+            'mime_type' => $mimeType,
+            'taille_octets' => strlen($content),
+            'nom_original' => $originalName,
+            'est_chiffre' => $encrypt,
+        ];
+    }
+
     public function delete(Justificatif $justificatif): void
     {
         $this->deleteByPath($justificatif->chemin_stockage);
